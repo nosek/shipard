@@ -364,15 +364,8 @@ class WidgetLive extends WidgetBoard
 				$badgesBig .= "<div class='e10-cam-sensor-display' style='position: absolute; $posStyle'>";
 				foreach ($placeContent['sensors'] as $sensor)
 				{
-
-					$sh = new SensorHelper($this->app());
-					$sh->setSensorInfo($sensor['info']);
-					$badgeCode = $sh->badgeCode();
-					if ($badgeCode !== '')
-					{
-						$badgesSmall .= ' '.$badgeCode;
-						$badgesBig .= ' '.$badgeCode;
-					}
+					$badgesSmall .= $sensor['code'];
+					$badgesBig .= $sensor['code'];
 				}
 				$badgesSmall .= "</div>";
 				$badgesBig .= "</div>";
@@ -449,7 +442,7 @@ class WidgetLive extends WidgetBoard
 
 		$this->createContent_Toolbar ();
 		$this->createGridDefinition();
-		//$this->loadSensors();
+		$this->loadSensors();
 
 		if (substr ($this->activeTopTab, 0, 8) === 'subzone-')
 		{
@@ -469,16 +462,25 @@ class WidgetLive extends WidgetBoard
 
 	public function createContent_Toolbar()
 	{
-		$this->loadIoTSC();
 		$this->loadScenes();
+		$this->loadIoTSC();
 		$c = '';
 
 		$c .= "<div class='padd5' style='display: inline-block; width: 100%;'>";
 
 		$c .= "<span class='_pull-right'>";
-		foreach ($this->iotScenes as $placeId => $placeCfg)
+		foreach ($this->iotScenes as $setupNdx => $setupCfg)
 		{
-			$c .= $this->createEnumParamCode ($placeCfg);
+			$c .= $this->createEnumParamCode ($setupCfg);
+
+			if (count($setupCfg['controls']))
+			{
+				foreach ($setupCfg['controls'] as $cc)
+				{
+					$c .= $cc;
+				}
+				$c .= "<span class='pr1'>&nbsp;<span>";
+			}
 		}
 		$c .= '</span>';
 
@@ -651,12 +653,9 @@ class WidgetLive extends WidgetBoard
 
 	function loadSensors()
 	{
-		$q [] = 'SELECT sensorsToShow.*, ';
-		array_push ($q, ' sensors.fullName AS sensorFullName, sensors.srcDataSourceQuantityId, sensors.srcDataSourceValuesIds, sensors.sensorBadgeLabel, sensors.sensorBadgeUnits,');
-		array_push ($q, ' dataSources.fullName AS dsFullName, dataSources.url AS srcDataSourceUrl');
+		$q [] = 'SELECT sensorsToShow.*';
 		array_push ($q, ' FROM [mac_lan_devicesSensorsShow] AS sensorsToShow');
 		array_push ($q, ' LEFT JOIN [mac_iot_sensors] AS sensors ON sensorsToShow.sensor = sensors.ndx');
-		array_push ($q, ' LEFT JOIN [mac_data_sources] AS dataSources ON sensors.srcDataSource = dataSources.ndx');
 		array_push ($q, ' LEFT JOIN [mac_lan_devices] AS devices ON sensorsToShow.device = devices.ndx');
 		array_push ($q, ' WHERE 1');
 		array_push ($q, ' AND sensorsToShow.[device] IN %in', $this->zone['cameras']);
@@ -665,14 +664,18 @@ class WidgetLive extends WidgetBoard
 		$rows = $this->db()->query($q);
 		foreach ($rows as $r)
 		{
-			$placeId = $r['camPosH'].'-'.$r['camPosH'];
+			$placeId = $r['camPosH'].'-'.$r['camPosV'];
+
+			$sh = new SensorHelper($this->app());
+			$sh->setSensor($r['sensor']);
+			$sensorCode = $sh->badgeCode(1);
 
 			if (!isset($this->sensors[$r['device']][$placeId]))
 			{
 				$this->sensors[$r['device']][$placeId] = ['camPosH' => $r['camPosH'], 'camPosV' => $r['camPosV'], 'sensors' => []];
 			}
 
-			$sensor = ['info' => $r->toArray()];
+			$sensor = ['info' => $r->toArray(), 'code' => $sensorCode];
 			$this->sensors[$r['device']][$placeId]['sensors'][] = $sensor;
 		}
 	}
@@ -707,7 +710,12 @@ class WidgetLive extends WidgetBoard
 				$control = new \mac\iot\libs\Control($this->app());
 				$control->setControl($r['iotControl']);
 
-				$this->iotSC[] = ['type' => 1, 'object' => $control, 'code' => $control->controlCode()];
+				if ($control->controlRecData['iotSetup'])
+				{
+					$this->iotScenes[$control->controlRecData['iotSetup']]['controls'][] = $control->controlCode();
+				}
+				else
+					$this->iotSC[] = ['type' => 1, 'object' => $control, 'code' => $control->controlCode()];
 			}
 			elseif ($r['rowType'] === 2)
 			{ // setup
@@ -718,11 +726,9 @@ class WidgetLive extends WidgetBoard
 
 	function loadScenes()
 	{
-		//if (!isset($this->zone['places']) || !count($this->zone['places']))
-		//	return;
-
 		// -- setups
 		$setups = [];
+		$setupsOrders = [];
 		$q [] = 'SELECT iotSC.*';
 		array_push($q, ' FROM [mac_base_zonesIoTSC] AS iotSC');
 		array_push($q, ' WHERE 1');
@@ -732,23 +738,25 @@ class WidgetLive extends WidgetBoard
 		else
 			array_push($q, ' AND iotSC.[zone] = %i', $this->zone['ndx']);
 
+		array_push($q, ' ORDER BY iotSC.[rowOrder]');
+
 		$rows = $this->db()->query($q);
 		foreach ($rows as $r)
+		{
 			$setups[] = $r['iotSetup'];
-
+			$setupsOrders[$r['iotSetup']] = $r['rowOrder'];
+		}
 		// -- scenes
 		if (!count($setups))
 			return;
 
 		$q = [];
-		array_push($q, 'SELECT scenes.*, setups.fullName AS setupFullName');
+		array_push($q, 'SELECT scenes.*, setups.fullName AS setupFullName, setups.shortName AS setupShortName');
 		array_push($q, ' FROM mac_iot_scenes AS scenes');
 		array_push($q, ' LEFT JOIN mac_iot_setups AS setups ON scenes.setup = setups.ndx');
 		array_push($q, ' WHERE 1');
 		array_push($q, ' AND setup IN %in', $setups);
-		
-		/*
-		*/
+		array_push($q, ' ORDER BY [scenes].[order]');
 
 		$scenes = [];
 		$rows = $this->db()->query($q);
@@ -758,7 +766,14 @@ class WidgetLive extends WidgetBoard
 			$sceneNdx = $r['ndx'];
 			if (!isset($scenes[$setupNdx]))
 			{
-				$scenes[$setupNdx] = ['title' => $r['setupFullName'], 'paramId' => "set_scene_{$setupNdx}_{$r['ndx']}", 'enum' => []];
+				$scenes[$setupNdx] = [
+					'type' => 'scene',
+					'order' => $setupsOrders[$r['setup']],
+					'title' => $r['setupShortName'],
+					'paramId' => "set_scene_{$setupNdx}_{$r['ndx']}", 
+					'enum' => [],
+					'controls' => [],
+				];
 				$activeScene = $this->db()->query('SELECT * FROM [mac_iot_setupsStates] WHERE [setup] = %i', $setupNdx)->fetch();
 				if ($activeScene)
 					$scenes[$setupNdx]['activeScene'] = $activeScene['activeScene'];
@@ -779,8 +794,6 @@ class WidgetLive extends WidgetBoard
 
 			if (!isset($scenes[$setupNdx]['defaultValue']) && $scenes[$setupNdx]['activeScene'] === $sceneNdx)
 				$scenes[$setupNdx]['defaultValue'] = $r['friendlyId'];
-			//if (!isset($scenes[$placeNdx]['defaultValue']) && !isset($scenes[$placeNdx]['activeScene']))
-			//	$scenes[$placeNdx]['defaultValue'] = $r['friendlyId'];
 		}
 
 		$this->iotScenes = $scenes;
