@@ -1,0 +1,94 @@
+<div class='h1'>pro individuální výuku</div>
+
+
+<table class="mainInfo">
+	<tr>
+		<td class="info">
+			<table class="dates">
+				<tr>
+					<td class='label'>Školní rok:</td><td class='value'><b>{{data.head.print.skolniRok}}</b></td>
+				</tr>
+				{{! <tr><td>Obor:</td><td>{ {data.head.print.svpObor} }</td></tr>!}}
+				<tr>
+					<td class='label'>{{data.svpOddeleni}}:</td><td class='value'>{{data.head.print.svpOddeleni}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Vyučovací předmět:</td><td class='value'>{{data.predmet.nazev}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Ročník:</td><td class='value'>{{data.head.print.rocnik}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Učitel/ka:</td><td class='value'>{{data.ucitel.fullName}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Studium:</td><td class='value'>{{data.studium.poradoveCislo}}</td>
+				</tr>	
+			</table>
+		</td>
+
+		<td class="info">
+			<table class="docInfo">
+				<tr>
+					<td class='label'>Jméno a příjmení žáka:</td><td class='value'><b>{{data.student.firstName}} {{data.student.lastName}}</b></td>
+				</tr>
+				<tr>
+					<td class='label'>Škola:</td><td class='value'>{{{data.head.studentSkola}}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Datum narození:</td><td class='value'>{{{data.birthDate}}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Adresa trvalého bydliště:</td><td class='value'>{{data.student.lists.address.0.street}}{{#data.student.lists.address.0.street}}, {{/data.student.lists.address.0.street}}
+					{{data.student.lists.address.0.city}}{{#data.student.lists.address.0.city}}, {{/data.student.lists.address.0.city}}
+					{{data.student.lists.address.0.zipcode}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Zák. zástupce:</td><td class='value'>{{{data.zz1_jmeno}}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Telefon:</td><td class='value'>{{#data.zz1_telefon}}{{data.zz1_telefon}}{{/data.zz1_telefon}}{{^data.zz1_telefon}}{{data.telefon}}{{/data.zz1_telefon}}</td>
+				</tr>
+			</table>				
+		</td>
+	</tr>
+</table>
+
+<div class='headingAlt'>Roční studijní plán</div>
+<div class='etkStudijniPlan'>
+	{{{data.studijniPlan}}}
+</div>
+
+
+<div class='headingAlt'>Vyučovací hodiny</div>
+<table class='ethHours'>
+	<thead>
+	<tr>
+		<th>Dat.</th>
+		<th>P</th>
+		<th>Probíraná látka</th>
+		<th>Z</th>
+	</tr>
+	</thead>
+	{{#data.hodiny}}
+		<tr>
+			<td>{{datum}}</td>
+			<td>{{pritomnost}}</td>
+			<td>{{probiranaLatka}}</td>
+			<td>{{znamka}}</td>
+		</tr>
+	{{/data.hodiny}}
+</table>
+
+<div class="etkHoursNotes">
+	<b>P</b>řítomnost: <b>P</b>:&nbsp;Přítomen, <b>NO</b>:&nbsp;Nepřítomen&nbsp;-&nbsp;omluven, <b>NN</b>:&nbsp;Nepřítomen&nbsp;-&nbsp;neomluven, <b>SS</b>:&nbsp;Státní&nbsp;svátek, <b>PR</b>:&nbsp;Prázdniny, <b>ŘV</b>:&nbsp;Ředitelské&nbsp;volno, <b>V</b>:&nbsp;Volno<br>
+	<b>Z</b>námka: 1 - 4, <b>-</b> Nehodnoceno<br>
+</div>
+
+
+{{#data.head.ucinkovani}}
+	<div class='h2'>Účinkování</div>
+	<div class='etkUcinkovani'>
+	{{data.head.ucinkovani}}
+	</div>
+{{/data.head.ucinkovani}}

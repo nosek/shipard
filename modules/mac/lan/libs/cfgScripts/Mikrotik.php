@@ -19,7 +19,7 @@ class Mikrotik extends \mac\lan\libs\cfgScripts\CoreCfgScript
 		parent::setDevice($deviceRecData, $lanCfg);
 		if (isset ($this->deviceCfg['userLogin']))
 			if (strlen ($this->deviceCfg['userLogin']))
-			$this->userLogin = $this->deviceCfg['userLogin'];
+				$this->userLogin = $this->deviceCfg['userLogin'];
 	}
 
 	function createData_Init_Identity()

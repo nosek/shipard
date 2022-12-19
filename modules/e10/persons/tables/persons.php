@@ -1,28 +1,21 @@
 <?php
 
-namespace E10\Persons;
+namespace e10\persons;
 use \Shipard\Viewer\TableViewPanel;
 use \e10\base\libs\UtilsBase;
-
-require_once __DIR__ . '/../../base/base.php';
-
-
-use \E10\Application, \E10\utils, \E10\DataModel, \E10\TableView, \E10\TableViewDetail, \Shipard\Form\TableForm, \E10\DbTable;
+use \Shipard\Utils\Utils, \Shipard\Application\DataModel, \Shipard\Viewer\TableView, \Shipard\Viewer\TableViewDetail;
+use \Shipard\Form\TableForm, \Shipard\Table\DbTable;
 
 
 /**
- * Tabulka Osoby
- *
+ * class TablePersons
  */
-
 class TablePersons extends DbTable
 {
-	public static $defaultIconSet = array ('x-company', 'x-man', 'x-woman');
-
 	public function __construct ($dbmodel)
 	{
 		parent::__construct ($dbmodel);
-		$this->setName ("e10.persons.persons", "e10_persons_persons", "Osoby", 1000);
+		$this->setName ('e10.persons.persons', 'e10_persons_persons', 'Osoby', 1000);
 	}
 
 	public function checkNewRec (&$recData)
@@ -44,7 +37,7 @@ class TablePersons extends DbTable
 		if (isset($recData['id']) && $recData['id'] === '' && isset($recData['ndx']) && $recData['ndx'] !== 0)
 		{
 			$idFormula = $this->app()->cfgItem ('flags.e10.persons.idFormula', '%n');
-			$recData['id'] = utils::createRecId($recData, $idFormula);
+			$recData['id'] = Utils::createRecId($recData, $idFormula);
 			$this->app()->db()->query ("UPDATE [e10_persons_persons] SET [id] = %s WHERE [ndx] = %i", $recData['id'], $recData['ndx']);
 		}
 
@@ -77,7 +70,7 @@ class TablePersons extends DbTable
 			// -- set validate request
 			$this->app()->db()->query ('UPDATE [e10_persons_personsValidity] SET [revalidate] = 1 WHERE [person] = %i', $recData['ndx']);
 		}
-	} // checkAfterSave
+	}
 
 	public function checkBeforeSave (&$recData, $ownerData = NULL)
 	{
@@ -129,7 +122,7 @@ class TablePersons extends DbTable
 		if (isset($recData['id']) && $recData['id'] === '' && isset($recData['ndx']) && $recData['ndx'] !== 0)
 		{
 			$idFormula = $this->app()->cfgItem ('flags.e10.persons.idFormula', '%n');
-			$recData['id'] = utils::createRecId($recData, $idFormula);
+			$recData['id'] = Utils::createRecId($recData, $idFormula);
 		}
 		if ($recData['docState'] === 4000)
 				$recData['moreAddress'] = 1;
@@ -154,7 +147,7 @@ class TablePersons extends DbTable
 
 		$q = "SELECT [fullName] FROM [e10_persons_persons] WHERE [ndx] = " . intval ($pk);
 		$refRec = $this->app()->db()->query ($q)->fetch ();
-		$refTitle = $refRec [$titleColumn];
+		$refTitle = $refRec [$titleColumn] ?? '';
 
 		$thisTableId = $this->tableId();
 		$srcTableId = $srcTable->tableId ();
@@ -183,19 +176,21 @@ class TablePersons extends DbTable
 
 		$inputCode .= "<span class='e10-refinp-infotext'>" .$refTitle . '</span>';
 
-		$clsf = \E10\Base\ListClassification::referenceWidget($form, $this, $pk);
-		if ($clsf['html'] !== '')
+		if (intval($pk))
 		{
-			$inputCode .= "<div style='padding: 2px; clear: both; margin: 4px; '>".$clsf['html'].'</div>';
+			$clsf = \E10\Base\ListClassification::referenceWidget($form, $srcColumnId, $this, $pk);
+			if ($clsf['html'] !== '')
+			{
+				$inputCode .= "<div style='padding: 2px; clear: both; margin: 4px; '>".$clsf['html'].'</div>';
+			}
 		}
-
 		$inputCode .= '</div>';
 
 		$info ['widgetCode'] = NULL;
 		$info ['inputCode'] = $inputCode;
 		$info ['labelCode'] = NULL;
 		if ($label)
-			$info ['labelCode'] = "<label for='inp_refid_$ip{$srcColumnId}'>" . utils::es ($label) . "</label>";
+			$info ['labelCode'] = "<label for='inp_refid_$ip{$srcColumnId}'>" . Utils::es ($label) . "</label>";
 
 		return $info;
 	}
@@ -306,7 +301,7 @@ class TablePersons extends DbTable
 		$groups = $this->db()->fetchAll ($q);
 		forEach ($groups as $g)
 		{
-			$thisGroup = utils::searchArray ($allGroups, 'id', $g ['group']);
+			$thisGroup = Utils::searchArray ($allGroups, 'id', $g ['group']);
 			if ($thisGroup)
 				$properties [$g ['person']]['groups'][] = array ('text' => $thisGroup ['name'], 'class' => 'label label-default');
 		}
@@ -326,7 +321,7 @@ class TablePersons extends DbTable
 
 			$text = $c ['valueString'];
 			if ($c ['valueDate'])
-				$text = utils::datef ($c ['valueDate'], '%D');
+				$text = Utils::datef ($c ['valueDate'], '%D');
 
 			$np = array ('text' => $text, 'pid' => $c ['property'], 'class' => 'nowrap');
 			if (isset ($pdefs [$c ['property']]['icon']))
@@ -353,7 +348,7 @@ class TablePersons extends DbTable
 
 		$ndx = $recData ['ndx'];
 		$properties = $this->loadProperties ($ndx);
-		$classification = \E10\Base\loadClassification ($this->app(), $this->tableId(), $ndx);
+		$classification = UtilsBase::loadClassification ($this->app(), $this->tableId(), $ndx);
 
 		$contactInfo = [];
 		if (isset ($properties [$ndx]['ids']))
@@ -363,9 +358,9 @@ class TablePersons extends DbTable
 			$hdr ['info'][] = ['class' => 'info', 'value' => $contactInfo];
 
 		$hdr ['info'][] = ['class' => 'title', 'value' => [['text' => $recData ['fullName']], ['text' => '#'.$recData ['id'], 'class' => 'pull-right id']]];
-		
+
 		$secLine = [];
-		
+
 		if (isset ($properties [$ndx]['groups']))
 		{
 			$secLine = $properties [$ndx]['groups'];
@@ -381,7 +376,7 @@ class TablePersons extends DbTable
 			$hdr ['image'] = $image ['smallImage'];
 			unset ($hdr ['icon']);
 		}
-		
+
 		return $hdr;
 	}
 
@@ -489,8 +484,7 @@ class TablePersons extends DbTable
 
 
 /**
- * Class ViewPersonsBase
- * @package E10\Persons
+ * class ViewPersonsBase
  */
 class ViewPersonsBase extends TableView
 {
@@ -562,10 +556,13 @@ class ViewPersonsBase extends TableView
 			{
 				if ($selectLevel === 0)
 				{
-					array_push ($q, '(([lastName] LIKE %s', $searchValue.'%');
+					array_push ($q, '(');
+					array_push ($q, '([lastName] LIKE %s', $searchValue.'%');
 					array_push ($q, ' OR [firstName] LIKE %s', $searchValue.'%');
 					array_push ($q, ')');
-					array_push ($q, ' OR ([lastName] LIKE %s', '%'.$searchValue.'%', ' AND [company] = 1)', ')');
+					array_push ($q, ' OR ([lastName] LIKE %s', '%'.$searchValue.'%', ' AND [company] = 1)');
+					$this->qryFullTextExt ($q);
+					array_push ($q, ')');
 				}
 				else
 				if ($selectLevel === 1)
@@ -613,7 +610,11 @@ class ViewPersonsBase extends TableView
 			array_push ($q, ' ORDER BY [docStateMain], [lastName], [firstName] ' . $this->sqlLimit ());
 
 		return $q;
-	} // selectRowsCmd
+	}
+
+	public function qryFullTextExt (array &$q)
+	{
+	}
 
 	public function qryPanel (array &$q)
 	{
@@ -680,7 +681,7 @@ class ViewPersonsBase extends TableView
 			return;
 
 		$this->properties = $this->table->loadProperties ($this->pks, ['officialName', 'shortName']);
-		$this->classification = \E10\Base\loadClassification ($this->table->app(), $this->table->tableId(), $this->pks);
+		$this->classification = UtilsBase::loadClassification ($this->table->app(), $this->table->tableId(), $this->pks);
 
 		// -- addresses
 		if ($this->loadAddresses)
@@ -785,13 +786,7 @@ class ViewPersonsBase extends TableView
 		$paramsPersonCountries->addParam ('string', 'query.geo.zipcode', ['title' => 'PSČ']);
 
 		// -- tags
-		$clsf = \E10\Base\classificationParams ($this->table);
-		foreach ($clsf as $cg)
-		{
-			$params = new \E10\Params ($panel->table->app());
-			$params->addParam ('checkboxes', 'query.clsf.'.$cg['id'], ['items' => $cg['items']]);
-			$qry[] = array ('style' => 'params', 'title' => $cg['name'], 'params' => $params);
-		}
+		UtilsBase::addClassificationParamsToPanel($this->table, $panel, $qry);
 
 		// -- others
 		$chbxOthers = [
@@ -806,12 +801,12 @@ class ViewPersonsBase extends TableView
 
 		$panel->addContent(['type' => 'query', 'query' => $qry]);
 	}
-} // class ViewPersonsBase
+}
 
 
 /**
- * Class ViewPersons
- * @package E10\Persons
+ * class ViewPersons
+ *
  */
 class ViewPersons extends ViewPersonsBase
 {
@@ -829,7 +824,7 @@ class ViewPersons extends ViewPersonsBase
 	}}
 
 /**
- * Základní detail Osoby
+ * class ViewDetailPersons
  *
  */
 
@@ -1008,12 +1003,12 @@ class FormPersons extends TableForm
 
 		$this->closeForm ();
 	}
-} // class FormPersons
+}
 
 
 /**
- * Class FormPersonsRobot
- * @package E10\Persons
+ * class FormPersonsRobot
+ *
  */
 class FormPersonsRobot extends TableForm
 {
@@ -1073,8 +1068,8 @@ class FormPersonsRobot extends TableForm
 }
 
 /**
- * Class ViewDetailPersonsRights
- * @package E10\Persons
+ * class ViewDetailPersonsRights
+ *
  */
 class ViewDetailPersonsRights extends TableViewDetail
 {

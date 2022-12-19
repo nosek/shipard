@@ -81,7 +81,11 @@ class TableItems extends DbTable
 
 	public function columnRefInputTitle ($form, $srcColumnId, $inputPrefix)
 	{
-		$pk = isset ($form->recData [$srcColumnId]) ? $form->recData [$srcColumnId] : 0;
+		$prefixParts = explode ('.', $inputPrefix);
+		if (isset($prefixParts[0]) && $prefixParts[0] === 'subColumns')
+			$pk = isset($form->subColumnsData[$prefixParts[1]][$srcColumnId]) ? intval($form->subColumnsData[$prefixParts[1]][$srcColumnId]) : 0;
+		else
+			$pk = isset ($form->recData [$srcColumnId]) ? $form->recData [$srcColumnId] : 0;
 		if (!$pk)
 			return '';
 
@@ -102,7 +106,7 @@ class TableItems extends DbTable
 
 	public function columnInfoEnum ($columnId, $valueType = 'cfgText', TableForm $form = NULL)
 	{
-		if ($columnId === 'vatRate')	
+		if ($columnId === 'vatRate')
 		{
 			$enum = [];
 			$taxRates = $this->app()->cfgItem('e10doc.taxes.eu.cz.taxRates', []);
@@ -114,7 +118,7 @@ class TableItems extends DbTable
 			return $enum;
 		}
 
-		return parent::columnInfoEnum ($columnId, $valueType = 'cfgText', $form);	
+		return parent::columnInfoEnum ($columnId, $valueType = 'cfgText', $form);
 	}
 
 	function copyDocumentRecord ($srcRecData, $ownerRecord = NULL)
@@ -350,6 +354,10 @@ class ViewItems extends TableView
 				array_push ($q, "[items].[fullName] LIKE %s", '%'.$dotaz.'%');
 				array_push ($q, " OR [items].[shortName] LIKE %s", '%'.$dotaz.'%');
 				array_push ($q, " OR [items].[id] LIKE %s", $dotaz.'%');
+
+				if ($this->table->app()->model()->table ('e10doc.debs.accounts') !== FALSE)
+					array_push ($q, ' OR [items].[debsAccountId] LIKE %s', $dotaz.'%');
+
 				array_push ($q, " OR EXISTS (SELECT ndx FROM e10_base_properties WHERE items.ndx = e10_base_properties.recid AND valueString LIKE %s AND tableid = %s)", '%'.$dotaz.'%', 'e10.witems.items');
 			}
 			else
@@ -938,7 +946,7 @@ class FormItems extends TableForm
 			$this->openTab ();
 				$this->addColumnInput ("shortName");
 				$this->addColumnInput ("id");
-
+				$this->addColumnInput ('description');
 				if ($itemKind === 0)
 				{ // service
 					$this->addList ('doclinks', '', TableForm::loAddToFormLayout);

@@ -151,7 +151,7 @@ class TemplateCore extends \Mustache
 		{
 			$parts = explode ('.', $subtemplateId);
 			$t = array_pop ($parts);
-			$fullSubTemplateName = $this->app->cfgItem ('modulesPath') . strtolower(implode ('/', $parts)) . '/subtemplates/'.$subtemplateId.'.mustache';
+			$fullSubTemplateName = __SHPD_MODULES_DIR__ . strtolower(implode ('/', $parts)) . '/subtemplates/'.$subtemplateId.'.mustache';
 		}
 
 		$this->subTemplate = file_get_contents ($fullSubTemplateName);
@@ -470,7 +470,9 @@ class TemplateCore extends \Mustache
 		$qrCodeGenerator = new \lib\tools\qr\QRCodeGenerator($this->app);
 		$qrCodeGenerator->textData = $qrData;
 		$qrCodeGenerator->createQRCode();
-		return $qrCodeGenerator->fullFileName;
+
+		$url = 'https://'.$this->app->cfgItem('hostingCfg.serverDomain').'/'.$this->app->cfgItem('dsid').'/tmp/'.basename($qrCodeGenerator->fullFileName);
+		return $url;
 	}
 
 	function resolveCmd_Script ($params)

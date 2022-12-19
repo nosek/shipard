@@ -1,0 +1,28 @@
+[
+	{
+		"table": "e10.persons.persons",
+		"views": {
+			"hostingUsers": {
+				"id": "hostingUsers", "class": "hosting.core.libs.ViewerHostingUsers", "title": "Uživatelé",
+				"details": {
+					"detail": {"title": "Přehled", "icon": "system/detailDetail", "type": "detail", "order":  0, "class": "e10.persons.ViewDetailPersons"}
+				}
+			}
+		}
+	},
+	{
+		"table": "plans.core.items",
+		"views": {
+			"hostingProjectTable": {
+				"id": "hostingProjectTable", "class": "hosting.core.libs.ViewerProjectsGrid", "title": "Náhled",
+				"detail": "plans.core.ViewDetailItem"
+			}
+		}
+	},
+	{
+		"table": "helpdesk.core.tickets",
+		"columns": [
+			{"id": "dataSource", "name": "Databáze", "type": "int", "reference": "hosting.core.dataSources"}
+		]
+	}
+]

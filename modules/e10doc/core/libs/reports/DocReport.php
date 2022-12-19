@@ -6,6 +6,8 @@ require_once __SHPD_MODULES_DIR__ . 'e10doc/core/core.php';
 
 use \e10doc\core\libs\reports\DocReportBase;
 use \e10doc\core\libs\E10Utils;
+use \Shipard\UI\Core\UIUtils;
+use \Shipard\Utils\Json;
 
 
 /**
@@ -14,9 +16,16 @@ use \e10doc\core\libs\E10Utils;
  */
 class DocReport extends DocReportBase
 {
+	CONST icmNone = 0, icmSingleLineList = 1, icmSingleLineInline = 2, icmMuliLineCols = 3;
+	var $docReportsItemCodesMode = self::icmNone;
+
 	public function loadData()
 	{
+		$this->app()->printMode = TRUE;
+
 		parent::loadData();
+
+		$this->docReportsItemCodesMode = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsItemCodes', 0));
 
 		$this->data['hasAdvance'] = 0;
 		$this->data['hasTaxAdvance'] = 0;
@@ -45,7 +54,7 @@ class DocReport extends DocReportBase
 
 		// -- rows
 		$q = [];
-		array_push($q, 'SELECT [rows].*, items.fullName as itemFullName, items.id as itemID');
+		array_push($q, 'SELECT [rows].*, items.fullName AS itemFullName, items.id AS itemID, items.description AS itemDecription');
 		array_push($q, ' FROM [e10doc_core_rows] as [rows]');
 		array_push($q, ' LEFT JOIN e10_witems_items as items ON [rows].item = items.ndx');
 		array_push($q, ' WHERE [document] = %i', $this->recData ['ndx']);
@@ -126,6 +135,15 @@ class DocReport extends DocReportBase
 
 			if (!in_array($addsMarksId, $usedAdditionsMarksIds))
 				$usedAdditionsMarksIds[] = $addsMarksId;
+
+			// -- rowData / subColumns
+			if ($r['rowVds'])
+			{
+				$sci = $tableDocRows->subColumnsInfo ($r, 'rowData');
+				$scData = Json::decode($r['rowData']);
+				$scCode = UIUtils::renderSubColumns ($this->app(), $scData, $sci);
+				$r['rowDataHtmlCode'] = $scCode;
+			}
 
 			$r['rowNumberAll'] = $rowNumberAll;
 
@@ -259,12 +277,20 @@ class DocReport extends DocReportBase
 				if (isset($acc['accRowsHeader']['#']))
 					unset($acc['accRowsHeader']['#']);
 				$this->data['accounting'] = ['table' => $acc['accRows'], 'header' => $acc['accRowsHeader']];
-			}	
+			}
 		}
 
 		// -- texts
+		/** @var \e10doc\base\TableReportsTexts */
 		$tableReportsTexts = $this->app()->table('e10doc.base.reportsTexts');
 		$this->data ['reportTexts'] = $tableReportsTexts->loadReportTexts($this->recData, $this->reportMode);
+		if (count($this->data ['reportTexts']))
+		{
+			$this->data ['_subtemplatesItems'] ??= [];
+			$this->data ['_subtemplatesItems'][] = 'reportTexts';
+			$this->data ['_textRenderItems'] ??= [];
+			$this->data ['_textRenderItems'][] = 'reportTexts';
+		}
 
 		// -- items codes
 		$this->data ['itemCodesHeader'] = [];
@@ -274,7 +300,7 @@ class DocReport extends DocReportBase
 			$row ['rowNumber'] = $rowNumber;
 			$rowNumber++;
 			$row ['rowItemProperties'] = \E10\Base\getPropertiesTable ($this->table->app(), 'e10.witems.items', $row['item']);
-			$this->loadDocRowItemsCodes($row);
+			$this->table->loadDocRowItemsCodes($this->recData, $this->data ['person']['personType'], $row, NULL, $row, $this->data);
 		}
 
 		if (count($this->data ['itemCodesHeader']))
@@ -292,38 +318,22 @@ class DocReport extends DocReportBase
 
 				$row ['rowItemCodes'] = array_values($row ['rowItemCodes']);
 			}
-		
+
 			$this->data ['itemCodesHeader'] = array_values($this->data ['itemCodesHeader']);
-		}	
-	}
-
-	protected function loadDocRowItemsCodes(array &$row)
-	{
-		$codesKinds = $this->app()->cfgItem('e10.witems.codesKinds', []);
-
-		$q = [];
-		array_push ($q, 'SELECT [codes].*');
-		array_push ($q, ' FROM [e10_witems_itemCodes] AS [codes]');
-		array_push ($q, ' WHERE 1');
-		array_push ($q, ' AND [codes].[item] = %i', $row['item']);
-
-
-		$codes = [];
-		$rows = $this->db()->query($q);
-		foreach ($rows as $r)
-		{
-			$ckNdx = $r['codeKind'];
-			$ck = $codesKinds[$ckNdx];
-
-			if (!isset($this->data ['itemCodesHeader'][$ckNdx]))
-			{
-				$this->data ['itemCodesHeader'][$ckNdx] = $ck;
-			}
-
-			$irc = $r->toArray();
-			$codes[$ckNdx] = $irc;
 		}
-		$row ['rowItemCodesData'] = $codes;
+
+		$this->data ['flags']['multiLineRows'] = 0;
+		$this->data ['flags']['itemCodesList'] = 0;
+		$this->data ['flags']['itemCodesInline'] = 0;
+		if ($this->docReportsItemCodesMode == self::icmMuliLineCols && count($this->data ['itemCodesHeader']))
+			$this->data ['flags']['multiLineRows'] = 1;
+		if ($this->docReportsItemCodesMode == self::icmSingleLineList && count($this->data ['itemCodesHeader']))
+			$this->data ['flags']['itemCodesList'] = 1;
+		if ($this->docReportsItemCodesMode == self::icmSingleLineInline && count($this->data ['itemCodesHeader']))
+		{
+			$this->data ['flags']['itemCodesList'] = 1;
+			$this->data ['flags']['itemCodesInline'] = 1;
+		}
 	}
 
 	public function checkDocumentInfo (&$documentInfo)

@@ -2,14 +2,17 @@
 
 namespace e10doc\purchase\libs;
 
-
-use e10doc\core\e10utils;
 use E10\utils;
+use \e10\base\libs\UtilsBase;
 
 
-
+/**
+ * class ViewItemsForPurchase
+ */
 class ViewItemsForPurchase extends \e10\witems\ViewItems
 {
+	var $purchItemComboImages = 0;
+
 	public function init ()
 	{
 		parent::init();
@@ -25,12 +28,17 @@ class ViewItemsForPurchase extends \e10\witems\ViewItems
 
 		$comboByCats = intval($this->table->app()->cfgItem ('options.e10doc-buy.purchItemComboCats', 0));
 		$defaultCat = intval($this->table->app()->cfgItem ('options.e10doc-buy.purchItemDefaultComboCat', 0));
+		$purchItemComboAll = intval($this->table->app()->cfgItem ('options.e10doc-buy.purchItemComboAll', 1));
+
+		$this->purchItemComboImages = intval($this->table->app()->cfgItem ('options.e10doc-buy.purchItemComboImages', 0));
 
 		$allId = '';
 		if ($comboByCats)
 			$allId = 'c'.$comboByCats;
 
-		$bt [] = ['id' => $allId, 'title' => 'Vše', 'active' => ($defaultCat === 0) ? 1 : 0];
+		if ($purchItemComboAll == 1)
+			$bt [] = ['id' => $allId, 'title' => 'Vše', 'active' => ($defaultCat === 0) ? 1 : 0];
+
 		$comboByTypes = intval($this->table->app()->cfgItem ('options.e10doc-buy.purchItemComboByTypes', 0));
 		if ($comboByTypes)
 		{
@@ -54,6 +62,9 @@ class ViewItemsForPurchase extends \e10\witems\ViewItems
 				$bt [] = ['id' => 'c'.$cat['ndx'], 'title' => $cat['shortName'], 'active' => ($defaultCat == $cat['ndx']) ? 1 : 0];
 			}
 		}
+
+		if ($purchItemComboAll == 2)
+			$bt [] = ['id' => $allId, 'title' => 'Vše', 'active' => ($defaultCat === 0) ? 1 : 0];
 
 		if (count ($bt) > 1)
 			$this->setTopTabs ($bt);
@@ -108,42 +119,52 @@ class ViewItemsForPurchase extends \e10\witems\ViewItems
 		$thisItemType = $this->table->itemType ($item, TRUE);
 
 		$listItem ['pk'] = $item ['ndx'];
-		$listItem ['tt'] = $item['shortName'];
-		$listItem ['icon'] = $this->table->icon ($item);
+		$listItem ['t1'] = $item['shortName'];
+		//$listItem ['icon'] = $this->table->icon ($item);
+		$listItem ['t2'] = $item['description'];
+		$listItem ['i2'] = $item['id'];
 
 		if ($thisItemType['kind'] !== 2)
 		{
-			$listItem ['i2'] = ['text' => ''];
+			$listItem ['i1'] = ['text' => ''];
 
 			if ($this->showPrice === self::PRICE_SALE)
 			{
 				if ($item['priceSell'])
-					$listItem ['i2'] = ['text' => utils::nf($item['priceSell'], 2)];
+					$listItem ['i1'] = ['text' => utils::nf($item['priceSell'], 2)];
 			}
 			else
 			if ($this->showPrice === self::PRICE_BUY)
 			{
 				if ($item['priceBuy'])
-					$listItem ['i2'] = ['text' => utils::nf($item['priceBuy'], 2)];
+					$listItem ['i1'] = ['text' => utils::nf($item['priceBuy'], 2)];
 			}
 
 			if ($item['defaultUnit'] !== '')
-				$listItem ['i2']['prefix'] = $this->units[$item['defaultUnit']]['shortcut'];
+				$listItem ['i1']['prefix'] = $this->units[$item['defaultUnit']]['shortcut'];
 		}
-/*
-		if (!isset ($this->defaultType))
-		{
-			$listItem ['t2'] = $this->table->itemType ($item);
-			if ($item['useFor'] !== 0)
-			{
-				$useFor = $this->table->columnInfoEnum ('useFor', 'cfgText');
-				$listItem ['t2'] .= ' / '.$useFor [$item ['useFor']];
-			}
-		}
-*/
 
 		if ($item['groupCashRegister'] !== '' && $this->activeCategory !== FALSE && $this->activeCategory['si'] === 'cashreg')
 			$this->addGroupHeader ($item['groupCashRegister']);
+
+		if ($this->purchItemComboImages)
+		{
+			$image = UtilsBase::getAttachmentDefaultImage ($this->app(), $this->table->tableId(), $item['ndx'], TRUE);
+			if (isset($image ['smallImage']))
+			{
+				if ($this->purchItemComboImages === 1)
+					$listItem ['rightImage'] = ['thumb' => $image ['smallImage'], 'image' => $image ['originalImage'], 'cellClass' => 'width15'];
+				elseif ($this->purchItemComboImages === 2)
+					$listItem ['image'] = $image ['smallImage'];
+			}
+			else
+			{
+				if ($this->purchItemComboImages === 1)
+					$listItem ['rightImage'] = ['cellClass' => 'width15'];
+				elseif ($this->purchItemComboImages === 2)
+					$listItem ['image'] = '';
+			}
+		}
 
 		return $listItem;
 	}
@@ -158,5 +179,5 @@ class ViewItemsForPurchase extends \e10\witems\ViewItems
 					(isset($item ['i2']['text']) ? ' / '.$item ['i2']['text'] : '');
 	}
 
-} // class ViewItemsForPurchase
+}
 

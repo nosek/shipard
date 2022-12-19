@@ -57,6 +57,8 @@ class DashboardIssuesCore extends TableView
 	var $showProjectsParts = TRUE;
 	var $showProjectsFolders = TRUE;
 
+	var $useWorkOrders = 0;
+
 	var $help = '';
 
 	CONST dvsPanes = 0, dvsPanesMini = 2, dvsPanesOneCol = 3, dvsRows = 1, dvsPanesMicro = 7, dvsViewer = 5;
@@ -81,6 +83,8 @@ class DashboardIssuesCore extends TableView
 		$this->objectSubType = TableView::vsDetail;
 		//$this->usePanelRight = 1;
 		$this->enableDetailSearch = TRUE;
+
+		$this->useWorkOrders = intval($this->app()->cfgItem ('options.e10doc-commerce.useWorkOrders', 0));
 
 		$this->initMainQueries();
 
@@ -271,7 +275,7 @@ class DashboardIssuesCore extends TableView
 				['code' => "<span class='e10-ntf-badge' id='ntf-badge-wkf-s{$us}' style='display:none;'></span>"],
 			];
 
-			if (!count($sectionCfg['subSections']))
+			if (!isset($sectionCfg['subSections']) || !count($sectionCfg['subSections']))
 			{
 				$nv = isset($marks->marks[$us]) ? $marks->marks[$us] : 0;
 				if (!isset($marks->markCfg['states'][$nv]))
@@ -281,7 +285,7 @@ class DashboardIssuesCore extends TableView
 					['text' => '', 'icon' => $marks->markCfg['states'][$nv]['icon'], 'title' => $nt, 'class' => 'pull-right e10-small', 'css' => 'position: absolute; right:0; padding-right: 4px;'];
 			}
 
-			if ($sectionCfg['subSections'])
+			if (isset($sectionCfg['subSections']))
 			{
 				foreach ($sectionCfg['ess'] as $ss)
 				{
@@ -362,10 +366,24 @@ class DashboardIssuesCore extends TableView
 		array_push ($q, ' persons.fullName AS authorFullName, ');
 		array_push ($q, ' targets.shortName AS targetName,');
 		array_push ($q, ' statuses.[order] AS statusOrder');
+
+		if ($this->useWorkOrders)
+		{
+			array_push($q, ', wo.[title] AS woTitle, wo.[docNumber] AS woDocNumber');
+			array_push($q, ', woCusts.[fullName] AS woCustName');
+		}
+
 		array_push ($q, ' FROM [wkf_core_issues] AS issues');
 		array_push ($q, ' LEFT JOIN e10_persons_persons as persons ON issues.author = persons.ndx');
 		array_push ($q, ' LEFT JOIN wkf_base_targets AS [targets] ON issues.target = targets.ndx');
 		array_push ($q, ' LEFT JOIN wkf_base_issuesStatuses AS [statuses] ON issues.status = statuses.ndx');
+
+		if ($this->useWorkOrders)
+		{
+			array_push($q, ' LEFT JOIN [e10mnf_core_workOrders] AS wo ON [issues].workOrder = wo.ndx');
+			array_push($q, ' LEFT JOIN [e10_persons_persons] AS woCusts ON [wo].customer = woCusts.ndx');
+		}
+
 		array_push ($q, ' WHERE 1');
 
 		$this->qrySection($q, $selectPart);
@@ -405,7 +423,7 @@ class DashboardIssuesCore extends TableView
 			if ($selectPart === 'concept')
 			{
 				array_push($q, ' AND (',
-					' (issues.[docStateMain] = %i', 0, ' AND [author] IN %in', [0, $this->thisUserId], ')',
+					' (issues.[docStateMain] = %i', 0, ' AND [issues].[author] IN %in', [0, $this->thisUserId], ')',
 					' OR (issues.[docStateMain] = %i', 0, ' AND issues.docState = %i', 1001, ')',
 					' OR issues.[docState] = 8000',
 					')'
@@ -426,7 +444,7 @@ class DashboardIssuesCore extends TableView
 				array_push($q, 'issues.[docStateMain] = %i', 1);
 			else
 				array_push($q, ' issues.[docStateMain] IN %in', [1, 2, 5]);
-			array_push($q,' OR (issues.[docStateMain] = %i', 0, ' AND [author] IN %in', [0, $this->thisUserId], ')',
+			array_push($q,' OR (issues.[docStateMain] = %i', 0, ' AND [issues].[author] IN %in', [0, $this->thisUserId], ')',
 				' OR (issues.[docStateMain] = %i', 0, ' AND issues.docState = %i', 1001, ')',
 				' OR issues.[docState] = 8000'
 				);
@@ -444,7 +462,7 @@ class DashboardIssuesCore extends TableView
 		if ($mqId === 'all')
 		{
 			array_push($q, ' AND (issues.[docStateMain] != %i', 0,
-				' OR (issues.[docStateMain] = %i', 0, ' AND [author] IN %in', [0, $this->thisUserId], ')',
+				' OR (issues.[docStateMain] = %i', 0, ' AND [issues].[author] IN %in', [0, $this->thisUserId], ')',
 				')');
 		}
 	}
@@ -700,16 +718,23 @@ class DashboardIssuesCore extends TableView
 			$dstId= 't3';
 		if ($item['tableNdx'])
 		{
-			$docTable = $this->app()->tableByNdx($item['tableNdx']);
-			$docRecData = $docTable->loadItem ($item['recNdx']);
-			$docInfo = $docTable->getRecordInfo ($docRecData);
+			$showDocumentLabel = 1;
+			if ($item['tableNdx'] === 1120 && $item['recNdx'] === $item['workOrder'])
+				$showDocumentLabel = 0;
 
-			$docItem = [
-				'icon' => $docTable->tableIcon ($docRecData), 'text' => $docInfo['docID'],
-				'docAction' => 'edit', 'table' => $docTable->tableId(), 'pk' => $docRecData['ndx'], 'title' => $docInfo['title'],
-				'class' => '', 'actionClass' => 'label label-info', 'type' => 'span'];
+			if ($showDocumentLabel)
+			{
+				$docTable = $this->app()->tableByNdx($item['tableNdx']);
+				$docRecData = $docTable->loadItem ($item['recNdx']);
+				$docInfo = $docTable->getRecordInfo ($docRecData);
 
-			$item[$dstId][] = $docItem;
+				$docItem = [
+					'icon' => $docTable->tableIcon ($docRecData), 'text' => $docInfo['docID'],
+					'docAction' => 'edit', 'table' => $docTable->tableId(), 'pk' => $docRecData['ndx'], 'title' => $docInfo['title'],
+					'class' => '', 'actionClass' => 'label label-info', 'type' => 'span'];
+
+				$item[$dstId][] = $docItem;
+			}
 		}
 		if (isset ($this->docLinksDocs [$ndx]))
 			$item[$dstId] = array_merge($item[$dstId], $this->docLinksDocs [$ndx]);
@@ -721,6 +746,8 @@ class DashboardIssuesCore extends TableView
 		$section = isset($this->usersSections['all'][$item['section']]) ? $this->usersSections['all'][$item['section']] : NULL;
 
 		$ndx = $item ['ndx'];
+
+		$issueKindCfg = $this->app()->cfgItem ('wkf.issues.kinds.'.$item['issueKind'], NULL);
 
 		$item['pk'] = $ndx;
 		$item ['pane'] = ['title' => [], 'body' => [], 'class' => $this->paneClass.' e10-att-target'];
@@ -740,6 +767,16 @@ class DashboardIssuesCore extends TableView
 
 		if (($this->sectionCfg && $this->sectionCfg['isAdmin']) || $section && $section['isAdmin'])
 		{
+			if (!isset($this->atts[$item ['ndx']]) && $item['source'] == TableIssues::msEmail)
+			{
+				$sab = [
+					'type' => 'action', 'action' => 'addwizard', 'data-table' => 'wkf.core.issues', 'data-pk' => strval($ndx),
+					'text' => '', 'title' => 'Uložit text zprávy jako přílohu', 'data-class' => 'wkf.core.libs.SaveIssueBodyWizard', 'icon' => 'system/iconFilePdf',
+					'element' => 'span', 'class' => 'pull-right e10-small', 'actionClass' => '', 'btnClass' => '',
+				];
+				$title[] = $sab;
+			}
+
 			$seb = [
 				'type' => 'action', 'action' => 'addwizard', 'data-table' => 'wkf.core.issues', 'data-pk' => strval($ndx),
 				'text' => '', 'title' => 'Rychlé úpravy', 'data-class' => 'wkf.core.forms.SmartEdit', 'icon' => 'system/actionSettings',
@@ -779,6 +816,16 @@ class DashboardIssuesCore extends TableView
 				$title[] = $this->linkedPersons [$ndx]['wkf-issues-from'];
 			elseif ($item['issueType'] === TableIssues::mtOutbox && isset ($this->linkedPersons [$ndx]['wkf-issues-to']))
 				$title[] = $this->linkedPersons [$ndx]['wkf-issues-to'];
+			if (isset ($this->linkedPersons [$ndx]['wkf-issues-notify']))
+				$title[] = $this->linkedPersons [$ndx]['wkf-issues-notify'];
+
+			if ($item['workOrder'])
+			{
+				$woTitle = $item['woTitle'];
+				if ($woTitle === '')
+					$woTitle = $item['woCustName'];
+				$title[] = ['text' => $woTitle, 'class' => 'label label-default', 'icon' => 'tables/e10mnf.core.workOrders'];
+			}
 		}
 
 		$this->addDeadlineDate ($item, $title);
@@ -837,16 +884,23 @@ class DashboardIssuesCore extends TableView
 
 		if ($item['tableNdx'])
 		{
-			$docTable = $this->app()->tableByNdx($item['tableNdx']);
-			$docRecData = $docTable->loadItem ($item['recNdx']);
-			$docInfo = $docTable->getRecordInfo ($docRecData);
+			$showDocumentLabel = 1;
+			if ($item['tableNdx'] === 1120 && $item['recNdx'] === $item['workOrder'])
+				$showDocumentLabel = 0;
 
-			$docItem = [
-				'icon' => $docTable->tableIcon ($docRecData), 'text' => $docInfo['docID'],
-				'docAction' => 'edit', 'table' => $docTable->tableId(), 'pk' => $docRecData['ndx'], 'title' => $docInfo['title'],
-				'class' => '', 'actionClass' => 'label label-info', 'type' => 'span'];
+			if ($showDocumentLabel)
+			{
+				$docTable = $this->app()->tableByNdx($item['tableNdx']);
+				$docRecData = $docTable->loadItem ($item['recNdx']);
+				$docInfo = $docTable->getRecordInfo ($docRecData);
 
-			$title[] = $docItem;
+				$docItem = [
+					'icon' => $docTable->tableIcon ($docRecData), 'text' => $docInfo['docID'],
+					'docAction' => 'edit', 'table' => $docTable->tableId(), 'pk' => $docRecData['ndx'], 'title' => $docInfo['title'],
+					'class' => '', 'actionClass' => 'label label-info', 'type' => 'span'];
+
+				$title[] = $docItem;
+			}
 		}
 		if (isset ($this->docLinksDocs [$ndx]))
 			$title = array_merge($title, $this->docLinksDocs [$ndx]);
@@ -862,6 +916,20 @@ class DashboardIssuesCore extends TableView
 		{
 			$title[] = ['icon' => 'icon-comment-o', 'class' => 'pull-right e10-off', 'text' => utils::nf(count($this->comments[$ndx]))];
 		}
+
+		// -- email forward
+		/*
+		if ($issueKindCfg['enableEmailForward'] ?? 0)
+		{
+			$title[] = [
+				'text' => 'Přeposlat',
+				'type' => 'action', 'action' => 'addwizard', 'table' => 'wkf.core.issues', 'pk' => $ndx,
+				'data-class' => 'e10pro.purchase.addWizard',
+				'icon' => 'user/envelope', 'btnClass' => 'btn-success btn-xs', 'class' => 'pull-right',
+
+			];
+		}
+		*/
 
 		if (isset($this->atts[$ndx]))
 			$title[] = ['text' => utils::nf($this->atts[$ndx]['count']), 'icon' => 'system/formAttachments', 'class' => 'e10-off pull-right'];
@@ -975,6 +1043,30 @@ class DashboardIssuesCore extends TableView
 				if (isset($this->atts[$item ['ndx']]))
 				{
 					$links = $this->attLinks($item ['ndx']);
+
+					// -- email forward
+					if ($issueKindCfg['enableEmailForward'] ?? 0)
+					{
+						$links[] = [
+							'text' => 'Přeposlat',
+							'type' => 'action', 'action' => 'addwizard', 'table' => 'wkf.core.issues',
+							'data-class' => 'wkf.core.libs.IssueEmailForwardWizard',
+							'icon' => 'user/envelope', 'btnClass' => 'btn-success btn-xs', 'class' => 'pull-right',
+							'data-addparams' => 'focusedPK=' . $ndx,
+						];
+					}
+
+					if (count($links) > 1)
+					{
+						$splitButton = [
+							'type' => 'action', 'action' => 'addwizard', 'data-table' => 'wkf.core.issues', 'data-pk' => strval($ndx),
+							'text' => '', 'title' => 'Rozdělit na jednotlivé zprávy podle příloh',
+							'data-class' => 'wkf.core.libs.SplitIssueByAttachmentsWizard', 'icon' => 'system/actionSplit',
+							'element' => 'span', 'class' => 'pull-right', 'actionClass' => '', 'btnClass' => '',
+						];
+						$links[] = $splitButton;
+					}
+
 					if (count($links))
 						$item ['pane']['body'][] = ['value' => $links, 'class' => 'padd5'];
 				}
@@ -1273,6 +1365,27 @@ class DashboardIssuesCore extends TableView
 						'popup-id' => 'wdbi', 'with-shift' => 'tab' /* 'popup' */
 					];
 				$links[] = $l;
+			}
+		}
+
+		if (isset($attachments['files']))
+		{
+			foreach ($attachments['files'] as $a)
+			{
+				$suffix = strtolower(substr($a['filename'], -3));
+				if ($suffix !== 'zip')
+					continue;
+
+				$icon = 'system/iconFile';
+
+				$unzipButton = [
+					'text' => 'ZIP: '.$a['filename'], 'type' => 'action', 'action' => 'addwizard', 'icon' => $icon,
+					'btnClass' => 'btn-xs btn-primary', 'class' => '_pull-right',
+					'data-class' => 'wkf.core.libs.UnzipIssueAttachmentWizard',
+					'data-addparams' => 'issueNdx='.$ndx.'&attachmentNdx='.$a['ndx'],
+				];
+
+				$links[] = $unzipButton;
 			}
 		}
 

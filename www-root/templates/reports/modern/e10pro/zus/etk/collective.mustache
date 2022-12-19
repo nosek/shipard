@@ -1,0 +1,57 @@
+<div class='h1'>pro kolektivní výuku</div>
+
+<table class="mainInfo">
+	<tr>
+		<td class="info">
+			<table class="dates">
+				<tr>
+					<td class='label'>Školní rok:</td><td class='value'><b>{{data.head.print.skolniRok}}</b></td>
+				</tr>
+				<tr>
+					<td class='label'>Obor:</td><td class='value'>{{data.head.print.svpObor}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Učitel/ka:</td><td class='value'>{{data.ucitel.fullName}}</td>
+				</tr>
+			</table>
+		</td>
+
+		<td class="info">
+			<table class="docInfo">
+				<tr>
+					<td class='label'>Vyučovací předměty:</td><td class='value'>{{data.predmet.nazev}}
+						{{#data.predmet2.nazev}}<br>{{data.predmet2.nazev}}{{/data.predmet2.nazev}}</td>
+				</tr>
+				<tr>
+					<td class='label'>Ročníky:</td><td class='value'>{{data.rocnikyText}}</td>
+				</tr>
+			</table>				
+		</td>
+	</tr>
+</table>
+
+<div class='headingAlt'>Roční studijní plán</div>
+<div class='etkStudijniPlan'>
+	{{{data.studijniPlan}}}
+</div>
+
+<div class='headingAlt'>Vyučovací hodiny</div>
+<table class='ethHours'>
+	<thead>
+	<tr>
+		<th>Dat.</th>
+		<th>Probíraná látka</th>
+	</tr>
+	</thead>
+	{{#data.hodiny}}
+		<tr>
+			<td>{{datum}}</td>
+			<td>{{probiranaLatka}}</td>
+		</tr>
+	{{/data.hodiny}}
+</table>
+
+
+
+{{{@renderContent;dataItem:data.dochazka}}}
+

@@ -202,7 +202,15 @@ table.default thead tr th {text-align: left; border: 1px solid #909090; padding:
 table.stripped tbody tr:nth-child(even) {background-color: #F0F0F0 !important;}
 table.stripped tbody tr:nth-child(odd) {background-color: #FAFAFA !important;}
 
-td.e10-icon, th.e10-icon {width: 2em; text-align: center !important;}
+td.e10-icon, th.e10-icon {width: 2em; text-align: center !important; white-space: pre;}
+
+td.e10-icon {
+	>span>span.e10-ntf-badge {
+		position: absolute;
+		margin-left: -1ex;
+		margin-top: -0.9rem;
+	}
+}
 
 table.compact {
 	border-collapse: collapse;
@@ -261,7 +269,9 @@ td.docLinkIcon {
 
 .pl05 {padding-left: .5ex;}
 .pl1 {padding-left: 1ex;}
+.pl2 {padding-left: 2ex;}
 .pr1 {padding-right: 1ex;}
+.pr2 {padding-right: 2ex;}
 .pt1 {padding-top: 1ex;}
 .pb1 {padding-bottom: 1ex;}
 
@@ -328,7 +338,7 @@ table.dcInfo {
 	td {
 		padding: 2px 4px;
 		vertical-align: top;
-		line-height: 1.5;
+		line-height: 1.7;
 	}
 	td:first-child {
 		text-align: center;

@@ -27,8 +27,12 @@ class TableDocKinds extends DbTable
 			$dk = [
 				'ndx' => $r ['ndx'],
 				'fullName' => $r ['fullName'], 'shortName' => $r ['shortName'],
-				'workOrderType' => $r ['workOrderType'], 'disableRows' => $r ['disableRows'], 'priceOnHead' => $r ['priceOnHead'],
+				'workOrderType' => $r ['workOrderType'], 'workOrderFrequency' => $r ['workOrderFrequency'],
+				'useInvoicingPeriodicity' => $r['useInvoicingPeriodicity'],
+				'disableRows' => $r ['disableRows'], 'priceOnHead' => $r ['priceOnHead'],
+				'vds' => $r ['vds'],
 				'useDescription' => $r ['useDescription'],
+				'usePersonsList' => $r ['usePersonsList'],
 				'useDateIssue' => $r ['useDateIssue'], 'labelDateIssue' => $r ['labelDateIssue'],
 				'useDateContract' => $r ['useDateContract'], 'labelDateContract' => $r ['labelDateContract'],
 				'useDateBegin' => $r ['useDateBegin'], 'labelDateBegin' => $r ['labelDateBegin'],
@@ -39,6 +43,17 @@ class TableDocKinds extends DbTable
 				'useIntTitle' => $r ['useIntTitle'],
 				'useRetentionGuarantees' => $r ['useRetentionGuarantees'],
 				'useAddress' => $r ['useAddress'], 'invoicesInDetail' => $r ['invoicesInDetail'],
+				'viewerPrimaryTitle' => $r ['viewerPrimaryTitle'],
+				'useMembers' => $r ['useMembers'],
+				'useHeadSymbol1' => $r ['useHeadSymbol1'],
+				'useOwnerWorkOrder' => $r ['useOwnerWorkOrder'],
+				'useRowValidFromTo' => $r ['useRowValidFromTo'],
+				'useRowDateDeadlineRequested' => $r ['useRowDateDeadlineRequested'], 'labelRowDateDeadlineRequested' => $r ['labelRowDateDeadlineRequested'],
+				'useRowDateDeadlineConfirmed' => $r ['useRowDateDeadlineConfirmed'], 'labelRowDateDeadlineConfirmed' => $r ['labelRowDateDeadlineConfirmed'],
+				'useRowRefId1' => $r ['useRowRefId1'], 'labelRowRefId1' => $r ['labelRowRefId1'],
+				'useRowRefId2' => $r ['useRowRefId2'], 'labelRowRefId2' => $r ['labelRowRefId2'],
+				'useRowRefId3' => $r ['useRowRefId3'], 'labelRowRefId3' => $r ['labelRowRefId3'],
+				'useRowRefId4' => $r ['useRowRefId4'], 'labelRowRefId4' => $r ['labelRowRefId4'],
 			];
 
 			if ($dk['labelDateIssue'] === '')
@@ -56,6 +71,15 @@ class TableDocKinds extends DbTable
 			if ($dk['labelRefId2'] === '')
 				$dk['labelRefId2'] = 'Objednávka / HS';
 
+			if ($dk['labelRowRefId1'] === '')
+				$dk['labelRowRefId1'] = 'Objednávka / HS';
+			if ($dk['labelRowRefId2'] === '')
+				$dk['labelRowRefId2'] = 'Kód 2';
+			if ($dk['labelRowRefId3'] === '')
+				$dk['labelRowRefId3'] = 'Kód 3';
+			if ($dk['labelRowRefId4'] === '')
+				$dk['labelRowRefId4'] = 'Kód 4';
+
 			if ($r['useDetailMainSettings'])
 			{
 				$dk['mainDetail'] = [
@@ -63,13 +87,19 @@ class TableDocKinds extends DbTable
 				];
 			}
 
+			if ($dk['workOrderFrequency'] != 2)
+				$dk['useInvoicingPeriodicity'] = 0;
+
 			$docKinds [strval($r['ndx'])] = $dk;
 		}
 
 		$docKinds ['0'] = [
 			'ndx' => 0, 'fullName' => '', 'shortName' => '',
-			'workOrderType' => 0, 'disableRows' => 0, 'priceOnHead' => 0,
+			'workOrderType' => 0, 'workOrderFrequency' => 0, 'useInvoicingPeriodicity' => 0,
+			'disableRows' => 0, 'priceOnHead' => 0,
+			'viewerPrimaryTitle' => 0,
 			'useDescription' => 0,
+			'usePersonsList' => 0,
 			'useDateIssue' => 1, 'labelDateIssue' => 'Datum vystavení',
 			'useDateContract' => 0, 'labelDateContract' => '',
 			'useDateBegin' => 0, 'labelDateBegin' => '',
@@ -79,6 +109,10 @@ class TableDocKinds extends DbTable
 			'useRefId2' => 1, 'labelRefId2' => 'Objednávka / HS',
 			'useIntTitle' => 0,
 			'useRetentionGuarantees' => 0,
+
+			'useRowValidFromTo' => 0,
+			'useRowDateDeadlineRequested' => 0,
+			'useRowDateDeadlineConfirmed' => 0,
 		];
 
 		// save to file
@@ -185,15 +219,24 @@ class FormDocKind extends TableForm
 					$this->addColumnInput ('fullName');
 					$this->addColumnInput ('shortName');
 					$this->addColumnInput ('workOrderType');
-					$this->addColumnInput ('disableRows');
+					$this->addColumnInput ('workOrderFrequency');
+					if ($this->recData['workOrderFrequency'] == 2)
+						$this->addColumnInput ('useInvoicingPeriodicity');
 					$this->addColumnInput ('priceOnHead');
 					$this->addColumnInput ('useDescription');
 					$this->addColumnInput ('useAddress');
+					$this->addColumnInput ('usePersonsList');
 					$this->addColumnInput ('invoicesInDetail');
+					$this->addColumnInput ('viewerPrimaryTitle');
+					$this->addColumnInput ('useMembers');
+					$this->addColumnInput ('useHeadSymbol1');
+					$this->addColumnInput ('useOwnerWorkOrder');
 					$this->addColumnInput ('order');
 					$this->addList ('doclinks', '', TableForm::loAddToFormLayout);
 				$this->closeTab ();
 				$this->openTab ();
+					$this->addStatic(['text' => 'Hlavička', 'class' => 'h2 pl1']);
+
 					$this->layoutOpen (TableForm::ltGrid);
 						$this->openRow ();
 							$this->addColumnInput ('useDateIssue', TableForm::coColW5);
@@ -230,6 +273,44 @@ class FormDocKind extends TableForm
 							$this->addColumnInput ('useRetentionGuarantees', TableForm::coColW5);
 						$this->closeRow ();
 					$this->layoutClose ();
+
+					$this->addSeparator(self::coH2);
+					$this->addStatic(['text' => 'Řádky zakázky', 'class' => 'h2 pl1']);
+					$this->layoutOpen (TableForm::ltGrid);
+						$this->openRow ();
+							$this->addColumnInput ('disableRows', TableForm::coColW12);
+						$this->closeRow ();
+						$this->openRow ();
+							$this->addColumnInput ('useRowValidFromTo', TableForm::coColW12);
+						$this->closeRow ();
+						$this->openRow ();
+							$this->addColumnInput ('useRowDateDeadlineRequested', TableForm::coColW5);
+							$this->addColumnInput ('labelRowDateDeadlineRequested', TableForm::coColW7);
+						$this->closeRow ();
+						$this->openRow ();
+							$this->addColumnInput ('useRowDateDeadlineConfirmed', TableForm::coColW5);
+							$this->addColumnInput ('labelRowDateDeadlineConfirmed', TableForm::coColW7);
+						$this->closeRow ();
+						$this->openRow ();
+							$this->addColumnInput ('useRowRefId1', TableForm::coColW5);
+							$this->addColumnInput ('labelRowRefId1', TableForm::coColW7);
+						$this->closeRow ();
+						$this->openRow ();
+							$this->addColumnInput ('useRowRefId2', TableForm::coColW5);
+							$this->addColumnInput ('labelRowRefId2', TableForm::coColW7);
+						$this->closeRow ();
+						$this->openRow ();
+							$this->addColumnInput ('useRowRefId3', TableForm::coColW5);
+							$this->addColumnInput ('labelRowRefId3', TableForm::coColW7);
+						$this->closeRow ();
+						$this->openRow ();
+							$this->addColumnInput ('useRowRefId4', TableForm::coColW5);
+							$this->addColumnInput ('labelRowRefId4', TableForm::coColW7);
+						$this->closeRow ();
+					$this->layoutClose ();
+
+					$this->addSeparator(self::coH2);
+					$this->addColumnInput ('vds');
 				$this->closeTab ();
 				$this->openTab ();
 					$this->addColumnInput ('useDetailMainSettings');

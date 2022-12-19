@@ -1,9 +1,9 @@
 <?php
 
-namespace E10\Base;
+namespace e10\base;
 
-require_once __DIR__ . '/../../base/base.php';
-use \e10\utils, \e10\TableView, \e10\TableViewDetail, \e10\TableForm, \e10\DbTable;
+use \Shipard\Utils\Utils, \Shipard\Viewer\TableView, \Shipard\Viewer\TableViewDetail, \Shipard\Form\TableForm, \Shipard\Table\DbTable;
+use \Shipard\Utils\Json;
 
 
 /**
@@ -85,20 +85,25 @@ class TableClsfItems extends DbTable
 					'name' => $r ['fullName'], 'id' => $iid, 'ndx' => $r ['ndx'],
 					'colorbg' => $r ['colorbg'], 'colorfg' => $r ['colorfg']
 			];
+
 			if ($r['colorbg'] !== '')
 				$ci['css'] = 'color: ' . $r['colorfg'] . '; background-color: ' . $r['colorbg'];
+
+			if (!Utils::dateIsBlank($r['validFrom']))
+				$ci['validFrom'] = $r['validFrom']->format('Y-m-d');
+			if (!Utils::dateIsBlank($r['validTo']))
+				$ci['validTo'] = $r['validTo']->format('Y-m-d');
 
 			$clsfItems ['e10']['base']['clsf'][$r['group']][$r ['ndx']] = $ci;
 		}
 
-		file_put_contents ($fileName, json_encode ($clsfItems));
+		file_put_contents ($fileName, Json::lint ($clsfItems));
 	}
 }
 
 
 /**
- * Class ViewClsfItems
- * @package E10\Base
+ * class ViewClsfItems
  */
 class ViewClsfItems extends TableView
 {
@@ -135,21 +140,26 @@ class ViewClsfItems extends TableView
 	{
 		$listItem ['pk'] = $item ['ndx'];
 		$listItem ['t1'] = $item['fullName'];
-		//$listItem ['i1'] = ['text' => '#'.$item['group'].'.'.$item['ndx'], 'class' => 'id'];
-		$listItem ['icon'] = $this->table->icon ($item);
+		$listItem ['i1'] = ['text' => '#'.$item['ndx'], 'class' => 'id'];
+		$listItem ['icon'] = $this->table->tableIcon ($item);
 
 		$labelText = ($item['id'] !== '') ? $item['id'] : $item['fullName'];
 
+		$listItem ['t2'] = [];
 		if ($item['colorbg'] !== '')
 		{
 			$css = 'color: '.$item['colorfg'].'; background-color: '.$item['colorbg'];
-			$listItem ['t2'] = ['text' => $labelText, 'css' => $css, 'class' => 'label'];
+			$listItem ['t2'][] = ['text' => $labelText, 'css' => $css, 'class' => 'label'];
 		}
 		else
-			$listItem ['t2'] = ['text' => $labelText, 'class' => 'label label-default'];
+			$listItem ['t2'][] = ['text' => $labelText, 'class' => 'label label-default'];
+
+		$ft = utils::dateFromTo($item['validFrom'], $item['validTo'], NULL);
+		if ($ft !== '')
+			$listItem['t2'][] = ['text' => $ft, 'class' => 'label label-default'];
 
 		if ($item['order'])
-			$listItem ['i2'] = ['text' => utils::nf($item['order']), 'icon' => 'system/iconOrder', 'class' => 'label label-default'];
+			$listItem ['i2'] = ['text' => Utils::nf($item['order']), 'icon' => 'system/iconOrder', 'class' => 'label label-default'];
 
 		return $listItem;
 	}
@@ -157,8 +167,7 @@ class ViewClsfItems extends TableView
 
 
 /**
- * Class ViewDetailClsfItems
- * @package E10\Base
+ * class ViewDetailClsfItems
  */
 class ViewDetailClsfItems extends TableViewDetail
 {
@@ -171,8 +180,7 @@ class ViewDetailClsfItems extends TableViewDetail
 
 
 /**
- * Class FormClsfItems
- * @package E10\Base
+ * class FormClsfItems
  */
 class FormClsfItems extends TableForm
 {
@@ -182,18 +190,22 @@ class FormClsfItems extends TableForm
 		$this->setFlag ('sidebarPos', TableForm::SIDEBAR_POS_RIGHT);
 
 		$this->openForm ();
-			$this->addColumnInput ('fullName');
-			$this->addColumnInput ('id');
-			$this->addColumnInput ('colorbg');
-			$this->addColumnInput ('order');
-			$this->addList ('doclinks', '', TableForm::loAddToFormLayout);
+			$tabs ['tabs'][] = ['text' => 'Základní', 'icon' => 'system/formHeader'];
+			$tabs ['tabs'][] = ['text' => 'Nastavení', 'icon' => 'system/formSettings'];
+			$this->openTabs ($tabs, TRUE);
+				$this->openTab ();
+					$this->addColumnInput ('fullName');
+					$this->addColumnInput ('id');
+					$this->addColumnInput ('colorbg');
+					$this->addColumnInput ('order');
+					$this->addList ('doclinks', '', TableForm::loAddToFormLayout);
+				$this->closeTab ();
+				$this->openTab ();
+					$this->addColumnInput ('validFrom');
+					$this->addColumnInput ('validTo');
+				$this->closeTab ();
+			$this->closeTabs();
 		$this->closeForm ();
-	}
-
-	public function createHeaderCode ()
-	{
-		$hdr = $this->table->createHeaderInfo ($this->recData);
-		return $this->defaultHedearCode ($hdr);
 	}
 }
 

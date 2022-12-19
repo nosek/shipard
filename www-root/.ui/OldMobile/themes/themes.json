@@ -5,8 +5,8 @@
     "icons":"glyphish",
     "css":"ordinary",
     "integrity":{
-      "sha384":"76c9aaf8046e2c7e161baa019368895ca38ac949a22533afdd7d49d22a2414e79d7260d2b806fa14b738ad967874eed5",
-      "md5":"193ee1cf0383f0372df52fe31d479cd1"
+      "sha384":"ff471629304ec52c52c92a648c11b076590d5cf7e721f2459545fb30578050c8c64357870226e7b6286d85dfa705aacf",
+      "md5":"41c02397459d617b7e3c538cfd9b191e"
     }
   },
   "carbon-fibre":{
@@ -15,8 +15,8 @@
     "icons":"glyphish",
     "css":"carbon-fibre",
     "integrity":{
-      "sha384":"82d6c0acf33164e4279d400bd37cea4c3635058eeec3e74d94e740115da16093c2bacffb0a65cef64204fbe35a2028ea",
-      "md5":"185ccd2dee4d86b5228daf4dc4fb51f7"
+      "sha384":"c415384b7922115fa85e0068066f108695d1d81d70a537cf5a8f322cd9bb65d2b1f2c4d525819ba72b26b1d8ea54a365",
+      "md5":"6d35361d32b39c62c93b34e94cf2d4d2"
     }
   },
   "elegant":{
@@ -25,8 +25,8 @@
     "icons":"glyphish",
     "css":"elegant",
     "integrity":{
-      "sha384":"21583fc7619b49717df2b38945660ff5be7bb68c0876fb2f430cae8d5d67b93748543e206d9475af58c9690ac2d3013e",
-      "md5":"6a15c0dbece8619d61cba204d28fe999"
+      "sha384":"df3063b6745acb703d82d6f926e3b5fbb84c454c3bc222afde62c11712aeb7f6f61f3084318e83caa0e31e7700401b67",
+      "md5":"525f7f2eb8dcdfcd3113205b0930c188"
     }
   },
   "elegant-1969":{
@@ -35,8 +35,8 @@
     "icons":"glyphish",
     "css":"elegant-1969",
     "integrity":{
-      "sha384":"74fa98374e6674343c109a07dc8d223a878709402d269f4b27b926af409e3ca66ee7364d695408cc321d11c843025d58",
-      "md5":"14b2272637ed276e64623bb33fdc133b"
+      "sha384":"322c1ef09c2a9a2316cd68a45f6a97803d619469ebb73197594db4c0e443bed1d3b97deaa25c89035376f5fb33568ea9",
+      "md5":"8749542930dc1a0bf8949e89fd92e7cb"
     }
   },
   "elegant-raptors":{
@@ -45,8 +45,8 @@
     "icons":"glyphish",
     "css":"elegant-raptors",
     "integrity":{
-      "sha384":"0a3f35f3453165b92e315151cdc10fc313caa15d78ecb9b207d2dd184f7ce5e0ac078de400666e8380c6560ea9a2d306",
-      "md5":"0822c7915244d3dbc04bfeeeced787ae"
+      "sha384":"f1323ae5199d20759902ece472364351798b279ff36017f4792507fafeadadb09ab347a52ccb5ebf9014e5a74e1f01b7",
+      "md5":"25b47ac5464939cf391b31615d8cf897"
     }
   },
   "metro":{
@@ -55,8 +55,8 @@
     "icons":"glyphish",
     "css":"metro",
     "integrity":{
-      "sha384":"61c68cc7005fe92116622a4591ac1be9966a50bf9343da0d5e00ff7b9184f3b025ff42ed1140758d3d024eb6a3260ea6",
-      "md5":"7bbfc63da346b73e2c1b140322f795e4"
+      "sha384":"8a3bf696316aadee205317045c448989de589f0e3e962c3481ca300bb25e3a2e2a1d44ea82ffb6c422b289dbaf1e9a3e",
+      "md5":"655f8d61bf8dee3603d3d4c35de32fc0"
     }
   },
   "rainbow6":{
@@ -65,8 +65,8 @@
     "icons":"glyphish",
     "css":"rainbow6",
     "integrity":{
-      "sha384":"0d8665a047b8f6fc1b0b9d58cec9ace4da4e758c985546923ea5a90c7000c44f44b3c87ff20ddc97633c14405b168476",
-      "md5":"3cfd251d3b8bc63024168cdeb5da686d"
+      "sha384":"358d24e46c3c7737e05f08ec1ce43741c1ca8348455b3c9e9ee76f96d2ad65e7deada309072282a7e2c1c2c2a27cef8a",
+      "md5":"11f6a0b0bd032ece24d9bd862397a8a4"
     }
   },
   "shipard":{
@@ -75,8 +75,8 @@
     "icons":"glyphish",
     "css":"shipard",
     "integrity":{
-      "sha384":"7cac650bdf477a56edfd4f6491ee3e28d37e69a4fb2de293aeec4fe2a75ca00d4be03ea15f9eacb055ed750d1aed5cb8",
-      "md5":"2e90aa8851c5acb8b7c201228e5c79b2"
+      "sha384":"2264cbc9ef8655698fecdfbf62e5ebfb83174aca0c727a82968d32eb4fc46c56fe98f24e2a6e88385c3a5c15bd7346ad",
+      "md5":"46a7f679895ea1805312a7a6bf0311a2"
     }
   },
   "shipard1":{
@@ -85,16 +85,16 @@
     "icons":"glyphish",
     "css":"shipard1",
     "integrity":{
-      "sha384":"970ae64e4802d525ab9c47f04c0c4cc176372156f71ed23b5f664956c277448538150546358c663c168755146b71de9d",
-      "md5":"74daabbcdbe1a19e2b63c1af83af4a68"
+      "sha384":"3a648b7ba0007ebbc679972f3b0a10e896b23d64f0c7c74fa29eef5565b9e33103dad2c7a7c263e12fbf37baa9a420e5",
+      "md5":"6d3f92bee955783a8d3f31441eee3773"
     }
   },
   "md-default":{
     "id":"md-default",
     "name":"Pink Material Design",
     "integrity":{
-      "sha384":"afa1d7220540610f604c5f47e8616597707e949b0c12df771cfaabbb8a8e46a1712eda4158ca448dc0a549fdee0901e8",
-      "md5":"adabedd5c35053a625c9b81e53f59550"
+      "sha384":"3637f3df78dd5e18d73e0aeb526e0181c66ace4aae1a5a22cdfad6d8ced9c7ca5e8c994bb4abb398caf0781be2600de7",
+      "md5":"51f80d36cd225efd8bb9f7bcbe530d58"
     }
   },
   "lime":{
@@ -103,48 +103,48 @@
     "icons":"glyphish",
     "css":"lime",
     "integrity":{
-      "sha384":"e92129bcb0fd631ab00c0a44c70bf7ad9ace8c0a70fe2514bf403bb5b43c0c887d662493f0b4c569f54320a664e55970",
-      "md5":"df4cfb86f94264a2b37559fb1503d773"
+      "sha384":"a95f6f76e4dafc7722f4e29fde2c4ce439886cf846c35fc3ded3a2642aae915508324a15d788670f5aa9418ed6d1c0f7",
+      "md5":"d97fb32b2e0a8e1b7d730877c426b342"
     }
   },
   "md-bluegray":{
     "id":"md-bluegray",
     "name":"Modro \u0161ed\u00e1",
     "integrity":{
-      "sha384":"31c507c134cd37e8d351fa7c1bf9de6ea6d725fe1a080c71d1838c8f3f47abe10c9179357190e6f50100fdd0325e6a63",
-      "md5":"303f71192cd69c803a22985412b190a6"
+      "sha384":"e49557d747801a4a87fc68662a33bdfb67769ff0f4cd68aeba8fbf6677339d5ba7c84bc4fffe3d2c172230d6dc348fab",
+      "md5":"3335a8308eb36026744e52e6899504b7"
     }
   },
   "md-indigo":{
     "id":"md-indigo",
     "name":"Indigo Material Design",
     "integrity":{
-      "sha384":"0c20996a2eef5eb077bb76c46997c2f17355d348d916c645cc78be3a0e0e3e06cf0256b93743a84c8bc06f4390c62832",
-      "md5":"0c5ee70c6c104a64bdf63b2be942b95c"
+      "sha384":"82ad55eb8db3ebb9eba1251240d3d0bd26d4839c93df60ba866d875359df974d113491d991f9f3b60d315e7ffaaa5333",
+      "md5":"2a4eff272c2941e545fb7858fc7fc584"
     }
   },
   "md-lime":{
     "id":"md-lime",
     "name":"Lime Material Design",
     "integrity":{
-      "sha384":"a26d160111ef2c0d77c11a107de772f294a94743316667ea0ce7d33c57c7334db8dc0db8ed4667e1f7e0722515a7eb8b",
-      "md5":"ef2bf5355e11dde5b4050c49e1920fec"
+      "sha384":"e427b79b3f4628475738610a281a8b6f02f66f264c58a79b67b11e2419e3ab1f6d8c5dc2404e6f5bd11165b5cfc02eaf",
+      "md5":"b2b5bf6f506afbc983e1d1fb5fcd7a3c"
     }
   },
   "md-shipard":{
     "id":"md-shipard",
     "name":"Shipard Material Design",
     "integrity":{
-      "sha384":"99fdf8710ffd23d0cf2acecab4c5aca046ce670c03945ced874a446015d89e57ad37d4aa29618a8120d3b2180648b9dd",
-      "md5":"a32733f11873508622eb252461489b0f"
+      "sha384":"e206d53d96c87ac962bdfcd810d54101d6d6cf6303b75dc4065d167f23ee861b1a33f5e48a093c708713f1163035d9ac",
+      "md5":"55443b169bb178c8eb9021790c6d0d5e"
     }
   },
   "md-teal":{
     "id":"md-teal",
     "name":"Teal Material Design",
     "integrity":{
-      "sha384":"19e6cddf2f9238040c88c5872310f2ff4eeaa5fe0f2e8ee82e59f8fe426264b14009ac236bf338a9926fef3f1a5b1ea1",
-      "md5":"4ba193817459bbd5e043f3886ed45bbc"
+      "sha384":"4d150bac01937fdbcfe114f674786fc9a81a5962f56062abdaa23d932108b310a7e94097c8aea3f7968ceb5558e81c86",
+      "md5":"d667bf766aa9abd727c419b9810c24a8"
     }
   }
 }

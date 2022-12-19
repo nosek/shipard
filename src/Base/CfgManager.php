@@ -190,10 +190,6 @@ class CfgManager
 		else
 			$newConfig ['appSkeleton'] = $appSkeleton;
 
-
-		if (!isset ($newConfig ['modulesPath']))
-			$newConfig ['modulesPath'] = __SHPD_MODULES_DIR__;
-
 		// -- check unset critical options
 		$newConfig['systemConfig']['unconfigured'] = 0;
 		foreach ($newConfig['appOptions'] as $i1 => $o1)
@@ -218,9 +214,9 @@ class CfgManager
 		// theme
 		if (!isset ($newConfig ['appTheme']) || $newConfig ['appTheme'] === '')
 			$newConfig ['appTheme'] = 'elegant';
-		if (isset ($newConfig ['options']['experimental']['appTheme']))
-			if ($newConfig ['options']['experimental']['appTheme'] !== '')
-				$newConfig ['appTheme'] = $newConfig ['options']['experimental']['appTheme'];
+		if (isset ($newConfig ['options']['appearanceApp']['appTheme']))
+			if ($newConfig ['options']['appearanceApp']['appTheme'] !== '')
+				$newConfig ['appTheme'] = $newConfig ['options']['appearanceApp']['appTheme'];
 
 		// ad data model to config
 		$newConfig ['dataModel'] = $this->dataModel->model;
@@ -246,7 +242,7 @@ class CfgManager
 		$hosting = [];
 		$hosting['hostingDomain'] = $cfgServer['hostingDomain'];
 		$hosting['serverDomain'] = $cfgServer['serverDomain'];
-		
+
 		$cfgServer['useHosting'] = $cfgServer['useHosting'];
 
 		$newConfig['hostingCfg'] = $hosting;
@@ -269,7 +265,7 @@ class CfgManager
 				$newConfig ['dsMode'] = Application::dsmDevel;
 			elseif (isset($newConfig ['dsi']['dsType']) && $newConfig ['dsi']['dsType'] === 1)
 				$newConfig ['dsMode'] = Application::dsmTesting;
-			else	
+			else
 				$newConfig ['dsMode'] = Application::dsmProduction;
 		}
 
@@ -1056,6 +1052,13 @@ class CfgManager
 				$alterTableAddColumn .= "CHANGE $a{$sqlColName}$a $a{$sqlColName}$a smallint NULL DEFAULT '0'";
 				continue;
 			}
+			if ($col ['type'] == 'int' && $nativeType !== 'INT')
+			{ // columns converted from ctEnumInt to int with reference
+				if ($colNdx != 0)
+					$alterTableAddColumn .= ', ';
+				$alterTableAddColumn .= "CHANGE $a{$sqlColName}$a $a{$sqlColName}$a INT DEFAULT '0'";
+				continue;
+			}
 		}
 
 		if ($alterTableAddColumn != '')
@@ -1146,8 +1149,8 @@ class CfgManager
 		if (!$cfgString)
 			return FALSE;
 		$this->appCfg = json_decode ($cfgString, true);
-		if (!isset ($this->appCfg ['modulesPath']))
-			$this->appCfg ['modulesPath'] = __SHPD_MODULES_DIR__;
+		//if (!isset ($this->appCfg ['modulesPath']))
+		//	$this->appCfg ['modulesPath'] = __SHPD_MODULES_DIR__;
 		return TRUE;
 	}
 

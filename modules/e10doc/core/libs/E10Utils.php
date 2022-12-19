@@ -444,6 +444,42 @@ class E10Utils
 		return FALSE;
 	}
 
+	static function personGroups ($app, $personNdx)
+	{
+		$groups = [];
+		if (!$personNdx)
+			return $groups;
+		$rows = $app->db()->query('SELECT [group] FROM e10_persons_personsgroups WHERE person = %i', $personNdx);
+		foreach ($rows as $r)
+			$groups[] = $r['group'];
+		return $groups;
+	}
+
+	static function docRowDir ($app, $rowRecData, $headRecData)
+	{
+		$docType = $app->cfgItem ('e10.docs.types.' . $headRecData['docType']);
+		if (isset ($docType ['docDir']) && $docType ['docDir'] != 0)
+			return $docType ['docDir'];
+
+		if ($headRecData['docType'] == 'cash')
+		{
+			if ($headRecData ['cashBoxDir'] == 1) // příjem
+				return 2;
+			return 1;
+		}
+
+		if ($headRecData['docType'] === 'bank' || $headRecData['docType'] === 'cmnbkp')
+		{
+			if ($rowRecData ['debit'] != 0.0)
+				return 1;
+			if ($rowRecData ['credit'] != 0.0)
+				return 2;
+			return FALSE;
+		}
+
+		return 0;
+	}
+
 	static function balanceOverDueClass ($app, $overDueDays)
 	{
 		if ($overDueDays > 90)
@@ -550,7 +586,7 @@ class E10Utils
 
 	static function docTaxCountryId($app, $docHeadRecData)
 	{
-		if ($docHeadRecData['taxCountry'] === '')
+		if (!isset($docHeadRecData['taxCountry']) || $docHeadRecData['taxCountry'] === '')
 			return 'cz';
 		return $docHeadRecData['taxCountry'];
 	}
@@ -582,7 +618,7 @@ class E10Utils
 		$country = $app->cfgItem('e10doc.base.taxAreas.'.$taxRegCfg['taxArea'].'.countries.'.$taxCountryId, NULL);
 		if (!$country)
 			return 'eur';
-	
+
 		return $country['currency'];
 	}
 
@@ -604,7 +640,7 @@ class E10Utils
 		$taxCode = 'EUCZ000';
 		if ($taxes)
 		{
-			forEach ($taxes as $itmid => $itm) 
+			forEach ($taxes as $itmid => $itm)
 			{
 				if ($itm ['dir'] != $dirTax)
 					continue;
@@ -613,7 +649,7 @@ class E10Utils
 				$taxCode = $itmid;
 				break;
 			}
-		}	
+		}
 		return $taxCode;
 	}
 
@@ -651,12 +687,12 @@ class E10Utils
 		$enum = [];
 		foreach ($ta['countries'] as $countryId => $country)
 		{
-			if ($fullConfig)	
+			if ($fullConfig)
 				$enum[$countryId] = $country;
 			else
 				$enum[$countryId] = $country['fn'];
 		}
-		
+
 		return $enum;
 	}
 
@@ -740,7 +776,7 @@ class E10Utils
 				}
 			}
 		}
-	
+
 		// -- nedaňový doklad
 		if ($itemRecData['priceSellTotal'] != 0.0)
 			return $itemRecData['priceSellTotal'];
@@ -759,7 +795,7 @@ class E10Utils
 			return NULL;
 
 		$k = key($taxRegs);
-		
+
 		return $taxRegs[$k];
 	}
 }

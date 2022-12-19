@@ -726,8 +726,11 @@ class DbTable
 		if (isset ($recInfo['recidOwner']))
 			$logEvent['recidOwner'] = $recInfo['recidOwner'];
 
-		$logData = array ('recData' => $recData,
-			'lists' => $this->loadLists ($recData));
+		$logData = [
+			'recData' => $recData,
+			'lists' => $this->loadLists ($recData)
+		];
+		Json::polish($logData['recData']);
 		$logEvent ['eventData'] = json_encode ($logData);
 
 		$this->dbmodel->db->query ('INSERT INTO [e10_base_docslog]', $logEvent);
@@ -914,12 +917,15 @@ class DbTable
 				case 'clsf':
 					foreach ($values as $group => $items)
 					{
-						foreach ($items as $itemNdx => $itemValue) {
+						$groupParts = explode(':', $group);
+						$groupId = $groupParts[0];
+						foreach ($items as $itemNdx => $itemValue)
+						{
 							$vp = explode(':', $itemValue);
 							if (count($vp) === 1)
 								continue;
 							$this->db()->query("INSERT INTO [e10_base_clsf] ([tableid], [recid], [clsfItem], [group]) VALUES (%s, %i, %s, %s)",
-								$vp[0], isset($vp[1]) ? intval($vp[1]) : 0, $itemNdx, $group);
+								$vp[0], isset($vp[1]) ? intval($vp[1]) : 0, $itemNdx, $groupId);
 						}
 					}
 					break;
@@ -944,18 +950,18 @@ class DbTable
 			foreach ($subColumns as $key => $value)
 			{
 				$data[$key] = $value;
-			}	
+			}
 			$sci = $this->subColumnsInfo($saveData ['recData'], $columnId);
 			if ($sci !== FALSE)
 				$this->app()->subColumnsCalc($data, $sci);
 
-			if ($sci)	
+			if ($sci)
 			{
-				$dataClean = [];	
+				$dataClean = [];
 				foreach ($sci['columns'] as $colCfg)
 				{
 					$key = $colCfg['id'];
-					
+
 					if (isset($data[$key]))
 						$dataClean[$key] = $data[$key];
 				}
@@ -1224,7 +1230,7 @@ class DbTable
 		{
 			$parts = explode ('.', $class);
 			$className = array_pop ($parts);
-			$moduleFileName = $this->app()->cfgItem ('modulesPath') . '/' . strtolower(implode ('/', $parts)) . '/' . end($parts) . '.php';
+			$moduleFileName = __SHPD_MODULES_DIR__ . strtolower(implode ('/', $parts)) . '/' . end($parts) . '.php';
 			if (is_file ($moduleFileName))
 				include_once ($moduleFileName);
 		}

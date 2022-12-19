@@ -63,7 +63,8 @@ class TableForm
 	var $dirtyColsReferences;
 
 	const INPUT_STYLE_RADIO = 1, INPUT_STYLE_OPTION = 2, INPUT_STYLE_MONEY = 3, INPUT_STYLE_DATE = 4, INPUT_STYLE_STRING = 5,
-				INPUT_STYLE_DOUBLE = 6, INPUT_STYLE_INT = 7, INPUT_STYLE_DATETIME = 8, INPUT_STYLE_TIME = 9, INPUT_STYLE_TIMELEN = 10;
+				INPUT_STYLE_DOUBLE = 6, INPUT_STYLE_INT = 7, INPUT_STYLE_DATETIME = 8, INPUT_STYLE_TIME = 9, INPUT_STYLE_TIMELEN = 10,
+				INPUT_STYLE_STRING_COLOR = 11;
 	const SIDEBAR_POS_NONE = 0, SIDEBAR_POS_LEFT = 1, SIDEBAR_POS_RIGHT = 2, SIDEBAR_POS_PARENT_FORM = 3;
 	const ltForm = 1, ltHorizontal = 2, ltVertical = 3, ltDocMain = 4, ltDocRows = 5, ltNone = 6, ltGrid = 7, ltRenderedTable = 99;
 
@@ -99,7 +100,9 @@ class TableForm
 				coRight					= 0x80000000,
 				coBold					= 0x100000000,
 				coH3						= 0x200000000,
-				coH4						= 0x400000000;
+				coH4						= 0x400000000,
+				coRightCheckbox	= 0x800000000,
+				coDisabled			= 0x1000000000;
 
 
 	const loAddToFormLayout = 0x1000, loWidgetParts = 0x2000, loRowsDisableMove = 0x4000;
@@ -378,7 +381,7 @@ class TableForm
 		$inputCode = "<input type='checkbox' name='$ip{$columnId}' id='$colId' class='e10-inputLogical$class' value='{$valueForTrue}' data-fid='{$this->fid}'$inputParams/>";
 		$hints = $this->columnOptionsHints ($options);
 
-		if ($options & TableForm::coRight)
+		if ($options & TableForm::coRight || $options & TableForm::coRightCheckbox)
 			$this->appendElement ($labelCode, $inputCode, $hints);
 		else
 			$this->appendElement ($inputCode, $labelCode, $hints);
@@ -534,6 +537,12 @@ class TableForm
 										if ($colDef && isset($colDef['subtype']))
 											$inputType = $colDef['subtype'];
 										break;
+			case self::INPUT_STYLE_STRING_COLOR:
+										$inputClass = 'e10-inputString';
+										if ($len)
+											$inputParams .= " maxlength='$len'";
+										$inputType = 'color';
+										break;
 		}
 
 		if ($options & DataModel::coScanner)
@@ -573,8 +582,12 @@ class TableForm
 		if ($options & TableForm::coRight)
 			$rightLayout = TRUE;
 
-		if ($options & TableForm::coReadOnly)
+		if ($options & TableForm::coDisabled && $options & TableForm::coReadOnly)
+			$inputParams .= " readonly='readonly' disabled";
+		elseif ($options & TableForm::coReadOnly)
 			$inputParams .= " readonly='readonly'";
+		elseif ($options & TableForm::coDisabled)
+			$inputParams .= " readonly='readonly' disabled";
 
 		if ($options & TableForm::coFocus)
 		{
@@ -781,7 +794,7 @@ class TableForm
 		if ($label)
 			$labelCode = "<label for='$colId'>" . $this->app()->ui()->composeTextLine($label) . "</label>";
 		$inputCode = "";
-
+		$oneInputCClass = '';
 		$a = $enums;
 		if ($style == self::INPUT_STYLE_RADIO)
 		{
@@ -790,11 +803,12 @@ class TableForm
 			{
 				if (is_array($txt) && isset($txt['enumLabelOnly']))
 				{
-					$inputCode .= $this->app()->ui()->composeTextLine($txt).'<br/>';
-				}	
+					$inputCode .= $this->app()->ui()->composeTextLine($txt);
+					$oneInputCClass = ' ml1';
+				}
 				else
 				{
-					$inputCode .= "<div class='padd5 e10-selectable-radio$active'>";
+					$inputCode .= "<div class='padd5 e10-selectable-radio$active$oneInputCClass'>";
 					$inputCode .= "<input type='radio' class='e10-inputRadio' id='{$colId}_$val' name='$ip{$columnId}' value='$val' data-fid='{$this->fid}'> ";
 					$inputCode .= "<label for='{$colId}_$val' style='vertical-align: top;'>" . $this->app()->ui()->composeTextLine($txt) . "</label><br/>";
 					$inputCode .= "</div>";
@@ -847,9 +861,11 @@ class TableForm
 		if ($options & TableForm::coFocus)
 			$this->setFlag ('autofocus', 1);
 
+		$hidden = $options & TableForm::coHidden;
+
 		$colDef = $this->inputColDef($columnId, $columnPath);
 
-		if (isset ($colDef ['reference']))
+		if (isset ($colDef ['reference']) && !$hidden)
 		{
 			$ip = $this->option ('inputPrefix', '');
 
@@ -1010,16 +1026,19 @@ class TableForm
 		$this->addContent($content, 0, FALSE, 0);
 	}
 
-	public function addSubColumns ($columnId)
+	public function addSubColumns ($columnId, $isRowMode = 0)
 	{
 		$sci = $this->subColumnInfo($columnId);
 		if (!$sci)
-			return;
+			return 0;
 
 		$this->subColumnInfo = $sci;
 
 		$oldInputPrefix = $this->option('inputPrefix', '');
-		$this->setOption('inputPrefix', 'subColumns.'.$columnId.'.');
+		if ($isRowMode)
+			$this->setOption('inputPrefix', $oldInputPrefix.'subColumns_'.$columnId.'_');
+		else
+			$this->setOption('inputPrefix', 'subColumns.'.$columnId.'.');
 
 		if (isset ($sci['groups']))
 		{
@@ -1030,13 +1049,9 @@ class TableForm
 				{
 					if (!isset($col['group']) || $col['group'] !== $group['id'])
 						continue;
-					$sce = uiutils::subColumnEnabled ($col, $this->subColumnsData[$columnId]);
-					if ($sce === FALSE)
+					$sco = uiutils::subColumnEnabled ($col, $this->subColumnsData[$columnId]);
+					if ($sco === FALSE)
 						continue;
-
-					$sco = 0;
-					if ($sce === 1)
-						$sco = self::coReadOnly;
 
 					if (!$groupAdded && isset($group['title']))
 					{
@@ -1140,14 +1155,17 @@ class TableForm
 		{
 			foreach ($sci['columns'] as $col)
 			{
-				if (!uiutils::subColumnEnabled ($col, $this->subColumnsData[$columnId]))
+				$sco = uiutils::subColumnEnabled ($col, $this->subColumnsData[$columnId]);
+				if ($sco === FALSE)
 					continue;
-
-				$this->addColumnInput($col['id'], 0, FALSE, $columnId);
+				$params = uiutils::subColumnInputParams($col, $this->subColumnsData[$columnId] ?? []);
+				$this->addColumnInput($col['id'], $sco, $params, $columnId);
 			}
 		}
 
 		$this->setOption('inputPrefix', $oldInputPrefix);
+
+		return 1;
 	}
 
 	function subColumnInfo ($columnId)
@@ -1272,7 +1290,10 @@ class TableForm
 	{
 		$hints = $this->columnOptionsHints ($options);
 
-		if (is_string($content) || ((isset ($content['text']) || isset ($content[0]['text'])) && !isset ($content['type'])))
+		if (
+			is_string($content)
+			|| ((isset ($content['text']) || isset ($content[0]['text']) || isset ($content[0][0]['text'])) && !isset ($content['type']))
+		)
 		{
 			$class = 'e10-ef-label';
 			if ($options & TableForm::coH1)
@@ -1291,6 +1312,8 @@ class TableForm
 		{
 			if (isset($content['type']))
 				$this->appendElement (uiutils::renderContentPart ($this->app(), $content), NULL, $hints);
+			//else
+			//	$this->appendElement ('INVALID-CONTENT: '.json_encode ($content));
 		}
 	}
 
@@ -1720,6 +1743,8 @@ class TableForm
 						];
 						if (isset($gotoState['icon']))
 							$b['icon'] = $gotoState['icon'];
+						if (isset($gotoState['side']))
+							$b['side'] = $gotoState['side'];
 						if (isset($gotoState['buttonClass']))
 							$b['buttonClass'] = $gotoState['buttonClass'];
 						if (isset ($gotoState['focus']) && $gotoState['focus'])
@@ -2006,6 +2031,9 @@ class TableForm
 			$h .= "<div class='e10-row-btns'>";
 			if (!$this->readOnly)
 			{
+				$disableDeleteButton = $list->listDefinition ['disableDeleteButton'] ?? 0;
+				if ($this->app()->hasRole('root'))
+					$disableDeleteButton = 0;
 				if ($list && $list->rowsTableOrderCol && !($layoutOptions & TableForm::loRowsDisableMove))
 				{
 					$rowOrderForInsert = $this->option ('rowOrderForInsert', 0);
@@ -2013,7 +2041,8 @@ class TableForm
 
 					$h .= "<div class='e10-row-menu'>".$this->app()->ui()->icon('system/iconHamburgerMenu');
 					$h .= "<div class='e10-row-menu-btns' style='float: left;'>";
-					$h .= "<button tabindex='-1' class='e10-row-action' data-action='delete' title='Smazat řádek'>".$this->app()->ui()->icon('system/actionDelete')."</button>";
+					if (!$disableDeleteButton)
+						$h .= "<button tabindex='-1' class='e10-row-action' data-action='delete' title='Smazat řádek'>".$this->app()->ui()->icon('system/actionDelete')."</button>";
 					if ($rowNumber !== 0)
 						$h .= "<button tabindex='-1' class='e10-row-action' data-action='up' title='Posunout nahoru'>".$this->app()->ui()->icon('system/actionMoveUp')."</button>";
 					if (!$isLastRow)
@@ -2024,7 +2053,8 @@ class TableForm
 				}
 				else
 				{
-					$h .= "<button tabindex='-1' class='e10-row-action' data-action='delete' title='Smazat řádek'>".$this->app()->ui()->icon('system/actionDelete')."</button>";
+					if (!$disableDeleteButton)
+						$h .= "<button tabindex='-1' class='e10-row-action' data-action='delete' title='Smazat řádek'>".$this->app()->ui()->icon('system/actionDelete')."</button>";
 				}
 			}
 			$h .= "<div style='font-size:60%;'>".($rowNumber+1).'</div>';

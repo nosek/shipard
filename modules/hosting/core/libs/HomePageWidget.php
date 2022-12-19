@@ -15,12 +15,15 @@ class HomePageWidget extends WidgetBoard
 	var $dsBBoard = [];
 	var $activeTabId = '';
 
+	var $projectsAccessLevel = 0;
+
 	var $today;
 	var $mobileMode;
 
 	public function init ()
 	{
 		$this->activeTabId = $this->app()->testGetParam ('e10-widget-dashboard-tab-id');
+		$this->projectsAccessLevel = $this->app()->checkAccess (['object' => 'viewer', 'table' => 'plans.core.items', 'viewer' => 'hosting.core.libs.ViewerProjectsGrid']);
 
 		if ($this->activeTabId === '')
 			$this->activeTabId = 'tab-home';
@@ -43,11 +46,12 @@ class HomePageWidget extends WidgetBoard
 		array_push($qf, ' INNER JOIN [hosting_core_dsUsers] AS dsUsers ON dsOptions.uds = dsUsers.ndx');
 		array_push($qf, ' INNER JOIN [hosting_core_dataSources] AS dataSources ON dsUsers.dataSource = dataSources.ndx');
 		array_push($qf, ' WHERE 1');
+		array_push($qf, ' AND dataSources.[docState] IN %in', [4000, 8000]);
 		array_push($qf, ' AND dsUsers.[user] = %i', $this->app()->userNdx());
-		array_push($qf, ' AND dsUsers.[docStateMain] = 2');
+		array_push($qf, ' AND dsUsers.[docStateMain] = %i', 2);
 		array_push($qf, ' AND dsOptions.[addToToolbar] <= %i', 1);
-		
-		array_push($qf, ' ORDER BY dsOptions.[addToToolbar] DESC, dsOptions.[toolbarOrder], dataSources.[name]');		
+
+		array_push($qf, ' ORDER BY dsOptions.[addToToolbar] DESC, dsOptions.[toolbarOrder], dataSources.[name]');
 		array_push($qf, ' LIMIT 0, %i', $maxToolbarCnt);
 		$rows = $this->db()->query($qf);
 
@@ -79,10 +83,11 @@ class HomePageWidget extends WidgetBoard
 		array_push($qf, ' INNER JOIN [hosting_core_dsUsers] AS dsUsers ON dsOptions.uds = dsUsers.ndx');
 		array_push($qf, ' INNER JOIN [hosting_core_dataSources] AS dataSources ON dsUsers.dataSource = dataSources.ndx');
 		array_push($qf, ' WHERE 1');
+		array_push($qf, ' AND dataSources.[docState] IN %in', [4000, 8000]);
 		array_push($qf, ' AND dsUsers.[user] = %i', $this->app()->userNdx());
-		array_push($qf, ' AND dsUsers.[docStateMain] = 2');
-		array_push($qf, ' AND dsOptions.[addToDashboard] != %i', 9);		
-		array_push($qf, ' ORDER BY dsOptions.[addToDashboard] DESC, dsOptions.[dashboardOrder], dataSources.[name]');		
+		array_push($qf, ' AND dsUsers.[docStateMain] = %i', 2);
+		array_push($qf, ' AND dsOptions.[addToDashboard] != %i', 9);
+		array_push($qf, ' ORDER BY dsOptions.[addToDashboard] DESC, dsOptions.[dashboardOrder], dataSources.[name]');
 		array_push($qf, ' LIMIT 0, %i', $maxDashboardCnt);
 		$rows = $this->db()->query($qf);
 
@@ -100,11 +105,11 @@ class HomePageWidget extends WidgetBoard
 			$dashboardPriorityId = $r['addToDashboard'];
 			if ($dashboardPriorityId === 0)
 			{
-				if ($cnt > 6)	
+				if ($cnt > 6)
 					$dashboardPriorityId = 1;
-				elseif ($cnt > 2)	
+				elseif ($cnt > 2)
 					$dashboardPriorityId = 2;
-				else $dashboardPriorityId = 3;	
+				else $dashboardPriorityId = 3;
 			}
 
 			$this->dsBBoard[$dashboardPriorityId][$r['dataSource']] = $item;
@@ -149,7 +154,7 @@ class HomePageWidget extends WidgetBoard
 		{
 			$active = ($dsNdx == $this->activeTabId) ? ' active' : '';
 			$c .= "<li class='tab bb1 e10-widget-trigger$active' data-tabid='".$dsNdx."' id='e10-lanadmin-dstab-{$dsNdx}' style='padding: 0; position: relative;'>";
-			
+
 			$c .= "<span style='position: absolute; right: .4ex; bottom: .4ex; font-size: 110%;'>";
 			$c .= " <span class='e10-ntf-badge' id='ntf-badge-unread-ds-".utils::es($ds['gid'])."-sec' style='display: none;'></span>";
 			$c .= " <span class='e10-ntf-badge e10-ntf-badge-todo' id='ntf-badge-todo-ds-".utils::es($ds['gid'])."-sec' style='display: none;'></span>";
@@ -164,19 +169,19 @@ class HomePageWidget extends WidgetBoard
 			{
 				$c .= "<div title=\"".Utils::es($ds['title'])."\" style='font-size: 3rem; max-width: 4rem; width: 4rem; height: 4rem; padding: 0.4rem; overflow: hidden; text-align: center; display: inline;'>";
 				$c .= Utils::es($ds['dsEmoji']);
-				$c .= "</div>";	
+				$c .= "</div>";
 			}
 			elseif ($ds['dsIcon'] !== '')
 			{
 				$c .= "<div title=\"".Utils::es($ds['title'])."\" style='font-size: 2.6rem; max-width: 4rem; width: 4rem; height: 4rem; padding: 0.4rem; overflow: hidden; text-align: center;'>";
 				$c .= $this->app->ui()->icon($ds['dsIcon']);
-				$c .= "</div>";	
+				$c .= "</div>";
 			}
 			else
 			{
 				$c .= "<div title=\"".Utils::es($ds['title'])."\" style='max-width: 4rem; width: 4rem; height: 4rem; padding: 0.4rem; overflow: hidden; text-overflow: \"…\";'>";
 				$c .= Utils::es($ds['title']);
-				$c .= "</div>";	
+				$c .= "</div>";
 			}
 
 			$c .= "</li>";
@@ -207,7 +212,7 @@ class HomePageWidget extends WidgetBoard
 		$c = '';
 		$c .= "<div style='width: calc(100% - 4rem); height: 100%; float: left;'>";
 		$c .= "<iframe data-sandbox='allow-scripts' allow='fullscreen' frameborder='0' height='100%' width='100%' style='width:100%;height:calc(100%);' src='{$iframeUrl}'></iframe>";
-		$c .= '</div>';		
+		$c .= '</div>';
 		$this->addContent (['type' => 'text', 'subtype' => 'rawhtml', 'text' => $c]);
 	}
 
@@ -227,7 +232,44 @@ class HomePageWidget extends WidgetBoard
 
 			return;
 		}
-		
+
+		// -- devProjects
+		if ($this->activeTopTab === 'viewer-mode-devProjects')
+		{
+			if ($this->projectsAccessLevel)
+			{
+				$viewerMode = '1';
+				$vmp = explode ('-', $this->activeTopTabRight);
+				if (isset($vmp[2]))
+					$viewerMode = $vmp[2];
+
+				$this->addContent (['type' => 'text', 'subtype' => 'rawhtml', 'text' => '<div style="float: right; width: calc(100% - 1px); height: calc(100% - 2.4rem); position: absolute; left: 0;">']);
+				if ($viewerMode === 'gantt')
+					$this->addContentViewer('plans.core.items', 'hosting.core.libs.ViewerProjectsGantt', ['plan' => 1, 'viewerMode' => $viewerMode]);
+				else
+					$this->addContentViewer('plans.core.items', 'hosting.core.libs.ViewerProjectsGrid', ['plan' => 1, 'viewerMode' => $viewerMode]);
+				$this->addContent (['type' => 'text', 'subtype' => 'rawhtml', 'text' => '</div>']);
+			}
+			return;
+		}
+
+		// -- hedelpDesk
+		if ($this->activeTopTab === 'viewer-mode-helpdesk')
+		{
+			if ($this->app()->hasRole('hstngha'))
+			{
+				$viewerMode = '1';
+				$vmp = explode ('-', $this->activeTopTabRight);
+				if (isset($vmp[2]))
+					$viewerMode = $vmp[2];
+
+				$this->addContent (['type' => 'text', 'subtype' => 'rawhtml', 'text' => '<div style="float: right; width: calc(100% - 1px); height: calc(100% - 2.4rem); position: absolute; left: 0;">']);
+				$this->addContentViewer('helpdesk.core.tickets', 'hosting.core.libs.ViewerHelpdeskAdmins', ['viewerMode' => $viewerMode]);
+				$this->addContent (['type' => 'text', 'subtype' => 'rawhtml', 'text' => '</div>']);
+			}
+			return;
+		}
+
 		// -- overview
 		if ($this->activeTopTab === 'viewer-mode-home')
 		{
@@ -281,20 +323,26 @@ class HomePageWidget extends WidgetBoard
 
 		$tabs['viewer-mode-home'] = ['text' => ' Přehled', 'icon' => 'system/iconStart', 'action' => 'viewer-mode-home'];
 		$tabs['viewer-mode-dbs'] = ['text' => ' Databáze', 'icon' => 'system/iconDatabase', 'action' => 'viewer-mode-dbs'];
+		if ($this->projectsAccessLevel)
+			$tabs['viewer-mode-devProjects'] = ['text' => ' Projekty', 'icon' => 'user/code', 'action' => 'viewer-mode-devProjects'];
+
+		if ($this->app()->hasRole('hstngha'))
+			$tabs['viewer-mode-helpdesk'] = ['text' => 'Helpdesk', 'icon' => 'tables/helpdesk.core.tickets', 'action' => 'viewer-mode-helpdesk', 'ntfBadgeId' => "ntf-badge-hhdsk-total",];
+
 		$tabs['viewer-mode-user'] = ['text' => ' '.$userInfo['name'], 'icon' => 'system/iconUser', 'action' => 'viewer-mode-user'];
-	
+
 		$this->toolbar = ['tabs' => $tabs];
 
 		$btns = [];
 		$btns[] = [
-			'type' => 'action', 'action' => 'open-link', 
+			'type' => 'action', 'action' => 'open-link',
 			'icon' => 'system/actionLogout',
 			'data-url-download' => $logoutUrl, 'data-popup-id' => 'THIS-TAB',
 			'title' => 'Odhlásit', 'text' => '', 'element' => 'li', 'btnClass' => 'tab'
 		];
 
 		$this->toolbar['buttons'] = $btns;
-		$this->toolbar['logoUrl'] = 
+		$this->toolbar['logoUrl'] =
 			'https://system.shipard.app/att/2017/09/26/e10pro.wkf.documents/shipard-logo-header-web-t9n9ug.svg';
 	}
 
@@ -314,7 +362,7 @@ class HomePageWidget extends WidgetBoard
 		];
 
 		$title = [];
-		
+
 		if ($ds['dsImageUrl'] !== '')
 		{
 			$css = '';
@@ -347,7 +395,7 @@ class HomePageWidget extends WidgetBoard
 		$title[] = ['text' => '', 'class' => 'clear block'];
 
 		$dsTile['title'][] = ['value' => $title, 'class' => 'e10-bg-t9 block'];
-	
+
 		$this->addContent (['type' => 'grid', 'cmd' => 'colOpen', 'width' => $width]);
 			$this->addContent(['type' => 'tiles', 'tiles' => [$dsTile], 'class' => 'panes', 'pane' => 'e10-pane e10-pane-core']);
 		$this->addContent (['type' => 'grid', 'cmd' => 'colClose']);
@@ -373,11 +421,11 @@ class HomePageWidget extends WidgetBoard
 			]);
 
 
-		$deleteButton = 	
+		$deleteButton =
 			[
 				'text' => 'Zrušit účet', 'action' => 'wizard', 'icon' => 'system/actionDelete', 'data-class' => 'hosting.core.libs.WizardDeleteAccount',
 				'btnClass' => 'btn btn-danger', 'class' => 'pull-right',
-				'data-srcobjecttype' => 'widget', 'data-srcobjectid' => $this->widgetId,						
+				'data-srcobjecttype' => 'widget', 'data-srcobjectid' => $this->widgetId,
 			];
 		$this->addContent (['type' => 'line', 'line' => $deleteButton]);
 
@@ -392,11 +440,11 @@ class HomePageWidget extends WidgetBoard
 		else
 			$t[$row] = [
 				't1' => 'Vytváření nových databází', 'v1' => [
-					['text' => 'Zakázáno', 'icon' => 'system/docStateCancel'], 
+					['text' => 'Zakázáno', 'icon' => 'system/docStateCancel'],
 					[
 						'text' => 'Povolit', 'action' => 'wizard', 'icon' => 'system/iconCheck', 'data-class' => 'hosting.core.libs.WizardEnableCreatingDatabases',
 						'btnClass' => 'btn btn-success', 'class' => 'pull-right',
-						'data-srcobjecttype' => 'widget', 'data-srcobjectid' => $this->widgetId,						
+						'data-srcobjecttype' => 'widget', 'data-srcobjectid' => $this->widgetId,
 					],
 				],
 			];
@@ -412,10 +460,23 @@ class HomePageWidget extends WidgetBoard
 		$this->addContent (['type' => 'grid', 'cmd' => 'rowClose']);
 	}
 
+	protected function initRightTabs ()
+	{
+		if ($this->activeTopTab === 'viewer-mode-devProjects')
+		{
+			$rt = [
+				'viewer-mode-table' => ['text' => '', 'icon' => 'system/dashboardModeRows', 'action' => 'viewer-mode-table'],
+				'viewer-mode-gantt' => ['text' => '', 'icon' => 'system/iconCalendar', 'action' => 'viewer-mode-gantt'],
+			];
+
+			$this->toolbar['rightTabs'] = $rt;
+		}
+	}
+
 	function renderContentTitle ()
 	{
 		return '';
-	}	
+	}
 
 	public function title() {return FALSE;}
 }

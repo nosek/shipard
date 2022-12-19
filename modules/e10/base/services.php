@@ -32,7 +32,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			$msg->setBody($message);
 
 			$msg->sendMail();
-			*/	
+			*/
 			return TRUE;
 		}
 	}
@@ -48,6 +48,13 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$this->checkNewPlaces();
 
 		$this->upgradeTemplateLooks();
+	}
+
+	public function onBeforeAppUpgrade ()
+	{
+		$this->upgradeAppOption ('options.experimental.appTheme', 'options.appearanceApp.appTheme');
+		$this->upgradeAppOption ('options.experimental.iconsTheme', 'options.appearanceApp.iconsTheme');
+		$this->upgradeAppOption ('options.experimental.mobileuiTheme', 'options.appearanceApp.mobileuiTheme');
 	}
 
 	function checkNewPlaces()
@@ -166,6 +173,11 @@ class ModuleServices extends \E10\CLI\ModuleServices
 
 		// -- modules
 		$dsStats->data['modules'] = utils::loadCfgFile(__APP_DIR__.'/config/modules.json');
+
+		// -- channel & version
+		$si = $this->app->cfgItem ('serverInfo', NULL);
+		if ($si)
+			$dsStats->data['shipardVersion'] = ['channelId' => $si['channelId'], 'version' => __E10_VERSION__, 'commit' => $si['e10commit']];
 
 		$dsStats->saveToFile();
 	}

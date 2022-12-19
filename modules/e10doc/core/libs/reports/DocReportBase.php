@@ -6,7 +6,8 @@ require_once __SHPD_MODULES_DIR__ . 'e10doc/core/core.php';
 
 use \Shipard\Report\FormReport;
 use \Shipard\Utils\World;
-
+use \Shipard\Utils\Utils;
+use \e10doc\core\libs\E10Utils;
 
 /**
  * Class DocReportBase
@@ -29,14 +30,13 @@ class DocReportBase extends FormReport
 
 	public function setReportId($baseReportId)
 	{
-
 		if (str_starts_with($baseReportId, 'reports.default.'))
 		{
 			$reportId = $baseReportId;
 		}
 		else
 		{
-			$reportType = $this->app()->cfgItem ('options.experimental.docReportsType', 'default');
+			$reportType = $this->app()->cfgItem ('options.appearanceDocs.docReportsType', 'default');
 			$reportIdBegin = 'reports.'.$reportType.'.';
 			$reportId = $reportIdBegin.$baseReportId;
 
@@ -48,7 +48,7 @@ class DocReportBase extends FormReport
 			{
 				$reportType = 'default';
 				$reportIdBegin = 'reports.'.$reportType.'.';
-				$reportId = $reportIdBegin.$baseReportId;	
+				$reportId = $reportIdBegin.$baseReportId;
 			}
 		}
 
@@ -62,6 +62,13 @@ class DocReportBase extends FormReport
 
 		$this->tablePersons = $this->app()->table('e10.persons.persons');
 		$this->allProperties = $this->app()->cfgItem('e10.base.properties', []);
+
+		$this->data['options']['docReportsPersonsSigns'] = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsPersonsSigns', 0));
+		$this->data['options']['docReportsHeadLogoRight'] = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsHeadLogoPlace', 1));
+		$this->data['options']['docReportsTablesRoundedCorners'] = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsTablesCorners', 1));
+		$this->data['options']['accentColor'] = $this->app()->cfgItem ('options.appearanceDocs.accentColor', '');
+		if ($this->data['options']['accentColor'] === '')
+			$this->data['options']['accentColor'] = '#CFECEC';
 	}
 
 	function loadData_MainPerson($columnId)
@@ -74,9 +81,13 @@ class DocReportBase extends FormReport
 			$this->data [$columnId]['lists'] = $this->tablePersons->loadLists($this->data [$columnId]);
 			if (isset($this->data [$columnId]['lists']['address'][0]))
 				$this->data [$columnId]['address'] = $this->data [$columnId]['lists']['address'][0];
-			
+
 			// persons country / language
-			World::setCountryInfo($this->app(), $this->data [$columnId]['lists']['address'][0]['worldCountry'], $this->data [$columnId]['address']);
+			$this->data [$columnId]['lists']['address'] = [];
+			$taxHomeCountryId = E10Utils::docTaxHomeCountryId($this->app(), $this->recData);
+			$taxHomeCountryNdx = World::countryNdx($this->app(), $taxHomeCountryId);
+			if (isset($this->data [$columnId]['address']))
+				World::setCountryInfo($this->app(), $this->data [$columnId]['lists']['address'][0]['worldCountry'] ?? $taxHomeCountryNdx, $this->data [$columnId]['address']);
 			if ($this->lang == '' && isset($this->data [$columnId]['address']['countryLangSC2']))
 				$this->lang = $this->data [$columnId]['address']['countryLangSC2'];
 
@@ -120,7 +131,9 @@ class DocReportBase extends FormReport
 		$this->data ['author']['lists'] = $this->tablePersons->loadLists($this->data ['author']);
 
 		$authorAtt = \E10\Base\getAttachments($this->table->app(), 'e10.persons.persons', $this->recData ['author'], TRUE);
-		$this->data ['author']['signature'] = \E10\searchArray($authorAtt, 'name', 'podpis');
+		$this->data ['author']['signature'] = Utils::searchArray($authorAtt, 'name', 'podpis');
+		if (isset($this->data ['author']['signature']))
+			$this->data ['author']['signature']['rfn'] = 'att/'.$this->data ['author']['signature']['path'].$this->data ['author']['signature']['filename'];
 
 		if (isset($this->data ['author']['lists']['address'][0]))
 			$this->data ['author']['address'] = $this->data ['author']['lists']['address'][0];
@@ -128,7 +141,7 @@ class DocReportBase extends FormReport
 
 	function loadData_DocumentOwner ()
 	{
-		$this->ownerNdx = $this->recData ['owner'];
+		$this->ownerNdx = $this->recData ['owner'] ?? 0;
 		if ($this->ownerNdx == 0)
 			$this->ownerNdx = intval($this->app()->cfgItem('options.core.ownerPerson', 0));
 		if ($this->ownerNdx)

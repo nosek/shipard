@@ -82,7 +82,7 @@ class WebTemplateLook extends Utility
 		{
 			if (!isset ($oneCol['cssType']))
 				continue;
-			if (!uiutils::subColumnEnabled ($oneCol, $this->lookParams))
+			if (uiutils::subColumnEnabled ($oneCol, $this->lookParams) === FALSE)
 				continue;
 			if ($oneCol['cssType'] === 'color')
 			{
@@ -134,7 +134,7 @@ class WebTemplateLook extends Utility
 
 			file_put_contents($dstFileName, $styleContent);
 
-			$cmd = "export LC_ALL=en_US.UTF.8 && cd {$this->destPath} && sass $dstFileName $dstCssFileName --style compressed --sourcemap=none 2>&1";
+			$cmd = "export LC_ALL=en_US.UTF.8 && cd {$this->destPath} && sass $dstFileName $dstCssFileName --style compressed --no-source-map 2>&1";
 
 			$output = '';
 			$fp = popen($cmd, 'r');

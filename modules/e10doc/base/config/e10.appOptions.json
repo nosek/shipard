@@ -11,6 +11,12 @@
 		"table": "e10doc.base.bankaccounts",
 		"viewer": "default"
 	},
+	"bankAccountsGroups": {
+		"name": "Skupiny Vlastních bankovních spojení", "order": 88000, "group": "codebase",
+		"type": "viewer",
+		"table": "e10doc.base.bankAccountsGroups",
+		"viewer": "default"
+	},
 	"centres": {
 		"name": "Střediska", "order": 17000, "group": "codebase",
 		"type": "viewer",
@@ -68,6 +74,10 @@
 	"docsAdditionsTypes": {
 		"name": "Typy dodatků dokladů", "order": 10220000, "group": "docs",
 		"type": "viewer", "table": "e10doc.base.additionsTypes", "viewer": "default"
+	},
+	"docRowsVDSCfg": {
+		"name": "Nastavení VDS na řádcích dokladů", "order": 10440000, "group": "docs",
+		"type": "viewer", "table": "e10doc.base.docRowsVDSCfg", "viewer": "default"
 	},
 	"experimental": {
 		"options": [

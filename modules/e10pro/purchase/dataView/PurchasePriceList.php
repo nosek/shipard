@@ -38,6 +38,9 @@ class PurchasePriceList extends DataView
       if ($categoryItem)
         $this->mainCategoryNdx = $categoryItem['ndx'];
     }
+
+		$this->checkRequestParamsList('withLabels');
+		$this->checkRequestParamsList('withoutLabels');
 	}
 
 	protected function loadData()
@@ -54,11 +57,26 @@ class PurchasePriceList extends DataView
     {
       array_push ($q, ' AND EXISTS (',
                       'SELECT ndx FROM e10_base_doclinks',
-                      ' WHERE items.ndx = srcRecId AND srcTableId = %s', 'e10.witems.items', 
+                      ' WHERE items.ndx = srcRecId AND srcTableId = %s', 'e10.witems.items',
                       ' AND dstTableId = %s', 'e10.witems.itemcategories',
                       ' AND e10_base_doclinks.dstRecId = %i)', $this->mainCategoryNdx
                     );
     }
+
+		if (isset($this->requestParams['withLabels']) && count($this->requestParams['withLabels']))
+		{
+			array_push ($q, ' AND EXISTS (',
+				'SELECT ndx FROM e10_base_clsf WHERE items.ndx = recid AND tableId = %s', 'e10.witems.items',
+				' AND [clsfItem] IN %in', $this->requestParams['withLabels'],
+				')');
+		}
+		if (isset($this->requestParams['withoutLabels']) && count($this->requestParams['withoutLabels']))
+		{
+			array_push ($q, ' AND NOT EXISTS (',
+				'SELECT ndx FROM e10_base_clsf WHERE items.ndx = recid AND tableId = %s', 'e10.witems.items',
+				' AND [clsfItem] IN %in', $this->requestParams['withoutLabels'],
+				')');
+		}
 
     array_push ($q, ' ORDER BY items.orderCashRegister, items.fullName');
 
@@ -71,8 +89,23 @@ class PurchasePriceList extends DataView
         $i = ['name' => $r['groupCashRegister'], 'header' => 1];
         $i['_options'] = ['colSpan' => ['name' => 3]];
         $data [$r['ndx'].'G'] = $i;
+				continue;
       }
-      $i = ['name' => $r['fullName'], 'unit' => $this->units[$r['defaultUnit']]['shortcut'], 'item' => 1];
+      $i = [
+				'id' => $r['id'],
+				'name' => $r['fullName'],
+				'unit' => $this->units[$r['defaultUnit']]['shortcut'],
+				'item' => 1,
+			];
+
+			if ($r['description'] !== '')
+			{
+				$i['name'] = [
+					['text' => $r['fullName'], 'class' => 'block'],
+					['text' => $r['description'], 'class' => 'itemDecription'],
+				];
+			}
+
       $i['_options'] = ['cellClasses' => ['unit' => 'unit']];
 
       $i['price'] = $r['priceBuy'];
@@ -115,9 +148,9 @@ class PurchasePriceList extends DataView
 	{
 		$c = '';
 
-    $h = ['name' => 'Název', 'price' => ' Cena', 'unit' => 'Jedn.'];
+    $h = ['id' => 'ID', 'name' => 'Název', 'price' => ' Cena', 'unit' => 'Jedn.'];
 
-    $tr = new TableRenderer($this->data['table'], $h, [], $this->app());
+    $tr = new TableRenderer($this->data['table'], $h, ['tableClass' => 'purchasePriceList'], $this->app());
     $c .= $tr->render();
 
 		return $c;

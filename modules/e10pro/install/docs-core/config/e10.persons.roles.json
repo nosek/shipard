@@ -24,6 +24,7 @@
 			"e10doc.base.whPlaces": {"default": 2, "tree":  2},
 			"e10doc.base.centres": {"default": 2},
 			"e10doc.base.bankaccounts": {"default": 2},
+			"e10doc.base.bankAccountsGroups": {"default": 2},
 			"e10doc.base.cashboxes": {"default": 2},
 			"e10doc.base.transports": {"default": 2},
 			"e10doc.base.taxRegs": {"default": 2},
@@ -31,7 +32,8 @@
 			"e10doc.base.additions": {"default": 2},
 			"e10doc.base.reportsTexts": {"default": 2},
 			"e10doc.helpers.rowsSettings": {"default": 2},
-			"e10doc.helpers.wkfSectionsRelations": {"default": 2}
+			"e10doc.helpers.wkfSectionsRelations": {"default": 2},
+			"e10doc.base.docRowsVDSCfg": {"default": 2}
 		},
 		"reports": {
 			"e10pro.reports.tests.docs.ReportBadFiscalPeriod": 2,

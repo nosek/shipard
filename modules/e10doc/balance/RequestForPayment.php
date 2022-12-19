@@ -21,8 +21,36 @@ class RequestForPayment extends FormReport
 
 	function init ()
 	{
-		$this->reportId = 'reports.default.e10doc.balance.requestForPayment';
-		$this->reportTemplate = 'reports.default.e10doc.balance.requestForPayment';
+		parent::init();
+		$this->setReportId('e10doc.balance.requestForPayment');
+	}
+
+	public function setReportId($baseReportId)
+	{
+		if (str_starts_with($baseReportId, 'reports.default.'))
+		{
+			$reportId = $baseReportId;
+		}
+		else
+		{
+			$reportType = $this->app()->cfgItem ('options.experimental.docReportsType', 'default');
+			$reportIdBegin = 'reports.'.$reportType.'.';
+			$reportId = $reportIdBegin.$baseReportId;
+
+			$parts = explode ('.', $reportId);
+			$tfn = array_pop ($parts);
+			$templateRoot = __SHPD_ROOT_DIR__.__SHPD_TEMPLATE_SUBDIR__.'/'.implode ('/', $parts).'/'.$tfn.'/';
+			$templateMainFile = $templateRoot.'page.mustache';
+			if (!is_readable($templateMainFile))
+			{
+				$reportType = 'default';
+				$reportIdBegin = 'reports.'.$reportType.'.';
+				$reportId = $reportIdBegin.$baseReportId;
+			}
+		}
+
+		$this->reportId = $reportId;
+		$this->reportTemplate = $reportId;
 	}
 
 	public function checkDocumentInfo (&$documentInfo)
@@ -113,6 +141,7 @@ class RequestForPayment extends FormReport
 			foreach ($ownerAtt as $oa)
 			{
 				$this->data ['owner']['logo'][$oa['name']] = $oa;
+				$this->data ['owner']['logo'][$oa['name']]['rfn'] = 'att/'.$oa['path'].$oa['filename'];
 			}
 		}
 
@@ -127,6 +156,11 @@ class RequestForPayment extends FormReport
 		if (isset($this->data ['author']['lists']['address'][0]))
 			$this->data ['author']['address'] = $this->data ['author']['lists']['address'][0];
 
+		$this->data['options']['accentColor'] = $this->app()->cfgItem ('options.appearanceDocs.accentColor', '');
+		$this->data['options']['docReportsHeadLogoRight'] = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsHeadLogoPlace', 1));
+		$this->data['options']['docReportsTablesRoundedCorners'] = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsTablesCorners', 1));
+		if ($this->data['options']['accentColor'] === '')
+			$this->data['options']['accentColor'] = '#CFECEC';
 
 		$this->loadData_Documents ();
 	}

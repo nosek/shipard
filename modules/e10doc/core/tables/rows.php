@@ -98,6 +98,18 @@ class TableRows extends DbTable
 			}
 		}
 
+		// -- subColumns
+		if ($recData['rowVds'])
+		{
+			$sci = $this->subColumnsInfo ($recData, 'rowData');
+			if ($sci && isset($sci['computeClass']))
+			{
+				$cc = $this->app()->createObject($sci['computeClass']);
+				if ($cc)
+					$cc->checkBeforeSave($recData, $ownerData, $sci);
+			}
+		}
+
 		// Výpočet cen v řádku...
 		$recData ['taxBaseHcCorr'] = 0;
 		if ($recData ['priceSource'] === 0)
@@ -408,13 +420,13 @@ class TableRows extends DbTable
 
 	public function columnInfoEnum ($columnId, $valueType = 'cfgText', TableForm $form = NULL)
 	{
-		if ($columnId === 'operation' && $form)	
+		if ($columnId === 'operation' && $form)
 			return $this->columnInfoEnumOperations ($form->recData, $form->option ('ownerRecData'));
 
 		if ($columnId === 'taxCode' && $form)
 			return $this->columnInfoEnumTaxCodes($form->recData, $form->option ('ownerRecData'), $form);
 
-		return parent::columnInfoEnum ($columnId, $valueType = 'cfgText', $form);	
+		return parent::columnInfoEnum ($columnId, $valueType = 'cfgText', $form);
 	}
 
 	public function columnInfoEnumOperations ($recData, $ownerRecData)
@@ -576,6 +588,27 @@ class TableRows extends DbTable
 			return $head->toArray();
 
 		return parent::ownerRecData ($recData, $suggestedOwnerRecData);
+	}
+
+	public function subColumnsInfo ($recData, $columnId)
+	{
+		if ($columnId === 'rowData')
+		{
+			if (!isset($recData['rowVds']) || !$recData['rowVds'])
+				return FALSE;
+
+			$vds = $this->db()->query ('SELECT * FROM [vds_base_defs] WHERE [ndx] = %i', $recData['rowVds'])->fetch();
+			if (!$vds)
+				return FALSE;
+
+			$sc = json_decode($vds['structure'], TRUE);
+			if (!$sc || !isset($sc['fields']))
+				return FALSE;
+
+			return $sc['fields'];
+		}
+
+		return parent::subColumnsInfo ($recData, $columnId);
 	}
 }
 

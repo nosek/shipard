@@ -7,6 +7,8 @@ require_once __SHPD_MODULES_DIR__ . 'e10/web/web.php';
 
 use \E10\TableView, \E10\TableViewDetail, \E10\TableForm, \E10\DbTable, \E10\utils, \E10\str, \E10\uiutils;
 use \Shipard\Form\FormSidebar;
+use \Shipard\Utils\Json;
+use \Shipard\Application\DataModel;
 
 
 /* ----------
@@ -297,7 +299,7 @@ class ListProperties implements \E10\IDocumentList
 			{
 				if (isset($this->recData [$this->listDefinition ['srcCfgKeyColumn2']]))
 					$this->myProperties = array_merge($this->myProperties, $this->table->app()->cfgItem($this->listDefinition ['propertiesCfgList2'].'.'.$this->recData [$this->listDefinition ['srcCfgKeyColumn2']], array()));
-			}	
+			}
 			else
 				$this->myProperties = array_merge($this->myProperties, $this->table->app()->cfgItem($this->listDefinition ['propertiesCfgList2'], []));
 		}
@@ -705,7 +707,7 @@ function searchPropertyRecId ($app, $tableId, $propertyId, $propertyValue)
 {
 	$sql = "SELECT * FROM [e10_base_properties] where [tableid] = %s AND [property] = %s AND [valueString] = %s ORDER BY [ndx] LIMIT 0, 1";
 	$rec = $app->db()->query ($sql, $tableId, $propertyId, $propertyValue)->fetch ();
-	if (!rec)
+	if (!$rec)
 		return 0;
 
 	return $rec ['recid'];
@@ -1304,7 +1306,26 @@ class ListRows implements \E10\IDocumentList
 			$rows = $this->rowsTable->app()->db ()->query ($q);
 
 			forEach ($rows as $r)
+			{
+				//-- subColumns
+				$columns = $this->rowsTable->columns();
+				foreach ($columns as $columnId => $column)
+				{
+					if ($column['type'] !== DataModel::ctSubColumns || !isset($r[$columnId]))
+						continue;
+
+					$scData = json_decode ($r[$columnId], TRUE);
+					if (!$scData)
+						continue;
+
+					foreach ($scData as $scKey => $scValue)
+					{
+						$r['subColumns_'.$columnId.'_'.$scKey] = $scValue;
+					}
+				}
+
 				$this->data [] = $r;
+			}
 		}
 		if ($this->formData)
 			$this->formData->checkLoadedList ($this);
@@ -1402,9 +1423,10 @@ class ListRows implements \E10\IDocumentList
 		}
 
 		$disableButton = isset($this->listDefinition ['disableAddButton']) ? intval($this->listDefinition ['disableAddButton']) : 0;
+		if ($this->rowsTable->app()->hasRole('root'))
+			$disableButton = 0;
 		if (!$this->formData->readOnly && !$disableButton)
 		{
-
 			$c .= "<li class='e10-rows-append'>";
 			if ($this->formData->appendListRow ($this->listId))
 				$c .= "<button class='btn btn-default' data-list='{$this->listId}' data-row='$rowNumber' data-fid='{$this->fid}'>".$this->formData->app()->ui()->icon('system/actionAdd')." Přidat další řádek</button>";
@@ -1429,6 +1451,8 @@ class ListRows implements \E10\IDocumentList
 			$rowsAppendId = "id='{$this->fid}FormMainRowsAppend' ";
 
 		$disableButton = isset($this->listDefinition ['disableAddButton']) ? intval($this->listDefinition ['disableAddButton']) : 0;
+		if ($this->rowsTable->app()->hasRole('root'))
+			$disableButton = 0;
 		if (!$disableButton)
 			$c .= "<li class='e10-rows-append'><button {$rowsAppendId}data-list='{$this->listId}' data-row='$rowNumber' data-fid='{$this->fid}'>Přidat další řádek1_{$this->listDefinition ['id']}</button></li>";
 
@@ -1758,8 +1782,10 @@ class ListClassification implements \E10\IDocumentList
 		return $sideBar->createHtmlCode();
 	}
 
-	static function referenceWidget ($form, $table, $recId)
+	static function referenceWidget ($form, $srcColumnId, $table, $recId)
 	{
+		$today = Utils::today('Y-m-d');
+
 		$listObject = new ListClassification($table->app());
 		$listObject->setRecData ($table, 'clsf', array ('ndx'=>$recId));
 		$listObject->loadData();
@@ -1796,10 +1822,12 @@ class ListClassification implements \E10\IDocumentList
 				{
 					if (isset ($result['itemsOn'][$key][$clsfItemOff['ndx']]))
 						continue;
-					$inputName = "extra.clsf.$key.".$clsfItemOff['ndx'];
+					if (isset($clsfItemOff['validTo']) && $clsfItemOff['validTo'] < $today)
+						continue;
+					$inputName = "extra.clsf.$key:$srcColumnId.".$clsfItemOff['ndx'];
 					$inputId = str_replace ('.', '-', "{$form->fid}_$inputName");
 					$inputValue = $table->tableId().':'.$recId;
-					$result['html'] .= "<span style='border: 1px solid #aaa; background-color: #eee!important;padding: 3px; display: inline-block;'><input type='checkbox' class='e10-inputLogical' name='$inputName' id='$inputId' data-fid='$form->fid' value='$inputValue'/><label for='$inputId'> ".$clsfItemOff['name'].'</label></span>';
+					$result['html'] .= "<span style='border: 1px solid #aaa; background-color: #eee!important;padding: 3px; display: inline-block;'><input type='checkbox' class='e10-inputLogical' name='$inputName' id='$inputId' data-fid='$form->fid' value='$inputValue'/><label for='$inputId'> ".Utils::es($clsfItemOff['name']).'</label></span>';
 				}
 			}
 		}
@@ -2358,6 +2386,7 @@ class NotificationCentre extends \Shipard\UI\Core\WidgetPane
 		// -- hosting - TODO: move to better place
 		if ($this->app->model()->module ('hosting.core') !== FALSE)
 		{
+			// -- data sources
 			$badges['ntf-badge-hosting-dbs'] = 0;
 
 			$q = [];
@@ -2373,9 +2402,50 @@ class NotificationCentre extends \Shipard\UI\Core\WidgetPane
 				$badges['ntf-badge-unread-ds-'.$r['gid']] = $r['cntUnread'];
 				$badges['ntf-badge-todo-ds-'.$r['gid']] = $r['cntTodo'];
 			}
+
+			// -- helpdesk - total
+			$q = [];
+			$q[] = 'SELECT COUNT(*) AS [cnt] ';
+			array_push($q, ' FROM e10_base_notifications AS ntf');
+			array_push($q, ' WHERE tableId = %s', 'helpdesk.core.tickets', ' AND state = 0 AND ntf.personDest = %s', $this->app()->userNdx());
+			$hdc = $this->db()->query($q)->fetch();
+
+			$badges['ntf-badge-hhdsk-total'] = intval($hdc['cnt'] ?? 0);
+		}
+		else
+		{ // hosting helpdesk notifications
+			if ($this->app()->hasRole('hdhstng'))
+				$this->getHostingHelpdeskNotifications($badges);
 		}
 
 		return $badges;
+	}
+
+	function getHostingHelpdeskNotifications(&$badges)
+	{
+		$cfgServer = Utils::loadCfgFile(__SHPD_ETC_DIR__.'/server.json');
+		if (!$cfgServer)
+      return;
+
+		$dsId = $this->app()->cfgItem ('dsid', 0);
+		$userLoginHash = md5(strtolower(trim($this->app()->user()->data('login'))));
+
+		$url = 'https://'.$cfgServer['hostingDomain'].'/api/objects/call/hosting-helpdesk-notifications?dsId='.$dsId.'&userLoginHash='.$userLoginHash;
+
+		$ce = new \lib\objects\ClientEngine($this->app());
+		$ce->apiKey = $cfgServer['hostingApiKey'];
+		$result = $ce->apiCall($url);
+
+		if (isset($result['success']) && $result['success'] === 1)
+		{
+			if (isset($result['badges']))
+			{
+				foreach ($result['badges'] as $bk => $bv)
+				{
+					$badges[$bk] = $bv;
+				}
+			}
+		}
 	}
 }
 

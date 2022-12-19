@@ -1,4 +1,5 @@
 var googleMapsApi = 0;
+const g_isMobile = window.matchMedia("(any-pointer:coarse)").matches;
 
 function e10client () {
 
@@ -157,16 +158,16 @@ function e10client () {
 	{
 		if (e.attr('data-object-class-id') === undefined)
 			return;
-	
+
 		var requestParams = {};
 		requestParams['object-class-id'] = e.attr('data-object-class-id');
 		requestParams['action-type'] = e.attr('data-action-type');
 		elementPrefixedAttributes (e, 'data-action-param-', requestParams);
 		if (e.attr('data-pk') !== undefined)
 			requestParams['pk'] = e.attr('data-pk');
-	
+
 			e10.server.api(requestParams, function(data) {
-	
+
 			if (e.parent().hasClass('btn-group'))
 			{
 				e.parent().find('>button.active').removeClass('active');
@@ -320,7 +321,7 @@ function e10client () {
 	};
 
 
-	function e10AttWidgetFileSelected(input) {
+	this.e10AttWidgetFileSelected = function (input) {
 		var infoPanel = $(input).parent().find('div.e10-att-input-files');
 
 		var info = '<table>';
@@ -335,35 +336,35 @@ function e10client () {
 		}
 		info += '</table>';
 		infoPanel.html(info);
-	}
+	};
 
 
-	function e10AttWidgetUploadFile(button) {
-		var table = searchParentAttr(button, 'data-table');
+	this.e10AttWidgetUploadFile = function (button) {
+		var table = e10.searchParentAttr(button, 'data-table');
 		if (table === null)
 			table = '_tmp';
 
-		var pk = searchParentAttr(button, 'data-pk');
+		var pk = e10.searchParentAttr(button, 'data-pk');
 
 		var infoPanel = button.parent().parent().find('div.e10-att-input-files');
 		var input = button.parent().parent().find('input:first').get(0);
 		infoPanel.attr('data-fip', input.files.length);
 		for (var i = 0; i < input.files.length; i++) {
 			var file = input.files[i];
-			var url = e10.server.httpServerRoot + "/upload/e10.base.attachments/" + table + '/' + pk + '/' + file.name;
-			e10AttWidgetUploadOneFile(url, file, infoPanel, i);
+			var url = e10.httpServerRoot + "/upload/e10.base.attachments/" + table + '/' + pk + '/' + file.name;
+			e10.e10AttWidgetUploadOneFile(url, file, infoPanel, i);
 		}
-	}
+	};
 
 
-	function e10AttWidgetUploadOneFile(url, file, infoPanel, idx) {
+	this.e10AttWidgetUploadOneFile = function (url, file, infoPanel, idx) {
 		var xhr = new XMLHttpRequest();
 		xhr.upload.addEventListener("progress", function (e) {
-			e10AttWidgetUploadProgress(e, infoPanel, idx);
+			e10.e10AttWidgetUploadProgress(e, infoPanel, idx);
 		}, false);
 		//xhr.upload.addEventListener ("load", function (e) {e10AttWidgetUploadDone (e, infoPanel, idx);}, false);
 		xhr.onload = function (e) {
-			e10AttWidgetUploadDone(e, infoPanel, idx);
+			e10.e10AttWidgetUploadDone(e, infoPanel, idx);
 		};
 		xhr.open("POST", url);
 		xhr.setRequestHeader("Cache-Control", "no-cache");
@@ -377,9 +378,9 @@ function e10client () {
 		 req.upload.addEventListener("abort", transferCanceled, false);
 		 */
 
-	}
+	};
 
-	function e10AttWidgetUploadDone(e, infoPanel, idx) {
+	this.e10AttWidgetUploadDone = function (e, infoPanel, idx) {
 		var cell = infoPanel.find('table tr:eq(' + idx + ') td:eq(2)');
 		cell.css({"background-color": "green"}).attr('data-ufn', e.target.responseText);
 		var fip = parseInt(infoPanel.attr('data-fip')) - 1;
@@ -387,15 +388,23 @@ function e10client () {
 
 		if (fip == 0) {
 		}
-	}
 
-	function e10AttWidgetUploadProgress(e, infoPanel, idx) {
+		var table = e10.searchParentAttr(infoPanel, 'data-table');
+		if (table === null)
+			table = '_tmp';
+
+		var pk = e10.searchParentAttr(infoPanel, 'data-pk');
+
+		e10.reloadDetail(table, pk);
+	};
+
+	this.e10AttWidgetUploadProgress = function (e, infoPanel, idx) {
 		if (e.lengthComputable) {
 			var percentage = Math.round((e.loaded * 100) / e.total);
 			var cell = infoPanel.find('table tr:eq(' + idx + ') td:eq(2)');
 			cell.text(percentage + ' % ');
 		}
-	}
+	};
 
 	this.init = function () {
 		//if ($.browser.chrome || $.browser.safari)
@@ -485,7 +494,7 @@ function e10client () {
 
 		$("body").on (e10.CLICK_EVENT, "li.e10-static-tab", function(event) {
 			e10StaticTab ($(this), event);
-		});	
+		});
 
 		$("body").on ('keydown', function(event) {
 			e10.keyDown(event, $(this));
@@ -496,7 +505,7 @@ function e10client () {
 		this.pageTabsInit();
 		this.widgetTabsInit();
 	}
-}
+};
 
 
 
@@ -576,6 +585,9 @@ e10client.prototype.loadPage = function (dataPath, successFunction, errorFunctio
 		url += '?app=1';
 	else
 		url += dataPath + '?app=1';
+
+	if (typeof g_initDataPath !== 'undefined' && window['g_UserInfo'] !== undefined && g_initDataPath !== '')
+		url += '&embeddMode=1';
 
 	if (e10.standaloneApp)
 		url += '&standaloneApp='+e10.standaloneApp;
@@ -788,6 +800,21 @@ e10client.prototype.openDocument = function (e) {
 	});
 };
 
+e10client.prototype.reloadDetail = function (table, pk) {
+	e10.closeModal();
+
+	e10.setProgress(1);
+	e10.openModal();
+
+	var url = '/api/d/'+table+'/'+pk;
+	e10.g_formId++;
+	var newElementId = "docPopup" + e10.g_formId;
+
+	e10.server.get (url, function (data) {
+		e10.createDocument(data, newElementId);
+		e10.setProgress(0);
+	});
+};
 
 e10client.prototype.createDocument = function (data, id) {
 	var c = '';

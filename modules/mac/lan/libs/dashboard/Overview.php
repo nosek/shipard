@@ -132,14 +132,17 @@ class Overview extends Content
 
 			$c .= "<td style='vertical-align: middle; padding-left: 1em; line-height: 1.8;padding-top: 1px;'>";
 
+			$cntBadges = 0;
 			if (isset($device['lanBadges']))
 			{
 				foreach ($device['lanBadges'] as $sb)
 				{
 					$sh = $this->lanSensorHelper($device['lan']);
-					if ($sh) {
+					if ($sh)
+					{
 						$bc = $sh->lanBadgeImg($sb['label'], $sb['badgeQuantityId'], $sb['badgeParams'], $sb['lanBadgesUrl'] ?? '');
 						$c .= ' ' . "<span>".$bc."</span>";
+						$cntBadges++;
 					}
 				}
 			}
@@ -151,11 +154,30 @@ class Overview extends Content
 				{
 					$bc = $sh->dsBadgeImg($sb['label'], $sb['badgeQuantityId'], $sb['badgeParams']);
 					$c .= ' '.$bc;
+					$cntBadges++;
 				}
 			}
 
-			if (isset($device['sensors']))
+			if (isset($device['infoBadges']))
 			{
+				if ($cntBadges > 1)
+					$c .= '<br/>';
+				foreach ($device['infoBadges'] as $sb)
+				{
+					$sh = $this->lanSensorHelper($device['lan']);
+					if ($sh)
+					{
+						$bc = $sh->lanBadgeImg($sb['label'], $sb['badgeQuantityId'], $sb['badgeParams'], $sb['lanBadgesUrl'] ?? '');
+						$c .= ' ' . "<span>".$bc."</span>";
+						$cntBadges++;
+					}
+				}
+			}
+
+			if (isset($device['sensors']) && count(($device['sensors'])))
+			{
+				if ($cntBadges > 1)
+					$c .= '<br/>';
 				foreach ($device['sensors'] as $sb)
 				{
 					$c .= ' ' . $sb['code'];
@@ -216,6 +238,18 @@ class Overview extends Content
 				}
 			}
 
+			if (isset($this->overviewData->devices[$treeItemNdx]['deviceBadges']))
+			{
+				foreach ($this->overviewData->devices[$treeItemNdx]['deviceBadges'] as $sb)
+				{
+					$sh = $this->lanSensorHelper($device['lan']);
+					if ($sh) {
+						$bc = $sh->lanBadgeImg($sb['label'], $sb['badgeQuantityId'], $sb['badgeParams'], $sb['lanBadgesUrl'] ?? '');
+						$c .= ' ' . "<span>".$bc."</span>";
+					}
+				}
+			}
+
 			foreach ($device['sensorsBadges'] as $sb)
 			{
 				$sh = $this->macDataSourceSensorHelper($sb['badgeDataSource']);
@@ -265,7 +299,7 @@ class Overview extends Content
 			$c .= "<span class='indicator' id='e10-lan-do-{$treeItemNdx}'>".$this->app()->ui()->icon('system/iconCheck')."</span> ";
 			$c .= utils::es($treeItem['title']);
 			$c .= "</td>";
-			
+
 			$c .= "<td style='vertical-align: middle; padding-left: 1em; line-height: 1.8; padding-top: 1px;'>";
 			if (isset($this->overviewData->devices[$treeItemNdx]['uplinkPortsBadges']))
 			{
@@ -278,6 +312,19 @@ class Overview extends Content
 					}
 				}
 			}
+
+			if (isset($this->overviewData->devices[$treeItemNdx]['deviceBadges']))
+			{
+				foreach ($this->overviewData->devices[$treeItemNdx]['deviceBadges'] as $sb)
+				{
+					$sh = $this->lanSensorHelper($device['lan']);
+					if ($sh) {
+						$bc = $sh->lanBadgeImg($sb['label'], $sb['badgeQuantityId'], $sb['badgeParams']);
+						$c .= ' ' . "<span>".$bc."</span>";
+					}
+				}
+			}
+
 			$c .= "</td>";
 
 			$c .= "</tr>";
@@ -404,7 +451,7 @@ class Overview extends Content
 				];
 			}
 			return NULL;
-		}	
+		}
 
 		return NULL;
 	}
@@ -441,7 +488,7 @@ class Overview extends Content
 			$mainServerLanControl = $this->overviewData->devices[$lanRecData['mainServerLanControl']] ?? NULL;
 			if (!$mainServerLanControl)
 				return NULL;
-		
+
 			$httpsPort = (isset($mainServerLanControl['macDeviceCfg']['httpsPort']) && (intval($mainServerLanControl['macDeviceCfg']['httpsPort']))) ? intval($mainServerLanControl['macDeviceCfg']['httpsPort']) : 443;
 			$url = 'https://'.$mainServerLanControl['macDeviceCfg']['serverFQDN'].':'.$httpsPort.'/netdata/';
 
@@ -460,6 +507,22 @@ class Overview extends Content
 		$cr->content = $this->content;
 		$this->code .= $cr->createCode('body');
 		$this->code .= "<script>e10.widgets.macLan.init('{$this->widget->widgetId}');</script>";
+	}
+
+	function blankContent()
+	{
+		$info = [];
+		$info[] = ['text' => 'Nic tu není...', 'class' => 'h1 block pa1'];
+		$info[] = [
+			'type' => 'action', 'action' => 'addwizard',
+			'text' => 'Přidat první síť', 'data-class' => 'mac.lan.libs.AddWizardLan', 'icon' => 'icon-plus-square',
+			'class' => 'text-center',
+			'data-srcobjecttype' => 'widget', 'data-srcobjectid' => $this->widget->widgetId,
+		];
+
+		$this->addContent (['type' => 'grid', 'cmd' => 'e10-fx-col e10-fx-12 e10-fx-sm-fw e10-fx-wrap e10-fx-sp-between center']);
+		$this->addContent(['type' => 'line', 'line' => $info]);
+		$this->addContent (['type' => 'grid', 'cmd' => 'fxClose']);
 	}
 
 	public function run(\Shipard\UI\Core\WidgetBoard $widget)

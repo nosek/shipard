@@ -120,7 +120,7 @@ function json_minify($json) {
  * @package E10
  */
 
-/* 
+/*
 class CfgItemTable extends DbTable
 {
 	public function __construct($dbmodel)
@@ -151,7 +151,7 @@ class CfgItemTable extends DbTable
  * @package E10
  */
 
-/* 
+/*
 class CfgItemViewer extends TableView
 {
 	var $cfgItemPath;
@@ -497,13 +497,13 @@ class ViewAppOptions extends TableView
 					$vd = $table->viewDefinition ('default');
 				if ($vd && isset($vd['help']))
 					$help = $vd ['help'];
-				if ($icon === '')	
+				if ($icon === '')
 					$icon = $table->tableIcon([]);
 			}
 			elseif (isset($c['help']))
 				$help = $c['help'];
 
-			if ($icon === '')	
+			if ($icon === '')
 				$icon = 'system/iconFile';
 
 			$this->queryRows [] = [
@@ -698,6 +698,11 @@ class FormAppOptions extends TableForm
 		if ($hideHidden && isset ($o['hidden']))
 			$columnOptions = TableForm::coHidden;
 
+		if (isset($o['preHeader']))
+		{
+			$form->addStatic($o['preHeader']);
+		}
+
 		if (isset ($o ['cfgItem']))
 		{
 			$options = [];
@@ -712,12 +717,12 @@ class FormAppOptions extends TableForm
 			}
 			$form->addInputEnum2 ($prefixKey.$o ['cfgKey'], $o ['cfgName'], $options, $style = self::INPUT_STYLE_OPTION);
 		}
-		else
-		if (isset ($o ['options']))
+		elseif (isset ($o ['options']))
 			$form->addInputEnum2 ($prefixKey.$o ['cfgKey'], $o ['cfgName'], $o ['options'], $style = self::INPUT_STYLE_OPTION);
-		else
-		if (isset ($o ['reference']))
+		elseif (isset ($o ['reference']))
 			$form->addInputIntRef ($prefixKey.$o ['cfgKey'], $o ['reference'], $o ['cfgName']);
+		elseif (isset ($o ['subtype']) && $o ['subtype'] === 'color')
+			$form->addInput ($prefixKey.$o ['cfgKey'], $o ['cfgName'], TableForm::INPUT_STYLE_STRING_COLOR, $columnOptions, 100, FALSE, utils::cfgItem($o, 'placeholder', ''));
 		else
 			$form->addInput ($prefixKey.$o ['cfgKey'], $o ['cfgName'], TableForm::INPUT_STYLE_STRING, $columnOptions, 100, FALSE, utils::cfgItem($o, 'placeholder', ''));
 	}

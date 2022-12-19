@@ -1,10 +1,13 @@
 <?php
 
 namespace Shipard\Utils;
-use \e10\str;
-use \e10\uiutils;
+use \Shipard\Utils\Str;
+use \Shipard\Application\DataModel;
 
 
+/**
+ * class Utils
+ */
 class Utils
 {
 	static $dayShortcuts = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
@@ -131,7 +134,7 @@ class Utils
 		else
 		if ($defaultValue !== NULL)
 			$dest [$key] = $defaultValue;
-	}	
+	}
 
 	static function addToTree (&$dest, $key, $value)
 	{
@@ -248,13 +251,24 @@ class Utils
 			}
 		}
 
+		if (isset($item['allowAccessClass']))
+		{
+			$o = $app->createObject($item['allowAccessClass']);
+			if ($o)
+			{
+				if ($o->allowAccess($item))
+					return TRUE;
+			}
+			return FALSE;
+		}
+
 		return TRUE;
 	}
 
 	static function createDateTime ($d, $isTimestamp = FALSE)
 	{
 		if ($d instanceof \DateTimeInterface)
-			return $d;
+			return new \DateTime ($isTimestamp ? $d->format('Y-m-d H:i:s') : $d->format('Y-m-d'));
 		if (is_string($d))
 		{
 			if ($d == '0000-00-00' || $d == '')
@@ -301,7 +315,7 @@ class Utils
 	{
 		if ($time == '' || !$time)
 			return 0;
-		$timeParts = explode (':', $time);
+		$timeParts = preg_split ('/[\:,\.,\-]/', $time);
 		$len = intval ($timeParts[0]) * 60 + intval ($timeParts[1]);
 		return $len;
 	}
@@ -412,11 +426,11 @@ class Utils
 					{
 					 	if ($part[$i] === '0' || $part[$i] === 'o' || $part[$i] === 'i' || $part[$i] === 'l' || $part[$i] === 'j')
 							continue;
-						$id .= $part[$i];	
-					}
-					else	
 						$id .= $part[$i];
-				}	
+					}
+					else
+						$id .= $part[$i];
+				}
 				if (strlen ($id) === $len)
 					return $id;
 			}
@@ -1507,9 +1521,12 @@ class Utils
 		return $cfg;
 	}
 
-	static function tmpFileName ($fileExt, $baseName = 'x')
+	static function tmpFileName ($fileExt, $baseName = 'x', $relative = 0)
 	{
-		$tmpFileName = __APP_DIR__ .'/tmp/'.$baseName.'-' . time() . '-' . mt_rand (1000000, 999999999) . '.' . $fileExt;
+		if ($relative)
+			$tmpFileName = 'tmp/'.$baseName.'-' . time() . '-' . mt_rand (1000000, 999999999) . '.' . $fileExt;
+		else
+			$tmpFileName = __APP_DIR__ .'/tmp/'.$baseName.'-' . time() . '-' . mt_rand (1000000, 999999999) . '.' . $fileExt;
 		return $tmpFileName;
 	}
 
@@ -1537,12 +1554,12 @@ class Utils
 	static function checkFilePermissions ($fullFileName)
 	{
 		$fp = substr(sprintf('%o', fileperms($fullFileName)), -4);
-		if ($fp !== '0660')	
+		if ($fp !== '0660')
 		{
 			if (!chmod ($fullFileName, 0660))
 				error_log("chmod failed on `$fullFileName` [$fp]");
 		}
-		
+
 		$fg = posix_getgrgid(filegroup($fullFileName));
 		if ($fg['name'] !== self::wwwGroup())
 		{
@@ -1674,7 +1691,7 @@ class Utils
 		if (!is_dir($dirName))
 			mkdir($dirName, 0770, true);
 
-		$sn = str::substr($recData['firstName'], 0, 1).str::substr($recData['lastName'], 0, 1);
+		$sn = Str::substr($recData['firstName'], 0, 1).Str::substr($recData['lastName'], 0, 1);
 		$colorId = substr($recData['ndx'], 0, 1);
 		$baseFileName = bin2hex ($sn).'_'.$colorId.'.svg';
 		$fullFileName = $dirName.$baseFileName;

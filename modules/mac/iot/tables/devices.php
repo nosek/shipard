@@ -141,7 +141,7 @@ class TableDevices extends DbTable
 			$cfg['io']['pins'] = $gplCfg['io']['pins'];
 		}
 
-		if ($withExtraPins && $iotDeviceNdx)	
+		if ($withExtraPins && $iotDeviceNdx)
 			$this->addGpioLayoutExtraPins($iotDeviceNdx, $cfg['io']);
 
 		return $cfg;
@@ -155,8 +155,7 @@ class TableDevices extends DbTable
 
 	function addGpioLayoutExtraPins($iotDeviceNdx, &$gpioLayout)
 	{
-		$ioPortExpandersTypes = ['gpio-expander/i2c'];
-		$ioPortExpandersDefs = $this->app()->cfgItem('mac.iot.ioPorts.i2cIOExpanders');
+		$ioPortExpandersTypes = ['gpio-expander/i2c', 'gpio-expander/rs485'];
 
 		$q = [];
 		array_push($q,'SELECT * FROM [mac_iot_devicesIOPorts] WHERE iotDevice = %i', $iotDeviceNdx);
@@ -167,9 +166,14 @@ class TableDevices extends DbTable
 		{
 			$portCfg = json_decode($r['portCfg'], TRUE);
 
-			if (!$portCfg || !isset($portCfg['expType']) || !isset($portCfg['dir']))
+			if (!$portCfg || !isset($portCfg['expType'])/* || !isset($portCfg['dir'])*/)
+				continue;
+			$portTypeCfg = $this->ioPortTypeCfg($r['portType']);
+			$expTypeColDef = Utils::searchArray($portTypeCfg['fields']['columns'], 'id', 'expType');
+			if (!$expTypeColDef)
 				continue;
 
+			$ioPortExpandersDefs = $this->app()->cfgItem($expTypeColDef['enumCfg']['cfgItem']);
 			$expDef = $ioPortExpandersDefs[$portCfg['expType']];
 
 			foreach ($expDef['pins'] as $ep)
@@ -192,7 +196,7 @@ class TableDevices extends DbTable
 	{
 		if ($columnId === 'deviceSettings')
 		{
-			$iotDeviceCfg = $this->iotDeviceCfgFromRecData($recData);	
+			$iotDeviceCfg = $this->iotDeviceCfgFromRecData($recData);
 			if ($iotDeviceCfg && isset($iotDeviceCfg['fields']))
 				return $iotDeviceCfg['fields'];
 
@@ -317,7 +321,7 @@ class FormDevice  extends TableForm
 					$this->addColumnInput ('deviceType');
 					$this->addColumnInput ('deviceVendor');
 					$this->addColumnInput ('deviceModel');
-					
+
 					$this->addSeparator(self::coH2);
 
 					$this->addColumnInput ('fullName');
@@ -327,7 +331,7 @@ class FormDevice  extends TableForm
 					$this->addColumnInput ('lan');
 
 					$this->addSeparator(self::coH2);
-					$this->addSubColumns('deviceSettings');			
+					$this->addSubColumns('deviceSettings');
 				$this->closeTab ();
 
 				if ($useIOPorts)
@@ -351,6 +355,11 @@ class FormDevice  extends TableForm
  */
 class ViewDetailDevice extends TableViewDetail
 {
+	public function createDetailContent ()
+	{
+		if ($this->item['deviceType'] === 'shipard')
+			$this->addDocumentCard('mac.iot.libs.dc.IoTDeviceIoTBox');
+	}
 }
 
 /**

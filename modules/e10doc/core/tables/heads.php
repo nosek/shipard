@@ -1651,6 +1651,81 @@ class TableHeads extends DbTable
 		return implode (', ', $emailsRows);
 	}
 
+	public function loadDocRowItemsCodes(array $headRecData, $personType, array $rowRecData, ?array $personGroups, array &$rowDestData, &$destData)
+	{
+		$codesKinds = $this->app()->cfgItem('e10.witems.codesKinds', []);
+		if (!$personGroups)
+			$personGroups = E10Utils::personGroups($this->app(), $headRecData['person']);
+
+		$addressColumn = 'otherAddress1';
+		$addressNdx = intval($headRecData[$addressColumn] ?? 0);
+		$addressLabels = [];
+		if ($addressNdx)
+		{
+			$labelsRows = $this->db()->query ('SELECT * FROM [e10_base_clsf] WHERE [tableid] = %s', 'e10.persons.address',
+																				' AND [recid] = %i', $addressNdx);
+			forEach ($labelsRows as $lr)
+			{
+				$addressLabels[] = $lr['clsfItem'];
+			}
+		}
+
+		$rowDir = E10Utils::docRowDir ($this->app(), $rowRecData, $headRecData);
+
+		$q = [];
+		array_push ($q, 'SELECT [codes].*, [nomencItems].fullName AS nomencName');
+		array_push ($q, ' FROM [e10_witems_itemCodes] AS [codes]');
+		array_push ($q, ' LEFT JOIN  [e10_base_nomencItems] AS [nomencItems] ON [codes].[itemCodeNomenc] = [nomencItems].[ndx]');
+		array_push ($q, ' WHERE 1');
+		array_push ($q, ' AND [codes].[item] = %i', $rowRecData['item']);
+		array_push ($q, ' AND ([codes].[codeDir] = %i', $rowDir, ' OR [codes].[codeDir] = %i)', 0);
+		array_push ($q, ' AND ([codes].[person] = %i', $headRecData['person'], ' OR [codes].[person] = %i)', 0);
+
+		if ($personType == 1) // human
+			array_push ($q, ' AND ([codes].[personType] = %i', 2, ' OR [codes].[personType] = %i)', 0);
+		elseif ($personType == 2) // company
+			array_push ($q, ' AND ([codes].[personType] = %i', 1, ' OR [codes].[personType] = %i)', 0);
+
+		if (count($addressLabels))
+		{
+			array_push ($q, ' AND ([codes].[addressLabel] IN %in', $addressLabels, ' OR [codes].[addressLabel] = %i)', 0);
+		}
+		else
+			array_push ($q, ' AND ([codes].[addressLabel] = %i)', 0);
+
+		array_push ($q, ' AND (');
+		if (count($personGroups))
+			array_push ($q, ' [codes].[personsGroup] IN %in', $personGroups, ' OR ');
+		array_push ($q, ' [codes].[personsGroup] = %i', 0);
+		array_push ($q, ')');
+
+		array_push ($q, ' ORDER BY [codes].systemOrder');
+
+		$codes = [];
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			$ckNdx = $r['codeKind'];
+			$ck = $codesKinds[$ckNdx];
+
+			if (isset($codes[$ckNdx]))
+				continue;
+
+			if (!isset($destData ['itemCodesHeader'][$ckNdx]))
+			{
+				$destData ['itemCodesHeader'][$ckNdx] = $ck;
+			}
+
+			$irc = $r->toArray();
+			$irc['itemCodeName'] = $ck['fn'];
+			if ($r['nomencName'])
+				$irc['itemCodeTitle'] = $r['nomencName'];
+
+			$codes[$ckNdx] = $irc;
+		}
+		$rowDestData ['rowItemCodesData'] = $codes;
+	}
+
 	public function printAfterConfirm (&$printCfg, &$recData, $docState, $saveData = NULL)
 	{
 		if (isset($docState['printAfterConfirm']) && is_array($docState['printAfterConfirm']))
@@ -1913,9 +1988,9 @@ class TableHeads extends DbTable
 			$taxReg = $this->app()->cfgItem('e10doc.base.taxRegs.'.$form->recData['vatReg'], NULL);
 			if ($taxReg)
 				return E10Utils::taxCountries ($this->app(), $taxReg['taxArea']);
-			return [];	
+			return [];
 		}
-		return parent::columnInfoEnum ($columnId, $valueType = 'cfgText', $form);	
+		return parent::columnInfoEnum ($columnId, $valueType = 'cfgText', $form);
 	}
 
 	public function columnInfoEnumTest ($columnId, $cfgKey, $cfgItem, TableForm $form = NULL)
@@ -2032,7 +2107,7 @@ class TableHeads extends DbTable
 					'base' => $r['sumBaseHc'], 'tax' => $r['sumTaxHc'], 'total' => $r['sumTotalHc'],
 					'_options' => ['cellClasses' => $cellClasses]
 				];
-			}	
+			}
 		}
 
 		// -- total
@@ -2091,12 +2166,16 @@ class TableHeads extends DbTable
 	public function resetRowItem ($headRecData, &$rowRecData, $itemRecData, $docType)
 	{
 		$rowRecData ['itemType'] = '';
+		$rowRecData ['rowVds'] = 0;
 		if (!$itemRecData)
+		{
 			return;
-
+		}
 		$rowRecData ['text'] = $itemRecData['fullName'];
 		$rowRecData ['taxRate'] = $itemRecData['vatRate'];
 		$rowRecData ['unit'] = $itemRecData['defaultUnit'];
+
+		$this->resetRowItem_Vds($headRecData, $rowRecData, $itemRecData, $docType);
 
 		switch ($docType ['tradeDir'])
 		{
@@ -2130,7 +2209,6 @@ class TableHeads extends DbTable
 
 	function resetRowItem_PriceSell($headRecData, $rowRecData, $itemRecData, $docType)
 	{
-		error_log("__1__");
 		if ($headRecData['taxCalc'] == 1)
 		{ // ze základu
 			if ($itemRecData['priceSellBase'] != 0.0)
@@ -2170,6 +2248,22 @@ class TableHeads extends DbTable
 			return $itemRecData ['priceSell'];
 
 		return 0.0;
+	}
+
+	function resetRowItem_Vds($headRecData, &$rowRecData, $itemRecData, $docType)
+	{
+		$q = [];
+		array_push ($q, 'SELECT * FROM [e10doc_base_docRowsVDSCfg] WHERE 1');
+		array_push ($q, ' AND [docStateMain] IN %in', [0, 2]);
+		array_push ($q, ' AND ([docType] = %s', $headRecData ['docType'], ' OR [docType] = %s)', '');
+		array_push ($q, ' AND ([docKind] = %i', $headRecData ['docKind'], ' OR [docKind] = 0)');
+		array_push ($q, ' AND ([docDbCounter] = %i', $headRecData ['dbCounter'], ' OR [docDbCounter] = 0)');
+		array_push ($q, ' AND ([witem] = %i', $itemRecData ['ndx'], ' OR [witem] = 0)');
+		array_push ($q, ' ORDER BY [systemOrder], [order], [ndx]');
+
+		$vds = $this->db()->query($q)->fetch();
+		if ($vds)
+			$rowRecData ['rowVds'] = $vds['vds'];
 	}
 
 	public function rowItemHistoryPrice ($headRecData, &$rowRecData, $itemRecData, $docType)
@@ -3160,9 +3254,9 @@ class ViewHeads extends TableView
 				if ($taxReg['payerKind'] === 0)
 					$taxRegLabel = ['text' => strtoupper($taxReg['taxCountry']), 'class' => 'label label-default', 'icon' => 'tables/e10doc.base.taxRegs'];
 				else
-					$taxRegLabel = ['text' => 'OSS', 'suffix' => strtoupper($item['taxCountry']), 'class' => 'label label-default', 'icon' => 'tables/e10doc.base.taxRegs'];	
+					$taxRegLabel = ['text' => 'OSS', 'suffix' => strtoupper($item['taxCountry']), 'class' => 'label label-default', 'icon' => 'tables/e10doc.base.taxRegs'];
 
-				$props [] = $taxRegLabel;	
+				$props [] = $taxRegLabel;
 			}
 		}
 

@@ -257,9 +257,13 @@ class TableRenderer extends \Shipard\Base\BaseObject
 				{
 					if ($this->form)
 					{
-						//$this->subColumnInfo,
-						$this->form->addColumnInput($cv['scInput'], 0, FALSE, $this->formColumnId);
-						$ct = $this->form->lastInputCode;
+						$colDef = utils::searchArray($this->subColumnInfo['columns'], 'id', $cv['scInput']);
+						$sco = \Shipard\UI\Core\UIUtils::subColumnEnabled ($colDef, $this->subColumnData[$cv['scInput']]);
+						if ($sco !== FALSE)
+						{
+							$this->form->addColumnInput($cv['scInput'], $sco, FALSE, $this->formColumnId);
+							$ct = $this->form->lastInputCode;
+						}
 					}
 					elseif ($this->subColumnData)
 					{
@@ -272,6 +276,11 @@ class TableRenderer extends \Shipard\Base\BaseObject
 								$ct = strval($this->subColumnData[$cv['scInput']]);
 						}
 					}
+				}
+				elseif (isset($cv['scInputValue']))
+				{
+					$colDef = utils::searchArray($this->subColumnInfo['columns'], 'id', $cv['scInputValue']);
+					$ct = $this->app->subColumnValue ($colDef, $this->subColumnData[$cv['scInputValue']]);
 				}
 				else
 					$ct = $this->app()->ui()->composeTextLine($cv, '');
@@ -368,6 +377,12 @@ class TableRenderer extends \Shipard\Base\BaseObject
 		else
 			if (isset ($this->params ['tableClass']))
 				$tableClass .= ' ' . $this->params ['tableClass'];
+
+		if ($this->app()->printMode)
+		{
+			if (isset ($this->params ['forceTableClassPrint']))
+				$tableClass = $this->params ['forceTableClassPrint'];
+		}
 
 		$c = "<table class='$tableClass'";
 		if (isset ($this->params ['tableCss']))

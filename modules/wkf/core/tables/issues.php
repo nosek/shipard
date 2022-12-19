@@ -38,6 +38,18 @@ class TableIssues extends DbTable
 			$this->app()->db()->query ("UPDATE [wkf_core_issues] SET [issueId] = %s WHERE [ndx] = %i", $recData['issueId'], $recData['ndx']);
 		}
 
+		$ik = $this->app()->cfgItem ('wkf.issues.kinds.'.$recData['issueKind'], NULL);
+		if ($ik && $recData['docState'] === 4000 && $recData['activateCnt'] === 1)
+		{
+			$emailForwardOnFirstConfirm = intval($ik['emailForwardOnFirstConfirm'] ?? 0);
+			if ($emailForwardOnFirstConfirm)
+			{
+				$ife = new \wkf\core\libs\IssueEmailForwardEngine($this->app());
+				$ife->setIssueNdx($recData['ndx']);
+				$ife->send();
+			}
+		}
+
 		// -- add mark to notified/assigned users
 		/*
 		if ($recData['docStateMain'] === 1)
@@ -122,6 +134,16 @@ class TableIssues extends DbTable
 			return $states;
 		}
 
+		$specialDocStates = $this->app()->cfgItem('wkf.issues.docStates.kind'.$recData['issueKind'], NULL);
+		if ($specialDocStates)
+		{
+			$states = $this->app()->model()->tableProperty ($this, 'states');
+			if ($states)
+				$states ['states'] = $specialDocStates;
+
+			return $states;
+		}
+
 		return parent::documentStates($recData);
 	}
 
@@ -146,6 +168,15 @@ class TableIssues extends DbTable
 			'title' => $recData['subject'], 'docID' => '#'.$recData['ndx'],
 			'docType' => $recData['issueType'], 'docTypeName' => $issueType['name']
 		];
+
+		if (isset($recData['workOrder']) && $recData['workOrder'])
+		{
+			$woRecData = $this->app()->loadItem($recData['workOrder'], 'e10mnf.core.workOrders');
+			if ($woRecData && isset($woRecData['customer']) && $woRecData['customer'])
+				$info ['persons']['to'][] = $woRecData['customer'];
+		}
+
+		$info ['persons']['from'][] = intval($this->app()->cfgItem ('options.core.ownerPerson', 0));
 
 		return $info;
 	}
@@ -703,7 +734,7 @@ class TableIssues extends DbTable
 		return parent::subColumnsInfo ($recData, $columnId);
 	}
 
-	public function addIssue($issue)
+	public function addIssue($issue, $moveAttachments = true)
 	{
 		$recData = $issue['recData'];
 
@@ -743,7 +774,7 @@ class TableIssues extends DbTable
 		if (isset($issue['attachments']) && count($issue['attachments']))
 		{
 			foreach ($issue['attachments'] as $att)
-				\E10\Base\addAttachments($this->app(), 'wkf.core.issues', $issueNdx, $att['fullFileName'], '', true);
+				\E10\Base\addAttachments($this->app(), 'wkf.core.issues', $issueNdx, $att['fullFileName'], '', $moveAttachments);
 		}
 
 		$this->checkAfterSave2($recData);

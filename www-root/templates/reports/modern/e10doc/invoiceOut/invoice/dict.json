@@ -11,11 +11,11 @@
     "it": "Fattura",
     "sk": "Faktúra"
   },
-  "Ev. číslo": {
-    "de": "Nr.",
-    "en": "No.",
-    "it": "Num.",
-    "sk": "Číslo"
+  "číslo": {
+    "de": "nr.",
+    "en": "no.",
+    "it": "num.",
+    "sk": "číslo"
   },
   "Dodavatel": {
     "de": "Lieferant",
@@ -311,11 +311,11 @@
     "it": "Codice QR",
     "sk": "QR kód"
   },
-  "Vytištěno aplikací": {
+  "Vystaveno v aplikaci": {
     "de": "Gedrückt mit",
-    "en": "Printed by",
+    "en": "Printed in",
     "it": "Stampato da",
-    "sk": "Vytlačené aplikácií"
+    "sk": "Vystavené v aplikácii"
   },
   "Zákazník": {
     "de": "Klient",

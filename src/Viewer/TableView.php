@@ -9,7 +9,7 @@ use \e10\uiutils;
 
 class TableView extends \Shipard\Base\BaseObject
 {
-	/** @var \Shipard\Base\DbTable */
+	/** @var \Shipard\Table\DbTable */
 	var $table;
 
 	protected $db;
@@ -212,7 +212,7 @@ class TableView extends \Shipard\Base\BaseObject
 
 	public function addGroupHeader ($name)
 	{
-		$this->objectData ['dataItems'][] = array ('groupName' => $name);
+		$this->objectData ['dataItems'][] = ['groupName' => $name];
 	}
 
 	public function addListItem ($listItem)
@@ -538,7 +538,7 @@ class TableView extends \Shipard\Base\BaseObject
 		if (!$this->fullWidthToolbar)
 			$c .= $this->createTopMenuSearchCode ();
 
-		$c .= "<{$this->htmlRowsElement} class='df2-viewer-list e10-viewer-list$listClass' id='{$this->vid}Items' data-rowspagenumber='0'".
+		$c .= "<{$this->htmlRowsElement} style='z-index: 499;' class='df2-viewer-list e10-viewer-list$listClass' id='{$this->vid}Items' data-rowspagenumber='0'".
 					"data-viewer='$this->vid' data-rowelement='{$this->htmlRowElement}'>";
 		$c .= $this->rows ();
 		$c .= "</{$this->htmlRowsElement}>";
@@ -602,8 +602,7 @@ class TableView extends \Shipard\Base\BaseObject
 
 		if ($this->accessLevel === 2 || $this->accessLevel === 30)
 		{
-			$toolbar [] = ['type' => 'action', 'action' => 'newform', 'text' => DictSystem::text(DictSystem::diBtn_Insert)];
-			$this->createToolbarAddButton ($toolbar[0]);
+			$this->createToolbarAddButton ($toolbar);
 		}
 
 		if ($this->accessLevel === 2 || $this->accessLevel === 30)
@@ -632,8 +631,9 @@ class TableView extends \Shipard\Base\BaseObject
 		return $toolbar;
 	} // createToolbar
 
-	public function createToolbarAddButton (&$button)
+	public function createToolbarAddButton (&$toolbar)
 	{
+		$toolbar [] = ['type' => 'action', 'action' => 'newform', 'text' => DictSystem::text(DictSystem::diBtn_Insert)];
 	}
 
 	public function createToolbar_addWizard (&$toolbar, $addWizard)
@@ -726,7 +726,10 @@ class TableView extends \Shipard\Base\BaseObject
 													if (isset ($btn ['table']))
 														$dataTable = "data-table='{$btn ['table']}' ";
 													break;
-				}
+					case '':				$class .= 'btn btn-success';
+													$icon = $this->app()->ui()->icon($btn['icon'] ?? 'system/actionAddWizard');
+													break;
+			}
 				$btnParams = '';
 				if (isset ($btn['data-class']))
 					$btnParams .= "data-class='{$btn['data-class']}' ";
@@ -738,7 +741,11 @@ class TableView extends \Shipard\Base\BaseObject
 
 				if (isset ($btn['subButtons']) || isset ($btn['dropdownMenu']))
 					$c .= "<div class='btn-group'>";
-				$c .= "<button class='btn {$btnClass}$class df2-{$btn['type']}-trigger e10-sv-tlbr-btn-{$btn['action']}' {$dataTable}data-action='{$btn['action']}' data-viewer='{$this->vid}' $btnParams>{$icon}&nbsp;{$btnText}</button>";
+
+				if ($btn['action'] === '')
+					$c .= "<button type='button' class='$class $btnClass dropdown-toggle' data-toggle='dropdown'>{$icon}&nbsp;{$btnText}&nbsp;<span class='caret'></span></button>";
+				else
+					$c .= "<button class='btn {$btnClass}$class df2-{$btn['type']}-trigger e10-sv-tlbr-btn-{$btn['action']}' {$dataTable}data-action='{$btn['action']}' data-viewer='{$this->vid}' $btnParams>{$icon}&nbsp;{$btnText}</button>";
 				if (isset ($btn['subButtons']))
 				{
 					foreach($btn['subButtons'] as $subbtn)
@@ -746,10 +753,11 @@ class TableView extends \Shipard\Base\BaseObject
 				}
 				if (isset ($btn['dropdownMenu']))
 				{
-					$c .= '
-					<button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown">
-						<span class="caret"></span>
- 					</button>';
+					if ($btn['action'] != '')
+						$c .= '
+							<button type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown">
+								<span class="caret"></span>
+							</button>';
 
 					$c .= '<ul class="dropdown-menu" role="menu">';
 
@@ -815,8 +823,20 @@ class TableView extends \Shipard\Base\BaseObject
 
 		$h = "";
 
+		$activeTab = 0;
+		$idx = 0;
+		forEach ($this->bottomTabs as $q)
+		{
+			if ($q['active'])
+			{
+				$activeTab = $idx;
+				break;
+			}
+			$idx++;
+		}
+
 		$h .= "<div class='viewerBottomTabs'>";
-		$h .= "<input name='bottomTab' type='hidden' value='{$this->bottomTabs[0]['id']}'/>";
+		$h .= "<input name='bottomTab' type='hidden' value='{$this->bottomTabs[$activeTab]['id']}'/>";
 
 		$activeTab = 0;
 		$idx = 0;
@@ -963,7 +983,7 @@ class TableView extends \Shipard\Base\BaseObject
 				if ($this->toolbarTitle)
 					$h .= "<td class='pr1'>".$this->app()->ui()->composeTextLine($this->toolbarTitle).'</td>';
 
-				$h .= "<td id='{$this->toolbarElementId}__Main' style='white-space: pre;right: 2rem; max-width: 70%;'>";
+				$h .= "<td id='{$this->toolbarElementId}__Main' style='right: 2rem; max-width: 70%;'>";
 				$h .= $this->createToolbarCode ();
 				$h .= "<div id='{$this->toolbarElementId}' style='display: inline-block; padding-left: 1em; padding-right: 1em;'>";
 				$h .= '</div>';
@@ -1181,8 +1201,8 @@ class TableView extends \Shipard\Base\BaseObject
 		}
 
 		$class = "r";
-		if (isset ($listItem ['txt']))
-			$class .= " t";
+		//if (isset ($listItem ['txt']))
+		//	$class .= " t";
 		if (isset ($listItem['class']))
 			$class .= " {$listItem['class']}";
 		if ($this->htmlRowElementClass !== '')
@@ -1208,7 +1228,7 @@ class TableView extends \Shipard\Base\BaseObject
 				$codeLine .= " data-url-download='".Utils::es($listItem ['data-url-download'])."'";
 				$codeLine .= " data-action='open-link'";
 		}
-	
+
 		$codeLine .= ">";
 
 		$codeLine .= $this->rowHtmlContent ($listItem);
@@ -1258,9 +1278,12 @@ class TableView extends \Shipard\Base\BaseObject
 			$codeLine .= "<td class='df2-list-item-icon'>{$icon}</span></td>";
 		}
 		else
-		if ((isset ($listItem ['image'])) && ($listItem ['image'] !== ''))
+		if (isset ($listItem ['image']))
 		{
-			$codeLine .= "<td class='df2-list-item-image'><img src='{$listItem ['image']}'></td>";
+			$codeLine .= "<td class='df2-list-item-image'>";
+			if ($listItem ['image'] !== '')
+				$codeLine .= "<img src='{$listItem ['image']}'>";
+			$codeLine .= '</td>';
 		}
 		elseif ((isset ($listItem ['emoji'])))
 		{
@@ -1312,8 +1335,8 @@ class TableView extends \Shipard\Base\BaseObject
 			$codeLine .= "<div class='df2-list-item-t3'>" . $this->app()->ui()->composeTextLine ($listItem['t3']) . '</div>';
 
 		if (isset ($listItem ['txt']))
-			$codeLine .= "<div class='txt'>{$listItem ['txt']}</div>";
-		
+			$codeLine .= "<div class='pageText'>{$listItem ['txt']}</div>";
+
 		if (isset($listItem['content']))
 		{
 			if (!$this->contentRenderer)
@@ -1322,11 +1345,25 @@ class TableView extends \Shipard\Base\BaseObject
 			$this->contentRenderer->setContent ($listItem ['content']);
 			$codeLine .= "<div class='content'>".$this->contentRenderer->createCode ()."</div>";;
 		}
-	
+
 		$codeLine .= "</td>";
 
-		//if ($this->inlineDetailClass != '')
-		//	$codeLine .= "<td class='df2-list-item-idb'></td>";
+		if (isset ($listItem ['rightImage']))
+		{
+			$imgCellClass = $listItem ['rightImage']['cellClass'] ?? 'df2-list-item-image';
+
+			$params = '';
+			if (isset($listItem['rightImage']['image']))
+			{
+				$params = " data-action='open-popup' data-popup-id='XYZ' data-popup-url='{$listItem['rightImage']['image']}' with-shift='tab'";
+				$imgCellClass .= ' df2-action-trigger';
+			}
+
+			$codeLine .= "<td class='$imgCellClass' $params>";
+			if (isset($listItem ['rightImage']['thumb']))
+				$codeLine .= "<img src='{$listItem ['rightImage']['thumb']}' style='max-width: 100%; margin-left: 6px; padding: 2px;'>";
+			$codeLine .= '</td>';
+		}
 
 		$codeLine .= "</tr>";
 		$codeLine .= "</table>";
@@ -1655,6 +1692,13 @@ class TableView extends \Shipard\Base\BaseObject
 			return;
 		}
 
+		if ($this->paneMode && $this->rowsPageNumber === 0)
+		{
+			$zrc = $this->zeroRowCode();
+			if ($zrc !== '')
+				$this->addHtmlItem($zrc);
+		}
+
 		$this->rowsLoadNext = 0;
 		$this->lineRowNumber = 0;
 		foreach ($this->queryRows as $item)
@@ -1808,6 +1852,11 @@ class TableView extends \Shipard\Base\BaseObject
 				$ct = substr ($ch, 1);
 				$this->gridColClasses [$cn] = 'number';
 			}
+			else if ($ch [0] == '*')
+			{
+				$ct = substr ($ch, 1);
+				$this->gridColClasses [$cn] = 'e10-icon';
+			}
 			else if ($ch [0] == ' ')
 			{
 				$ct = substr ($ch, 1);
@@ -1825,7 +1874,7 @@ class TableView extends \Shipard\Base\BaseObject
 			}
 			else
 				$ct = $ch;
-			$this->gridTableHeaderCode .= "<th class='{$this->gridColClasses [$cn]}'>" . utils::es ($ct) . "</th>";
+			$this->gridTableHeaderCode .= "<th class='{$this->gridColClasses [$cn]}'>".$this->app()->ui()->composeTextLine($ct).'</th>';
 		}
 		$this->gridTableHeaderCode .= '</tr></thead>';
 	}

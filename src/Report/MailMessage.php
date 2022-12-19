@@ -1,6 +1,9 @@
 <?php
 
 namespace Shipard\Report;
+
+require_once __SHPD_MODULES_DIR__ . 'e10/base/base.php';
+
 use \Shipard\Utils\Utils;
 use \Shipard\Utils\Str;
 
@@ -137,7 +140,7 @@ class MailMessage extends \Shipard\Base\Utility
 		if ($this->reportPrinted)
 			$issue['systemInfo']['printed'] = ['status' => 1];
 
-		$tableIssues->addIssue($issue);
+		$tableIssues->addIssue($issue, FALSE);
 	}
 
 	public function sendMail ()
