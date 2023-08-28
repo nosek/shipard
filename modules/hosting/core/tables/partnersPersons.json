@@ -3,7 +3,7 @@
 	"columns": [
 		{"id": "ndx", "name": "id", "type": "int_ai"},
 		{"id": "person", "name": "Osoba", "type": "int", "reference": "e10.persons.persons"},
-		{"id": "partner", "name": "Partner", "type": "int", "reference": "e10pro.hosting.server.partners"},
+		{"id": "partner", "name": "Partner", "type": "int", "reference": "hosting.core.partners"},
 
 		{"id": "isAdmin", "name": "Správce partnera", "type": "logical"},
 		{"id": "isSupport", "name": "Technická podpora zákazníků", "type": "logical"},

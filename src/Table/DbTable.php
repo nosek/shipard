@@ -173,7 +173,7 @@ class DbTable
 				if ($textKey == "")
 					$thisText = $item;
 				else
-					$thisText = $item [$textKey];
+					$thisText = $item [$textKey] ?? '';
 
 				$thisValue = "";
 				if ($valueKey == "")
@@ -1374,7 +1374,7 @@ class DbTable
 	}
 
 
-	public function getTableView ($viewId, $queryParams = NULL)
+	public function getTableView ($viewId, $queryParams = NULL, $requestParams = NULL)
 	{
 		$v = NULL;
 
@@ -1398,6 +1398,7 @@ class DbTable
 
 		if ($v)
 		{
+			$v->requestParams = $requestParams;
 			$v->viewerDefinition = $vd;
 			if ($v->rowsPageNumber !== -1)
 			{
@@ -1448,7 +1449,7 @@ class DbTable
 		if (isset ($recData [$stateColumn]))
 		{
 			$stateValue = $recData [$stateColumn];
-			$info ['state'] = $states ['states'][$stateValue];
+			$info ['state'] = $states ['states'][$stateValue] ?? '';
 			$info ['readOnly'] = isset ($states ['states'][$stateValue]['readOnly']) ? $states ['states'][$stateValue]['readOnly'] : 0;
 		}
 
@@ -1468,7 +1469,7 @@ class DbTable
 		switch ($key)
 		{
 			case	'styleClass':
-				return 'e10-docstyle-'. $states ['states'][$stateValue]['stateStyle'];
+				return 'e10-docstyle-'. (isset($states ['states'][$stateValue]) ? ($states ['states'][$stateValue]['stateStyle'] ?? 'unknown') : '');
 			case	'enablePrint':
 				return isset ($states ['states'][$stateValue]['enablePrint']) ? $states ['states'][$stateValue]['enablePrint'] : 0;
 			case	'notify':
@@ -1535,6 +1536,8 @@ class DbTable
 		{
 			forEach ($reports as $r)
 			{
+				if (!utils::enabledCfgItem($this->app(), $r))
+					continue;
 				if (isset ($r['role']) && !$this->app()->hasRole($r['role']))
 					continue;
 				if (isset ($r['roles']))
@@ -1595,6 +1598,19 @@ class DbTable
 				$btn ['data-printer'] = $printer;
 				$btn ['data-table'] = $this->tableId();
 				$btn ['data-pk'] = $recData['ndx'];
+
+				if (utils::param($r, 'rasterPrint', 0))
+				{
+					$btn ['data-print'] = 1;
+					$btn['subButtons'] = [];
+					$btn['subButtons'][] = [
+						'type' => 'action', 'action' => 'print',
+						'style' => 'print', 'text' => '', 'data-report' => $r ['class'],
+						'data-table' => $this->tableId(), 'data-pk' => $recData['ndx'],
+						'data-printer' => $printer,
+						'icon' => 'system/iconImage',
+					];
+				}
 
 				if (utils::param($r, 'email', 0))
 				{
@@ -1668,5 +1684,24 @@ class DbTable
 	function propertyEnabled ($recData, $groupId, $propertyId, $property, $loadedProperties)
 	{
 		return TRUE;
+	}
+
+	function itemMainBCId ($recData)
+	{
+		$totalLen = 12;
+		$bcTableId = strtoupper(base_convert($this->ndx, 10, 36));
+		$ndxId = strtoupper(base_convert($recData['ndx'] ?? 0, 10, 36));
+
+		$bcId = $bcTableId;
+
+		$bcId .= '-'.$ndxId;
+		$bcId .= '-';
+		while (strlen($bcId) < $totalLen)
+		{
+			$r = strtoupper(base_convert(mt_rand(1000, 9999), 10, 36));
+			$bcId .= $r[0];
+		}
+
+		return $bcId;
 	}
 }

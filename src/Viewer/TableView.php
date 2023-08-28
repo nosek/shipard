@@ -79,7 +79,10 @@ class TableView extends \Shipard\Base\BaseObject
 	var $info = [];
 
 	/**@var \E10\ContentRenderer */
-	protected $contentRenderer;
+	var $contentRenderer;
+	var $requestParams = NULL;
+	var $ngRenderer = NULL;
+	var $uiSubTemplate = '';
 
 	var $comboSettings;
 	var $saveAs = '';
@@ -157,6 +160,13 @@ class TableView extends \Shipard\Base\BaseObject
 		$this->addParams [$colParamName] = $value;
 	}
 
+
+	public function requestParam($paramId)
+	{
+		if ($this->requestParams)
+			return $this->requestParams[$this->requestParams[$paramId]] ?? NULL;
+	}
+
 	public function appendAsSubObject ()
 	{
 		$this->app()->response->addSubObject($this->vid, 'viewer');
@@ -229,13 +239,18 @@ class TableView extends \Shipard\Base\BaseObject
 
 	public function addListItem2 ($listItem)
 	{
-		$h = $this->rowHtml ($listItem);
+		$h = ($this->ngRenderer) ? $this->ngRenderer->rowHtml($listItem) : $this->rowHtml ($listItem);
 		$this->addHtmlItem($h, $listItem);
 	}
 
-
 	public function addEndMark ()
 	{
+		if ($this->ngRenderer)
+		{
+			$this->ngRenderer->addEndMark();
+			return;
+		}
+
 		$txt = ($this->rowsLoadNext) ? 'Načítají se další řádky' : $this->endMark (($this->rowsPageNumber === 0 && $this->countRows === 0));
 		if ($this->mode === 'panes')
 		{
@@ -640,17 +655,17 @@ class TableView extends \Shipard\Base\BaseObject
 	{
 		if ($addWizard)
 		{
-			$newItem = array ('type' => 'action', 'action' => 'addwizard', 'text' => '', 'data-class' => $addWizard ['class']);
+			$newItem = ['type' => 'action', 'action' => 'addwizard', 'text' => '', 'data-class' => $addWizard ['class']];
 			if (isset ($addWizard['icon']))
 				$newItem['icon'] = $addWizard['icon'];
 			if (isset ($addWizard['text']))
 				$newItem['text'] = $addWizard['text'];
 
+			if (!utils::enabledCfgItem ($this->app, $addWizard))
+				return;
+
 			if (isset($addWizard['place']))
 			{
-				if (isset ($addWizard['enabledCfgItem']) && $this->app()->cfgItem($addWizard['enabledCfgItem'], 0) == 0)
-					return;
-
 				$toolbar [0]['dropdownMenu'][] = $newItem;
 			}
 			else
@@ -1099,6 +1114,9 @@ class TableView extends \Shipard\Base\BaseObject
 
 	public function init ()
 	{
+		if (isset($this->requestParams['rowsPageNumber']))
+			$this->rowsPageNumber = intval($this->requestParams['rowsPageNumber']);
+
 		$this->rowsFirst = $this->rowsPageNumber * $this->rowsPageSize;
 		$this->rowsLoadNext = 0;
 
@@ -1227,6 +1245,7 @@ class TableView extends \Shipard\Base\BaseObject
 		{
 				$codeLine .= " data-url-download='".Utils::es($listItem ['data-url-download'])."'";
 				$codeLine .= " data-action='open-link'";
+				$codeLine .= " data-popup-id='NEW-TAB'";
 		}
 
 		$codeLine .= ">";
@@ -1454,7 +1473,7 @@ class TableView extends \Shipard\Base\BaseObject
 				if (count ($details) === 0)
 					$details ['default'] = [
 						'title' => 'Detail', 'icon' => 'system/detailDetail', 'order' => 1,
-						'class' => $this->viewerDefinition ['detail']
+						'class' => $this->viewerDefinition ['detail'] ?? ''
 					];
 
 				$details [$gdid] = $gd;

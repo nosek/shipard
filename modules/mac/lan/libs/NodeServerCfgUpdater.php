@@ -122,7 +122,7 @@ class NodeServerCfgUpdater extends Utility
 				else
 					$s['mqttServerHost'] = $mainServers[$r['mainServerIot']]['macDeviceCfgX']['serverFQDN'];
 
-				$s['mqttServerIPV4'] = $mainServers[$r['mainServerIot']]['macDeviceCfgX']['mqttServerIPV4'] ?? '';	
+				$s['mqttServerIPV4'] = $mainServers[$r['mainServerIot']]['macDeviceCfgX']['mqttServerIPV4'] ?? '';
 			}
 
 			$cfgData = $s;
@@ -137,6 +137,15 @@ class NodeServerCfgUpdater extends Utility
 			if ($macDeviceCfg['enableCams'])
 			{
 				$cfgData['camerasURL'] = 'https://'.$macDeviceCfg['serverFQDN'] . ($cfgData['httpsPort'] !== 443 ? ':'.$cfgData['httpsPort'].'/' : '/');
+
+				if ($macDeviceCfg['httpPictReceiverListenIP'] != '')
+				{
+					$cfgData['httpPictReceiverListenIP'] = $macDeviceCfg['httpPictReceiverListenIP'];
+					$cfgData['httpPictReceiverListenPort'] = $macDeviceCfg['httpPictReceiverListenPort'];
+					if (!$cfgData['httpPictReceiverListenPort'])
+						$cfgData['httpPictReceiverListenPort'] = 8021;
+				}
+
 				$this->nodeServerConfigCameras($cfgData, $r['ndx'], $r['lan'], $r['mainServerCameras'] === $r['ndx'], $macDeviceCfg);
 				$this->nodeServerConfigLanControl($cfgData, $r['ndx'], $r['lan'], $r['mainServerLanControl'] === $r['ndx']);
 			}
@@ -150,7 +159,7 @@ class NodeServerCfgUpdater extends Utility
 				foreach ($af as $afIP)
 					$cfgData['wssAllowedFrom'][] = trim($afIP);
 
-				$this->nodeServerNginxProxies($cfgData, $r['ndx'], $r['lan'], $r['mainServerLanControl'] === $r['ndx']);	
+				$this->nodeServerNginxProxies($cfgData, $r['ndx'], $r['lan'], $r['mainServerLanControl'] === $r['ndx']);
 				$this->nodeServerConfigIotBoxes($cfgData, $r['ndx'], $r['lan'], $r['mainServerLanControl'] === $r['ndx']);
 				$this->nodeServerConfigIotThings($cfgData, $r['ndx'], $r['lan'], $r['mainServerLanControl'] === $r['ndx']);
 				$this->nodeServerConfigLanControl($cfgData, $r['ndx'], $r['lan'], $r['mainServerLanControl'] === $r['ndx']);
@@ -240,6 +249,7 @@ class NodeServerCfgUpdater extends Utility
 
 	function nodeServerConfigCameras (&$cfgData, $serverNdx, $lanNdx, $isDefaultServer, $serverMacDeviceCfg)
 	{
+		/*
 		$cameras = [];
 		$q[] = 'SELECT * FROM [mac_lan_devices] WHERE [deviceKind] = 10 AND [docState] != 9800 ';
 
@@ -276,6 +286,13 @@ class NodeServerCfgUpdater extends Utility
 
 		if (count($cameras))
 			$cfgData['cameras'] = $cameras;
+		*/
+
+		$ccc = new \mac\iot\libs\CamsCfgCreator($this->app());
+    $ccc->create($serverNdx, $lanNdx, $isDefaultServer);
+
+		if (count($ccc->cfgs))
+			$cfgData['cameras'] = $ccc->cfgs;
 	}
 
 	function nodeServerConfigIotBoxes (&$cfgData, $serverNdx, $lanNdx, $isDefaultServer)
@@ -319,6 +336,13 @@ class NodeServerCfgUpdater extends Utility
 		$iecc = new \mac\iot\libs\IotEngineCfgCreator($this->app());
 		$iecc->init();
 		$iecc->run();
+
+		if (isset($cfgData['zigbee2mqttTopics']))
+		{
+			$iecc->cfg['zigbee2mqttTopics'] = $cfgData['zigbee2mqttTopics'];
+			unset($cfgData['zigbee2mqttTopics']);
+		}
+
 		$cfgData['iotThings'] = $iecc->cfg;
 	}
 
@@ -372,6 +396,7 @@ class NodeServerCfgUpdater extends Utility
 	function nodeServerNginxProxies (&$cfgData, $serverNdx, $lanNdx, $isDefaultServer)
 	{
 		$proxies = [];
+		$zigbee2mqttTopics = [];
 
 		$q [] = 'SELECT devices.*';
 		array_push($q, ' FROM [mac_lan_devices] AS [devices]');
@@ -406,25 +431,25 @@ class NodeServerCfgUpdater extends Utility
 				if (!$destPort)
 					$destPort = 19999;
 				$proxy = [
-					'id' => $proxyId, 
+					'id' => $proxyId,
 					'type' => 'netdata',
-					'destIP' => $macDeviceCfg['monNetdataIPAddress'], 
-					'destPort' => $destPort, 
+					'destIP' => $macDeviceCfg['monNetdataIPAddress'],
+					'destPort' => $destPort,
 				];
 				$proxies[] = $proxy;
 			}
 
-			if (intval($macDeviceCfg['zigbee2MQTTEnabled']))
+			if (isset($macDeviceCfg['zigbee2MQTTEnabled']) && intval($macDeviceCfg['zigbee2MQTTEnabled']))
 			{
 				$proxyId = 'z2m-'.utils::safeChars($r['id'], TRUE).'-'.$r['uid'];
 				$destPort = intval($macDeviceCfg['zigbee2MQTTUIPort']);
 				if (!$destPort)
 					$destPort = 8099;
-				$destAddress = $macDeviceCfg['zigbee2MQTTUIIPAddress'];	
+				$destAddress = $macDeviceCfg['zigbee2MQTTUIIPAddress'];
 				if ($destAddress === '')
 					$destAddress = 'localhost';
 				$proxy = [
-					'id' => $proxyId, 
+					'id' => $proxyId,
 					'type' => 'inside',
 				];
 
@@ -434,22 +459,27 @@ class NodeServerCfgUpdater extends Utility
 				$idef .= "\t\t".'proxy_set_header X-Real-IP $remote_addr;'."\n";
 				$idef .= "\t\t".'proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;'."\n";
 				$idef .= "\t}\n";
-				
+
 				$idef .= "\tlocation /z2m/$proxyId/api {\n";
 				$idef .= "\t\tproxy_pass http://{$destAddress}:{$destPort}/;\n";
 				$idef .= "\t\t".'proxy_set_header Host $host;'."\n";
-				
+
 				$idef .= "\t\t".'proxy_http_version 1.1;'."\n";
 				$idef .= "\t\t".'proxy_set_header Upgrade $http_upgrade;'."\n";
 				$idef .= "\t\t".'proxy_set_header Connection "upgrade";'."\n";
 				$idef .= "\t}\n\n";
 				$proxy['insideDef'] = $idef;
 				$proxies[] = $proxy;
+
+				$z2mTopic = (isset($macDeviceCfg['zigbee2MQTTBaseTopic']) && $macDeviceCfg['zigbee2MQTTBaseTopic'] != '') ? $macDeviceCfg['zigbee2MQTTBaseTopic'] : 'zigbee2mqtt';
+				$zigbee2mqttTopics[$z2mTopic] = ['serverNdx' => $r['ndx']];
 			}
 		}
 
 		if (count($proxies))
 			$cfgData['httpProxies'] = $proxies;
+		if (count($zigbee2mqttTopics))
+			$cfgData['zigbee2mqttTopics'] = $zigbee2mqttTopics;
 	}
 
 	function getNodeServerCfg($serverNdx)

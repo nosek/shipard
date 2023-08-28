@@ -1,11 +1,23 @@
 {
+	"awox": {
+		"fn": "AwoX"
+	},
 	"ikea": {
 		"fn": "IKEA"
+	},
+	"immax": {
+		"fn": "Immax"
+	},
+	"lidl": {
+		"fn": "Lidl"
 	},
 	"philips": {
 		"fn": "Philips"
 	},
 	"sonoff": {
 		"fn": "Sonoff"
+	},
+	"tuya": {
+		"fn": "TuYa"
 	}
 }

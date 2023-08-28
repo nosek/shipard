@@ -102,7 +102,9 @@ class TableForm
 				coH3						= 0x200000000,
 				coH4						= 0x400000000,
 				coRightCheckbox	= 0x800000000,
-				coDisabled			= 0x1000000000;
+				coDisabled			= 0x1000000000,
+				coInline				= 0x2000000000,
+				coBorder				= 0x4000000000;
 
 
 	const loAddToFormLayout = 0x1000, loWidgetParts = 0x2000, loRowsDisableMove = 0x4000;
@@ -182,7 +184,7 @@ class TableForm
 
 		$this->docState = $this->table->getDocumentState ($this->recData);
 		if ($this->docState)
-			$this->readOnly = $this->docState ['readOnly'];
+			$this->readOnly = $this->docState ['readOnly'] ?? 0;
 		$this->lockState = $this->table->getDocumentLockState ($this->recData, $this);
 		if ($this->lockState !== FALSE)
 			$this->readOnly = TRUE;
@@ -377,7 +379,7 @@ class TableForm
 		$colId = str_replace('.', '_', $this->fid . "_inp_$ip{$columnId}");
 		$labelCode = NULL;
 		if ($label)
-			$labelCode = "<label$labelClass for='$colId'>" . $this->app()->ui()->renderTextLine($label) . "</label>";
+			$labelCode = "<label$labelClass for='$colId'>" . $this->app()->ui()->composeTextLine($label) . "</label>";
 		$inputCode = "<input type='checkbox' name='$ip{$columnId}' id='$colId' class='e10-inputLogical$class' value='{$valueForTrue}' data-fid='{$this->fid}'$inputParams/>";
 		$hints = $this->columnOptionsHints ($options);
 
@@ -748,8 +750,9 @@ class TableForm
 			$a = $this->table->columnInfoEnum ($columnId, 'cfgText', $this);
 		if ($style == self::INPUT_STYLE_RADIO)
 		{
+			$inputClass = $this->columnOptionsClass ($options);
 			foreach ($a as $val => $txt)
-				$inputCode .= " <input type='radio' class='e10-inputRadio' id='{$colId}_$val' name='$finalColumnName' value='$val'> <label for='inp_$ip{$columnId}_$val'>" . self::e ($txt) . "</label>";
+				$inputCode .= " <input type='radio' class='e10-inputRadio $inputClass' id='{$colId}_$val' name='$finalColumnName' value='$val'> <label for='inp_$ip{$columnId}_$val'>" . self::e ($txt) . "</label>";
 		}
 		if ($style == self::INPUT_STYLE_OPTION)
 		{
@@ -798,6 +801,9 @@ class TableForm
 		$a = $enums;
 		if ($style == self::INPUT_STYLE_RADIO)
 		{
+			$baseElement = ($options & self::coInline) ? 'span' : 'div';
+			$inputClass = $this->columnOptionsClass ($options);
+			$baseElementClass = ($options & self::coBorder) ? ' bb1' : '';
 			$active = ' active';
 			foreach ($a as $val => $txt)
 			{
@@ -808,10 +814,10 @@ class TableForm
 				}
 				else
 				{
-					$inputCode .= "<div class='padd5 e10-selectable-radio$active$oneInputCClass'>";
-					$inputCode .= "<input type='radio' class='e10-inputRadio' id='{$colId}_$val' name='$ip{$columnId}' value='$val' data-fid='{$this->fid}'> ";
-					$inputCode .= "<label for='{$colId}_$val' style='vertical-align: top;'>" . $this->app()->ui()->composeTextLine($txt) . "</label><br/>";
-					$inputCode .= "</div>";
+					$inputCode .= "<$baseElement class='padd5 e10-selectable-radio$active$oneInputCClass$baseElementClass'>";
+					$inputCode .= "<input type='radio' class='e10-inputRadio $inputClass' id='{$colId}_$val' name='$ip{$columnId}' value='$val' data-fid='{$this->fid}'> ";
+					$inputCode .= "<label for='{$colId}_$val' style='vertical-align: top; display: inline;'>" . $this->app()->ui()->composeTextLine($txt) . "</label>";
+					$inputCode .= "</$baseElement>";
 					$active = '';
 				}
 			}
@@ -1363,12 +1369,12 @@ class TableForm
 		$this->appendElement ($widget->createHtmlCode (), NULL);
 	}
 
-	function addViewerWidget ($tableId, $viewClass, $options = NULL, $embedd = FALSE)
+	function addViewerWidget ($tableId, $viewClass, $options = NULL, $embedd = FALSE, $forceRefresh = FALSE)
 	{
 		$c = '';
 
 		/** @var \e10\TableView $v */
-		$v = $this->table->app()->table ($tableId)->getTableView ($viewClass, $options);
+		$v = $this->app()->table ($tableId)->getTableView ($viewClass, $options);
 		$v->type = 'form';
 		$v->renderViewerData ('');
 
@@ -1377,6 +1383,9 @@ class TableForm
 		$c .= $v->createViewerCode ('', TRUE);
 		if ($embedd)
 			$c .= "</div>";
+
+		if ($forceRefresh)
+			$c .= "<script>setTimeout (function () {viewerRefresh ($('#{$v->vid}'));}, 100);</script>";
 
 		$this->appendElement ($c, NULL);
 	}
@@ -1573,7 +1582,7 @@ class TableForm
 		$class = '';
 		$icon = '';
 		$iconClass = 'e10-docstyle-off';
-		if ($this->docState)
+		if ($this->docState && $this->table)
 		{
 			$docStateClass = $this->table->getDocumentStateInfo ($this->docState ['states'], $this->recData, 'styleClass');
 			if ($docStateClass)

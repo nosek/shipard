@@ -3,9 +3,11 @@
   "name": "Persons",
   "tables": [
 		"persons", "groups", "personsgroups", "connections", "sessions", "address", "requests", "userspasswords", "keys",
-		"personsValidity", "personsLastUse", "categories", "relations", "contacts"
+		"personsValidity", "personsLastUse", "categories", "relations", "contacts",
+		"personsContacts", "personsBA"
 	],
-	"modules": ["e10/world"],
+	"extensions": ["persons"],
+	"modules": ["e10/world", "e10/reports"],
   "config": [
 		{"id": "+appSkeleton", "file": "appSkeleton.panel.srvcfg.json"},
 	  {"id": "+e10.persons.addressTypes", "file": "e10.persons.addressTypes.json"},
@@ -24,6 +26,8 @@
 		{"id": "+registeredClasses", "file": "registeredClasses.json"},
 		{"id": "+e10.persons.keyTypes", "file": "e10.persons.keyTypes.json"},
 		{"id": "+e10.persons.categories.types", "file": "e10.persons.categoriesTypes.json"},
-		{"id": "+e10.persons.accountTypes", "file": "accountTypes.json"}
+		{"id": "+e10.persons.accountTypes", "file": "accountTypes.json"},
+		{"id": "+e10.persons.contactsIds", "file": "contactsIds.json"},
+		{"id": "+system.postUpdateConfig", "file": "postUpdateConfig.json"}
   ]
 }

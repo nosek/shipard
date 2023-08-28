@@ -32,19 +32,38 @@ class PersonData extends \services\persons\libs\CoreObject
 	public function loadById (string $countryCode, string $personId)
 	{
 		$countryNdx = 60;
-		$exist = $this->db()->query('SELECT [ndx], [importState], [valid] FROM [services_persons_persons] WHERE [oid] = %s', $personId, 
-																' AND [country] = %i', $countryNdx)->fetch();
+		$exist = NULL;
+
+		if ($personId[0] === '_')
+		{
+			$iid = substr($personId, 1);
+			$exist = $this->db()->query('SELECT [ndx], [importState], [valid] FROM [services_persons_persons]',
+																	' WHERE [iid] = %s', $iid,
+																	' AND [country] = %i', $countryNdx)->fetch();
+		}
+		elseif ($personId[0] === '*')
+		{
+			$ndx = intval(substr($personId, 1));
+			$exist = $this->db()->query('SELECT [ndx], [importState], [valid] FROM [services_persons_persons]',
+																	' WHERE [ndx] = %i', $ndx,
+																	' AND [country] = %i', $countryNdx)->fetch();
+		}
+		else
+		{
+			$exist = $this->db()->query('SELECT [ndx], [importState], [valid] FROM [services_persons_persons] WHERE [oid] = %s', $personId,
+																	' AND [country] = %i', $countryNdx)->fetch();
+		}
 		if ($exist)
 		{
 			if ($exist['importState'] === 0 && $exist['valid'])
 				$this->refreshImport($exist['ndx']);
-			
+
 			$this->setPersonNdx($exist['ndx']);
 			$this->load();
 		}
 	}
 
-	protected function refreshImport($personNdx)
+	public function refreshImport($personNdx)
 	{
 		// -- download
 		$downloadEngine = new \services\persons\libs\OnlinePersonRegsDownloadService($this->app);
@@ -129,8 +148,8 @@ class PersonData extends \services\persons\libs\CoreObject
 				if ($item['type'] === 1)
 					$item['addressFlags'][] = ['prefix' => 'Provozovna'];
 
-				if ($item['natId'] !== '')	
-					$item['addressFlags'][] = ['prefix' => 'IČP', 'id' => $item['natId']];	
+				if ($item['natId'] !== '')
+					$item['addressFlags'][] = ['prefix' => 'IČP', 'id' => $item['natId']];
 			}
 		}
 
@@ -222,7 +241,7 @@ class PersonData extends \services\persons\libs\CoreObject
 	}
 
 	function addBankAccount(array $bankAccount)
-	{		
+	{
 		$this->data	['bankAccounts'][] = $bankAccount;
 	}
 
@@ -248,24 +267,45 @@ class PersonData extends \services\persons\libs\CoreObject
 
 	public function saveChanges_Core (PersonData $changedPerson)
 	{
+		if (!isset($changedPerson->data['person']))
+			return;
+
 		$update = [];
 		$changes = [];
 		$this->recordUpdate($this->data['person'], $changedPerson->data['person'], $update, $changes);
-
+		if ($this->debug)
+		{
+			/*
+			echo "--- saveChanges_Core ---\n";
+			echo "  - FROM: ".json_encode($this->data['person'])."\n";
+			echo "  -   TO: ".json_encode($changedPerson->data['person'])."\n";
+			*/
+		}
 		if (count($update))
 		{
 			$this->db()->query('UPDATE [services_persons_persons] SET ', $update, ' WHERE [ndx] = %i', $this->personNdx);
+
+			$personData = $this->app()->loadItem($this->personNdx, 'services.persons.persons');
+			if ($personData)
+			{
+				if (!Utils::dateIsBlank($personData['validTo']) && $personData['valid'])
+					$this->db()->query('UPDATE [services_persons_persons] SET [valid] = %i', 0, ' WHERE [ndx] = %i', $this->personNdx);
+			}
+
 			$this->logRecord->addItem('update-person-core', '', ['update' => ['tableId' => 'services.persons.persons', 'changes' => $changes]]);
 		}
 	}
 
 	function saveChanges_Ids (PersonData $changedPerson)
 	{
+		if (!isset($changedPerson->data['ids']))
+			return;
+
 		$usedIdNdxs = [];
 
 		foreach ($changedPerson->data['ids'] as $oneId)
 		{
-			$existedId = $this->db()->query('SELECT * FROM [services_persons_ids] WHERE [person] = %i', $this->personNdx, 
+			$existedId = $this->db()->query('SELECT * FROM [services_persons_ids] WHERE [person] = %i', $this->personNdx,
 																			' AND [idType] = %i', $oneId['idType'], ' AND [id] = %s', $oneId['id'])->fetch();
 			if ($existedId)
 			{
@@ -283,7 +323,7 @@ class PersonData extends \services\persons\libs\CoreObject
 			{
 				$insert = [
 					'person' => $this->personNdx,
-					'idType' => $oneId['idType'], 
+					'idType' => $oneId['idType'],
 					'id' => $oneId['id']
 				];
 
@@ -299,11 +339,14 @@ class PersonData extends \services\persons\libs\CoreObject
 
 	function saveChanges_Address (PersonData $changedPerson)
 	{
+		if (!isset($changedPerson->data['address']))
+			return;
+
 		$usedAddrNdxs = [];
 
 		foreach ($changedPerson->data['address'] as $oneAddr)
 		{
-			$existedAddr = $this->db()->query('SELECT * FROM [services_persons_address] WHERE [person] = %i', $this->personNdx, 
+			$existedAddr = $this->db()->query('SELECT * FROM [services_persons_address] WHERE [person] = %i', $this->personNdx,
 																				' AND [addressId] = %s', $oneAddr['addressId'])->fetch();
 			if ($existedAddr)
 			{
@@ -322,13 +365,14 @@ class PersonData extends \services\persons\libs\CoreObject
 				$insert = [
 					'addressId' => $oneAddr['addressId'],
 					'person' => $this->personNdx,
-					'type' => $oneAddr['type'], 
+					'type' => $oneAddr['type'],
 
 					'street' => $oneAddr['street'],
 					'city' => $oneAddr['city'],
 					'zipcode' => $oneAddr['zipcode'],
 					'country' => $oneAddr['country'],
 					'specification' => $oneAddr['specification'] ?? '',
+					'natAddressGeoId' => $oneAddr['natAddressGeoId'] ?? 0,
 				];
 				if (isset($oneAddr['natId']))
 					$insert['natId'] = $oneAddr['natId'];
@@ -353,7 +397,7 @@ class PersonData extends \services\persons\libs\CoreObject
 		{
 			foreach ($changedPerson->data['bankAccounts'] as $oneItem)
 			{
-				$existed = $this->db()->query('SELECT * FROM [services_persons_bankAccounts] WHERE [person] = %i', $this->personNdx, 
+				$existed = $this->db()->query('SELECT * FROM [services_persons_bankAccounts] WHERE [person] = %i', $this->personNdx,
 																			' AND [bankAccount] = %s', $oneItem['bankAccount'])->fetch();
 				if ($existed)
 				{
@@ -381,7 +425,7 @@ class PersonData extends \services\persons\libs\CoreObject
 					$this->logRecord->addItem('new-person-bank-account', $oneItem['bankAccount'], ['insert' => ['tableId' => 'services.persons.bankAccounts', 'recId' => $newNdx, 'values' => $insert]]);
 				}
 			}
-		}	
+		}
 	}
 
 	public function saveChanges (PersonData $changedPerson, \services\persons\libs\LogRecord $logRecord)
@@ -393,7 +437,7 @@ class PersonData extends \services\persons\libs\CoreObject
 		$this->saveChanges_Address($changedPerson);
 		$this->saveChanges_BankAccounts($changedPerson);
 
-		$this->db()->query('UPDATE [services_persons_persons] SET [newDataAvailable] = %i', 0, 
+		$this->db()->query('UPDATE [services_persons_persons] SET [newDataAvailable] = %i', 0,
 												', [importState] = 1 WHERE [ndx] = %i', $this->personNdx);
 	}
 }

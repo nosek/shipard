@@ -54,22 +54,11 @@ class IssueCore2 extends TableForm
 		$this->issueKind = $this->app()->cfgItem('wkf.issues.kinds.'.$this->recData['issueKind']);
 		$topSection = $this->table->topSection($this->recData['section']);
 
-		$askPersons = intval($this->issueKind['askPersons']);
-		$askPersonsUsers = intval($this->issueKind['askPersonsUsers']);
-		$askPersonsOptions = 0;
-		if ($askPersons !== self::askNone && $askPersonsUsers === self::askUsersAdmins && $this->userAccessLevel !== 2)
-			$askPersonsOptions = self::coReadOnly;
-
 		$askWorkOrder = intval($this->issueKind['askWorkOrder']);
-		$askKind = intval($this->issueKind['askKind']);
 
 		$askDeadline = intval($this->issueKind['askDeadline']);
-		$askDeadlineUsers = intval($this->issueKind['askDeadlineUsers']);
 		$askDeadlineOptions = 0;
-		if ($askDeadline !== self::askNone && $askDeadlineUsers === self::askUsersAdmins && $this->userAccessLevel !== 2)
-			$askDeadlineOptions = self::coReadOnly;
 
-		$askDateIncoming = intval($this->issueKind['askDateIncoming']);
 		$enableConnectedIssues = intval($this->issueKind['enableConnectedIssues']);
 
 		$this->setFlag ('sidebarPos', TableForm::SIDEBAR_POS_RIGHT);
@@ -90,8 +79,8 @@ class IssueCore2 extends TableForm
 		$tabs ['tabs'][] = ['text' => 'Přílohy', 'icon' => 'system/formAttachments'];
 
 		$bigTextMode = 0;
-		if ($this->formKind === self::fkDefault && $askPersons !== self::askYes && $askDeadline !== self::askYes && $askDateIncoming !== self::askYes && $askWorkOrder !== self::askYes)
-			$bigTextMode = 1;
+		//if ($this->formKind === self::fkDefault && $askPersons !== self::askYes && $askDeadline !== self::askYes && $askDateIncoming !== self::askYes && $askWorkOrder !== self::askYes)
+		//	$bigTextMode = 1;
 
 		$this->openForm ();
 		$this->addColumnInput ('subject');
@@ -109,19 +98,13 @@ class IssueCore2 extends TableForm
 				{
 					$this->layoutOpen(self::ltHorizontal);
 						$this->layoutOpen(self::ltForm);
-							if ($askKind === self::askYes)
-								$this->addColumnInput('issueKind');
-							if ($askPersons === self::askYes)
-								$this->addList('doclinksPersons', '', TableForm::loAddToFormLayout | $askPersonsOptions);
-							if ($askDateIncoming === self::askYes || $askDeadline === self::askYes)
-							{
-								if ($askDateIncoming === self::askYes)
-									$this->addColumnInput('dateIncoming');
-								if ($askDeadline === self::askYes)
-									$this->addColumnInput('dateDeadline', $askDeadlineOptions);
-							}
-							if ($askWorkOrder === self::askYes && $this->app()->cfgItem ('options.e10doc-commerce.useWorkOrders', 0))
-								$this->addColumnInput('workOrder');
+							$this->addColumnInput('issueKind');
+							$this->addList('doclinksPersons', '', TableForm::loAddToFormLayout);
+							$this->addColumnInput('dateIncoming');
+							if ($askDeadline)
+								$this->addColumnInput('dateDeadline', $askDeadlineOptions);
+
+							$this->renderFormReadWrite_DocInputs ();
 
 							$this->addSubColumns('data');
 							$this->addTextInput2($bigTextMode);
@@ -133,21 +116,14 @@ class IssueCore2 extends TableForm
 				}
 				else
 				{
-					if ($askKind === self::askYes)
-						$this->addColumnInput('issueKind');
-					if ($askPersons === self::askYes)
-						$this->addList('doclinksPersons', '', TableForm::loAddToFormLayout | $askPersonsOptions);
-					if ($askDateIncoming === self::askYes || $askDeadline === self::askYes)
-					{
-						if ($askDateIncoming === self::askYes)
-							$this->addColumnInput('dateIncoming');
-						if ($askDeadline === self::askYes)
-							$this->addColumnInput('dateDeadline', $askDeadlineOptions);
-						if ($askWorkOrder === self::askYes && $this->app()->cfgItem ('options.e10doc-commerce.useWorkOrders', 0))
-						{
-							$this->addColumnInput('workOrder');
-						}
-					}
+					$this->addColumnInput('issueKind');
+					$this->addList('doclinksPersons', '', TableForm::loAddToFormLayout);
+					$this->addColumnInput('dateIncoming');
+					if ($askDeadline)
+						$this->addColumnInput('dateDeadline', $askDeadlineOptions);
+
+					$this->renderFormReadWrite_DocInputs ();
+
 					$this->addSubColumns('data');
 					$this->addTextInput2($bigTextMode);
 					$this->addBody();
@@ -157,30 +133,10 @@ class IssueCore2 extends TableForm
 		$this->openTab();
 		$this->addList('doclinksAssignment', '', TableForm::loAddToFormLayout);
 
-		if ($askWorkOrder === self::askSettings && $this->app()->cfgItem ('options.e10doc-commerce.useWorkOrders', 0))
-			$this->addColumnInput('workOrder');
-
 		$this->addList('clsf', '', TableForm::loAddToFormLayout);
-		if ($askDateIncoming === self::askSettings || $askDeadline === self::askSettings)
-		{
-			if ($askDateIncoming === self::askSettings && $askDeadline === self::askSettings)
-				$this->openRow();
-			if ($askDateIncoming === self::askSettings)
-				$this->addColumnInput('dateIncoming');
-			if ($askDeadline === self::askSettings)
-				$this->addColumnInput('dateDeadline', $askDeadlineOptions);
-			if ($askDateIncoming === self::askSettings && $askDeadline === self::askSettings)
-				$this->closeRow();
-		}
-		if ($askPersons == self::askSettings)
-		{
-			$this->addList('doclinksPersons', '', TableForm::loAddToFormLayout | $askPersonsOptions);
-		}
 		$this->addColumnInput('priority');
 		$this->addColumnInput('onTop');
 		$this->addColumnInput('disableComments');
-		if ($askKind === self::askSettings)
-			$this->addColumnInput('issueKind');
 		$this->addColumnInput('section');
 
 		//if ($topSection['useStatuses'])
@@ -199,6 +155,56 @@ class IssueCore2 extends TableForm
 		$this->closeForm ();
 	}
 
+	function renderFormReadWrite_DocInputs ()
+	{
+		$askWorkOrder = intval($this->issueKind['askWorkOrder']);
+		$askDocColumns = intval($this->issueKind['askDocColumns']);
+		$askDocAnalytics = intval($this->issueKind['askDocAnalytics']);
+
+		if ($askWorkOrder && $this->app()->cfgItem ('options.e10doc-commerce.useWorkOrders', 0))
+			$this->addColumnInput('workOrder');
+
+		if ($askDocColumns)
+		{
+			$this->addSeparator(self::coH2);
+			//$this->openRow();
+				$this->addColumnInput('docPrice');
+				$this->addColumnInput('docCurrency');
+			//$this->closeRow();
+
+			$this->addSeparator(self::coH4);
+			$this->addColumnInput('docPaymentMethod');
+			$this->addColumnInput('docId');
+			$this->addColumnInput('docSymbol1');
+			$this->addColumnInput('docSymbol2');
+
+			$this->addSeparator(self::coH4);
+			$this->addColumnInput('docDateIssue');
+			$this->addColumnInput('docDateDue');
+			$this->addColumnInput('docDateAccounting');
+			$this->addColumnInput('docDateTax');
+			$this->addColumnInput('docDateTaxDuty');
+		}
+
+		if ($askDocAnalytics)
+		{
+			$this->addSeparator(self::coH4);
+
+			if (!$askWorkOrder && $this->app()->cfgItem ('options.e10doc-commerce.useWorkOrders', 0))
+				$this->addColumnInput('workOrder');
+			if ($this->table->app()->cfgItem ('options.core.useProjects', 0))
+				$this->addColumnInput ('docProject');
+			if ($this->table->app()->cfgItem ('options.core.useCentres', 0))
+				$this->addColumnInput('docCentre');
+			if ($this->table->app()->cfgItem ('options.property.usePropertyExpenses', 0))
+				$this->addColumnInput('docProperty');
+
+			$whs = $this->app()->cfgItem ('e10doc.warehouses', NULL);
+			if ($whs && count($whs))
+				$this->addColumnInput('docWarehouse');
+		}
+	}
+
 	function addTextInput2 ($bigTextMode)
 	{
 		//if ($this->recData['source'] === TableIssues::msHuman)
@@ -215,7 +221,7 @@ class IssueCore2 extends TableForm
 
 		$this->content = [];
 
-		if ($this->recData ['text'] !== '' && $this->recData ['text'] !== '0')
+		if (isset($this->recData ['text']) && $this->recData ['text'] !== '' && $this->recData ['text'] !== '0')
 		{
 			if ($this->recData['source'] == TableIssues::msEmail)
 			{

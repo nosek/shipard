@@ -3209,19 +3209,24 @@ function e10ViewerPrintDetail (e)
 	var table = searchParentAttr (e, "data-table");
 	var reportClass = e.attr ('data-report');
 	var pk = searchParentAttr (e, "data-pk");
+	var printer = searchParentAttr (e, "data-printer");
+	if (printer === undefined)
+		printer = 0;
 
-	var url = httpApiRootPath + '/api/formreport/' + table + '/' + reportClass + '/' + pk;
+	var url = httpApiRootPath + '/api/formreport/' + table + '/' + reportClass + '/' + pk + '?vvv='+Date.now();
 
 	var params = elementAttributes (e, 'data-param');
 	if (params)
-		url += '?' + params;
+		url += '&' + params;
+
+	url += '&printer=' + printer;
 
 	if (e.attr ('data-saveas') !== undefined)
 	{
 		if (params)
 			url += '&';
 		else
-			url += '?';
+			url += '&';
 		url += 'saveas=' + e.attr('data-saveas');
 		window.location = url;
 	}
@@ -3248,6 +3253,8 @@ function e10ViewerPrintDetailDirect (e)
 	var pk = searchParentAttr (e, "data-pk");
 	var printer = e.attr ('data-printer');
 	var url = httpApiRootPath + '/api/formreport/' + table + '/' + reportClass + '/' + pk + "?printer=" + printer;
+	if (e.attr ('data-print') !== undefined)
+		url += '&print='+e.attr ('data-print');
 	$.get (url);
 }
 
@@ -4893,7 +4900,7 @@ function df2FormsSetData (id, data)
 		if (nameParts.length == 2)
 			thisInputValue = data [dataMainPart][dataColumnPart];
 		else
-		if (nameParts.length == 3)
+		if (nameParts.length == 3 && data [dataMainPart] !== undefined)
 			thisInputValue = data [dataMainPart][dataSubPart][dataColumnPart];
 		else
 		if (nameParts.length == 4)
@@ -5226,9 +5233,13 @@ function e10FormsRefInputComboOpen (input)
 	}
 	else
 	{
+		var form = $("#" + formId + 'Form');
 		sideBarType = 'main';
 		var sidebarViewer = $("#" + formId + 'Sidebar').find ("div.df2-viewer");
-		if (sidebarViewer.is ('DIV') && sidebarViewer.attr ('data-combo-rows-target') === 'rows')
+
+		var sidebarRefresh = form.attr('data-flag-sidebarrefresh');
+
+		if (sidebarViewer.is ('DIV') && sidebarViewer.attr ('data-combo-rows-target') === 'rows' && sidebarRefresh !== 'always')
 			return;
 	}
 
@@ -6681,6 +6692,7 @@ function e10WizardNext (input)
   var id = input.attr ('data-form');
 	var form = $("#" + id);
 	var uploadedFiles = [];
+	var viewersPks = [];
 
 	var fileInput = form.find (':input.e10-att-input-file').first();
 	if (fileInput)
@@ -6708,6 +6720,12 @@ function e10WizardNext (input)
 				});
 	}
 
+	// -- viewers
+	form.find ('ul.df2-viewer-list >li.active').each (function () {
+		if ($(this).attr ("data-pk"))
+			viewersPks.push ($(this).attr ("data-pk"));
+	});
+
 	var e = $("#" + id);
 	var codeTarget = e.parent().parent();
   //var formElement = document.getElementById (id);
@@ -6720,6 +6738,7 @@ function e10WizardNext (input)
 
   var formData = df2collectEditFormData (e, $.myFormsData [id]);
 	formData ['recData']['uploadedFiles'] = uploadedFiles;
+	formData ['recData']['viewersPks'] = viewersPks;
 	var focusedId = input.attr ('id');
 
 	var btns = $("#" + id + 'Buttons');
@@ -6783,6 +6802,10 @@ function e10WizardNext (input)
 				else
 				if (srcObjectType === 'widget')
 					e10WidgetAction (null, null, srcObjectId);
+				else if (srcObjectType == 'form-to-save')
+				{
+					e10SaveOnChange ($('#'+srcObjectId));
+				}
 
 				if (data.stepResult.addDocument == 1)
 					e10DocumentAdd (0, data.stepResult.params);

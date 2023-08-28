@@ -147,6 +147,14 @@ class SWInfoAnalyzer extends Utility
 					$this->osVersion = $this->srcData['WindowsBuildLabEx'];
 			}
 		}
+		elseif ($this->osFamily === SWUtils::osfSynology)
+		{
+			if (str_starts_with($this->srcData['osName'], 'DSM '))
+			{
+				$this->osName = 'DSM';
+				$this->osVersion = trim(substr($this->srcData['osName'], 4));
+			}
+		}
 		elseif(isset($this->srcData['osName']) && isset($this->srcData['version-os']))
 		{
 			$this->osName = $this->srcData['osName'];
@@ -225,6 +233,30 @@ class SWInfoAnalyzer extends Utility
 		}
 		elseif ($cnt === 0)
 		{
+			if ($r['swVersionsMode'] == 0) // auto add versions
+			{
+				$newVersion = [
+					'sw' => $this->swNdx,
+					'versionNumber' => $this->osVersion,
+					'lifeCycle' => 9,
+					'dateRelease' => Utils::today(),
+				];
+
+				/** @var \mac\sw\TableSWVersions */
+				$tableSWVersions = $this->app()->table('mac.sw.swVersions');
+
+				$newVersionNdx = $tableSWVersions->dbInsertRec($newVersion);
+				$newVersion = $tableSWVersions->loadItem($newVersionNdx);
+				$tableSWVersions->checkAfterSave2 ($newVersion);
+				$tableSWVersions->docsLog ($newVersionNdx);
+				$this->addProtocol('check-sw-version', "SW version `{$this->osVersion}` / `{$newVersion['suid']}` added");
+
+				$this->swVersionNdx = $newVersionNdx;
+				$this->swVersionSUID = $newVersion['suid'];
+
+				return;
+			}
+
 			$this->addProtocol('search-os-version', "No OS version found");
 			$this->error = TRUE;
 			return;
@@ -361,6 +393,30 @@ class SWInfoAnalyzer extends Utility
 		}
 		elseif ($cnt === 0)
 		{
+			if ($r['swVersionsMode'] == 0 && $this->swVersion !== '' && $this->swVersion !== '-') // auto add versions
+			{
+				$newVersion = [
+					'sw' => $this->swNdx,
+					'versionNumber' => $this->swVersion,
+					'lifeCycle' => 9,
+					'dateRelease' => Utils::today(),
+				];
+
+				/** @var \mac\sw\TableSWVersions */
+				$tableSWVersions = $this->app()->table('mac.sw.swVersions');
+
+				$newVersionNdx = $tableSWVersions->dbInsertRec($newVersion);
+				$newVersion = $tableSWVersions->loadItem($newVersionNdx);
+				$tableSWVersions->checkAfterSave2 ($newVersion);
+				$tableSWVersions->docsLog ($newVersionNdx);
+				$this->addProtocol('check-sw-version', "SW version `{$this->swVersion}` / `{$newVersion['suid']}` added");
+
+				$this->swVersionNdx = $newVersionNdx;
+				$this->swVersionSUID = $newVersion['suid'];
+
+				return;
+			}
+
 			$this->addProtocol('search-sw-version', "No SW version found");
 			$this->error = TRUE;
 			return;

@@ -140,6 +140,12 @@ class IncomingEmail extends Utility
 			if ($fileType === 'pdf')
 				$attOrder = 100;
 
+			$fileCheckSum = sha1_file($attFullFileName);
+			$attExist = $this->db()->query('SELECT ndx FROM [e10_attachments_files] WHERE recid = %i', $newMsgNdx,
+										' AND [tableid] = %s', 'wkf.core.issues', ' AND [fileCheckSum] = %s', $fileCheckSum)->fetch();
+			if ($attExist)
+				continue;
+
 			\E10\Base\addAttachments ($this->app, 'wkf.core.issues', $newMsgNdx, $attFullFileName, '', true, $attOrder, $attName);
 		}
 
@@ -152,31 +158,6 @@ class IncomingEmail extends Utility
 		$if->setIssue($issueRecData);
 		$if->applyFilters();
 
-		//-- analyze attachments?
-		$issueRecData = $this->tableIssues->loadItem($newMsgNdx);
-		$doAnalyze = 1;
-		$issueKindCfg = $this->app()->cfgItem ('wkf.issues.kinds.'.$issueRecData['issueKind'], NULL);
-		$sectionCfg = $this->app()->cfgItem ('wkf.sections.all.'.$issueRecData['section'], NULL);
-
-		if ($issueKindCfg && isset($issueKindCfg['aa']) && $sectionCfg && isset($sectionCfg['aa']))
-		{
-			if ($issueKindCfg['aa'] == 9 || $sectionCfg['aa'] == 9)
-				$doAnalyze = 0;
-		}
-
-		// -- analyze meta data
-		if ($doAnalyze)
-		{
-			$ee = new \lib\core\attachments\Extract($this->app());
-			$ee->setAttTableDocument ('wkf.core.issues', $newMsgNdx);
-			$ee->run();
-		}
-
-		// -- check docDataFiles
-		$ddfe = new \lib\docDataFiles\AttachmentsUpdater($this->app);
-		$ddfe->init();
-		$ddfe->doTableDocument('wkf.core.issues', $newMsgNdx);
-
 		// -- finish
 		$issueRecData = $this->tableIssues->loadItem($newMsgNdx);
 		$this->tableIssues->dbUpdateRec($issueRecData);
@@ -184,6 +165,14 @@ class IncomingEmail extends Utility
 		$this->tableIssues->checkAfterSave2($issueRecData);
 
 		$this->tableIssues->docsLog ($newMsgNdx);
+
+		$checkIncomingIssues = intval($this->app()->cfgItem('options.experimental.checkIncomingIssues', 0));
+		if ($checkIncomingIssues)
+		{
+			$im = new \wkf\core\libs\CheckIncomingIssue($this->app());
+			$im->setIssue($newMsgNdx);
+			$im->run();
+		}
 
 		return TRUE;
 	}
@@ -486,6 +475,8 @@ class IncomingEmail extends Utility
 
 			$a->saveAttachment (__APP_DIR__.'/tmp/', $attFileName);
 
+
+
 			\E10\Base\addAttachments ($this->app, $tableNdx, $recNdx, __APP_DIR__.'/tmp/'.$attFileName, '', TRUE);
 		}
 
@@ -659,7 +650,7 @@ class IncomingEmail extends Utility
 			}
 			return $headers;
 		}
-		
+
 		$headers = [];
 		foreach ($hstr as $oneHeader)
 		{

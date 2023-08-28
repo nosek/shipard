@@ -91,6 +91,7 @@ class ViewSetups extends TableView
 	{
 		$listItem ['pk'] = $item ['ndx'];
 		$listItem ['t1'] = $item['fullName'];
+		$listItem ['i1'] = ['text' => '#'.$item['ndx'], 'class' => 'id'];
 		$listItem ['icon'] = $this->table->tableIcon ($item);
 
 		$t2 = [];
@@ -103,6 +104,8 @@ class ViewSetups extends TableView
 
 		$listItem ['t2'] = $t2;
 
+		$listItem ['i2'] = ['text' => $item['id'], 'class' => 'label label-default'];
+
 		return $listItem;
 	}
 
@@ -111,10 +114,10 @@ class ViewSetups extends TableView
 		$fts = $this->fullTextSearch ();
 
 		$q [] = 'SELECT [iotSetups].*,';
-		array_push ($q, ' places.fullName AS placeName');				
+		array_push ($q, ' places.fullName AS placeName');
 		array_push ($q, ' FROM [mac_iot_setups] AS [iotSetups]');
 		array_push ($q, ' LEFT JOIN [e10_base_places] AS places ON iotSetups.place = places.ndx');
-		
+
 		array_push ($q, ' WHERE 1');
 
 		// -- fulltext
@@ -168,6 +171,10 @@ class FormSetup extends TableForm
  */
 class ViewDetailSetup extends TableViewDetail
 {
+	public function createDetailContent ()
+	{
+		$this->addDocumentCard('mac.iot.libs.dc.DCSetup');
+	}
 }
 
 /**

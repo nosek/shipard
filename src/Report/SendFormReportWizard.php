@@ -42,10 +42,17 @@ class SendFormReportWizard extends \Shipard\Form\Wizard
 
 	public function renderFormWelcome ()
 	{
+		/** @var \e10\persons\TablePersons */
+		$tablePersons = $this->app()->table('e10.persons.persons');
+
 		$this->table = $this->app->table ('e10.witems.items');
 
 		//$this->setFlag ('sidebarPos', TableForm::SIDEBAR_POS_RIGHT);
 		$this->setFlag ('formStyle', 'e10-formStyleSimple');
+
+		$focusedPKPrimary = intval ($this->app()->testGetParam('focusedPKPrimary'));
+		if ($focusedPKPrimary)
+			$this->focusedPK = $focusedPKPrimary;
 
 		$this->recData['documentNdx'] = $this->focusedPK;
 		$this->recData['documentTable'] = $this->app->testGetParam('documentTable');
@@ -68,7 +75,13 @@ class SendFormReportWizard extends \Shipard\Form\Wizard
 		$item = $documentTable->loadItem ($this->recData['documentNdx']);
 		$documentInfo = $documentTable->getRecordInfo ($item);
 		if (isset($documentInfo['persons']['to']))
-			$this->recData['to'] = $this->loadEmails($documentInfo['persons']['to']);
+		{
+			$this->recData['to'] = $tablePersons->loadEmailsForReport($documentInfo['persons']['to'], $this->recData['reportClass']);
+		}
+		elseif (isset($documentInfo['emails']['to']))
+		{
+			$this->recData['to'] = $documentInfo['emails']['to'];
+		}
 
 		$this->recData['emailFromAddress'] = $this->app->cfgItem ('options.core.ownerEmail');
 		$this->recData['emailFromName'] = $this->app->cfgItem ('options.core.ownerFullName');
@@ -105,6 +118,7 @@ class SendFormReportWizard extends \Shipard\Form\Wizard
 	{
 		$documentTable = $this->app()->table ($this->recData['documentTable']);
 
+		/** @var \Shipard\Report\FormReport */
 		$report = $documentTable->getReportData ($this->recData['reportClass'], $this->recData['documentNdx']);
 		foreach ($this->recData as $param => $value)
 		{
@@ -123,6 +137,7 @@ class SendFormReportWizard extends \Shipard\Form\Wizard
 		$msg->setSubject($this->recData['subject']);
 		$msg->setBody($this->recData['text']);
 		$msg->setDocument ($this->recData['documentTable'], $this->recData['documentNdx'], $report);
+		$msg->outboxLinkId = $report->outboxLinkId;
 
 		$attachmentFileName = utils::safeChars($report->createReportPart ('fileName'));
 		if ($attachmentFileName === '')
@@ -131,18 +146,17 @@ class SendFormReportWizard extends \Shipard\Form\Wizard
 		$msg->addAttachment($report->fullFileName, $attachmentFileName.'.pdf', 'application/pdf');
 
 		$this->addOtherReports($documentTable, $msg, $report);
+		$report->addMessageAttachments($msg);
 
 		$msg->sendMail();
 		$msg->saveToOutbox();
+		$report->reportWasSent($msg);
 	}
 
 	function addOtherReports($documentTable, $msg, $mainReport)
 	{
 		if ($this->recData['reportClass'] === 'e10doc.invoicesOut.libs.InvoiceOutReport')
 		{
-			$testISDoc = intval($this->app()->cfgItem ('options.experimental.testISDoc', 0));
-			if (!$testISDoc)
-				return;
 			$report = $documentTable->getReportData ('e10doc.core.libs.reports.DocReportISDoc', $this->recData['documentNdx']);
 			foreach ($this->recData as $param => $value)
 			{

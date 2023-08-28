@@ -6,12 +6,18 @@
 		"mdi": "extension"
     },
 		"tables/mac.iot.devices":{
-			"fa5": "fa-lightbulb",
-			"fa6pro": "fa-lightbulb-on",
-			"bsi": "bi-lightbulb",
-			"mdi": "lightbulb"
-		},	
-    "tables/mac.iot.scenes": {
+			"fa5":"fa-microchip",
+			"fa6pro":"fa-microchip",
+			"bsi":"bi-cpu-fill",
+			"mdi":"memory"
+	},
+	"tables/mac.iot.cams": {
+		"fa5": "fa-video",
+		"fa6pro": "fa-cctv",
+		"bsi": "bi-camera-video",
+		"mdi": "videocam"
+	},
+	"tables/mac.iot.scenes": {
 		"fa5": "fa-play-circle",
 		"fa6pro": "fa-play-circle",
 		"bsi": "bi-play-circle-fill",
@@ -133,6 +139,63 @@
 		"fa6pro": "fa-key-skeleton",
 		"bsi": "bi-key",
 		"mdi": "vpn_key"
+	},
+
+
+	"iotDevices/light":{
+		"fa5": "fa-lightbulb",
+		"fa6pro": "fa-lightbulb-on",
+		"bsi": "bi-lightbulb",
+		"mdi": "refresh"
+	},
+	"iotDevices/blind":{
+		"fa5": "fa-store",
+		"fa6pro": "fa-blinds",
+		"bsi": "bi-shop-window",
+		"mdi": "refresh"
+	},
+	"iotDevices/motion":{
+		"fa5": "fa-running",
+		"fa6pro": "fa-running",
+		"bsi": "bi-person-exclamation",
+		"mdi": "refresh"
+	},
+	"iotDevices/remote":{
+		"fa5": "fa-rss-square",
+		"fa6pro": "fa-rss-square",
+		"bsi": "bi-dpad-fill",
+		"mdi": "refresh"
+	},
+	"iotDevices/socket":{
+		"fa5": "fa-plug",
+		"fa6pro": "fa-outlet",
+		"bsi": "bi-outlet",
+		"mdi": "refresh"
+	},
+	"iotDevices/encoder":{
+		"fa5": "fa-undo-alt",
+		"fa6pro": "fa-undo-alt",
+		"bsi": "bi-arrow-clockwise",
+		"mdi": "refresh"
+	},
+	"iotDevices/sensor":{
+		"fa5": "fa-thermometer-three-quarters",
+		"fa6pro": "fa-thermometer-three-quarters",
+		"bsi": "bi-thermometer-half",
+		"mdi": "refresh"
+	},
+
+	"iconBrightness":{
+		"fa5": "fa-sun",
+		"fa6pro": "fa-sun",
+		"bsi": "bi-brightness-alt-high-fill",
+		"mdi": ""
+	},
+	"iconColorTemperature":{
+		"fa5": "fa-thermometer-half",
+		"fa6pro": "fa-thermometer-half",
+		"bsi": "bi-thermometer-half",
+		"mdi": ""
 	},
 
 

@@ -11,8 +11,12 @@ use \e10\base\libs\UtilsBase;
 
 class FormPurchaseDocs extends \e10doc\core\FormHeads
 {
+	var $testNewPersons = 0;
+
 	public function renderForm ()
 	{
+		$this->testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+
 		$this->checkInfoPanelAttachments('20vw');
 
 		$taxPayer = $this->recData['taxPayer'];
@@ -66,39 +70,37 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 						$this->addColumnInput ("person", DataModel::coSaveOnChange|self::coHeader);
 					$this->layoutClose ();
 
-					$regTitle = [['text' => 'Registrace', 'icon' => 'system/iconUser', 'class' => 'h2']];
-					$regTitle[] = [
-						'text' => 'Tisk', 'class' => 'pull-right', 'type' => 'action', 'action' => 'printdirect', 'printer' => '1',
-						'data-report' => 'e10pro.custreg.RegistrationListReport', 'actionClass' => 'btn-sm',
-						'data-table' => 'e10.persons.persons', 'data-pk' => $this->recData['person']
-					];
-					if (!$this->readOnly)
-						$regTitle[] = [
-								'text' => 'Upravit', 'class' => 'pull-right', 'docAction' => 'edit',
-								'actionClass' => 'btn btn-primary btn-sm', 'type' => 'button', 'icon' => 'system/actionOpen',
-								'table' => 'e10.persons.persons', 'pk' => $this->recData['person'],
-								'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid
-						];
-
-					$this->layoutOpen (self::ltForm, 'xxe10-row-info default stripped');
-						$this->addStatic($regTitle, self::coHeader);
-						//$this->table->addFormPersonProperties ($this);
-						$this->addFormPersonInfo();
-					$this->layoutClose ();
-					/*$this->addStatic('Adresa', self::coHeader);
-					$this->layoutOpen (self::ltGrid);
-						$this->table->addFormPersonAddress ($this);
-					$this->layoutClose ();
-*/
-
-					if ($this->recData['personType'] == 2)
+					if ($this->recData['person'])
 					{
-						$this->addSeparator(self::coH2);
-							$this->layoutOpen(self::ltVertical);
-							$this->addColumnInput ('personHandover', self::coHeader);
-							$this->addColumnInput ('cashPersonName', self::coColW12);
-							$this->addColumnInput ('cashPersonID', self::coColW12);
-						$this->layoutClose();
+						$regTitle = [['text' => 'Registrace', 'icon' => 'system/iconUser', 'class' => 'h2']];
+						$regTitle[] = [
+							'text' => 'Tisk', 'class' => 'pull-right', 'type' => 'action', 'action' => 'printdirect', 'printer' => '1',
+							'data-report' => 'e10pro.custreg.RegistrationListReport', 'actionClass' => 'btn-sm',
+							'data-table' => 'e10.persons.persons', 'data-pk' => $this->recData['person']
+						];
+						if (!$this->readOnly)
+						{
+							$regTitle[] = [
+									'text' => 'Upravit', 'class' => 'pull-right', 'docAction' => 'edit',
+									'actionClass' => 'btn btn-primary btn-sm', 'type' => 'button', 'icon' => 'system/actionOpen',
+									'table' => 'e10.persons.persons', 'pk' => $this->recData['person'],
+									'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid
+							];
+						}
+						$this->layoutOpen (self::ltForm, 'xxe10-row-info default stripped');
+							$this->addStatic($regTitle, self::coHeader);
+							$this->addFormPersonInfo();
+						$this->layoutClose ();
+
+						if ($this->recData['personType'] == 2)
+						{
+							$this->addSeparator(self::coH2);
+								$this->layoutOpen(self::ltVertical);
+								$this->addColumnInput ('personHandover', self::coHeader);
+								$this->addColumnInput ('cashPersonName', self::coColW12);
+								$this->addColumnInput ('cashPersonID', self::coColW12);
+							$this->layoutClose();
+						}
 					}
 				$this->layoutClose ();
       $this->closeTab ();
@@ -114,7 +116,7 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 				$this->addColumnInput ('myBankAccount');
 
 
-		if ($taxPayer)
+				if ($taxPayer)
 				{
 					$this->addColumnInput ("dateTax");
 					$this->addColumnInput ("taxCalc");
@@ -129,6 +131,8 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
         $this->addColumnInput ("warehouse");
 				$this->addColumnInput ("author");
 				$this->addList ('clsf', '', self::loAddToFormLayout);
+				$this->addColumnInput ('owner');
+				$this->addColumnInput ('ownerOffice');
 			$this->closeTab ();
 
       $this->closeTabs ();
@@ -288,101 +292,269 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 			$this->addStatic($properties[$personNdx]['contacts']);
 		if (isset($properties[$personNdx]['ids']))
 			$this->addStatic($properties[$personNdx]['ids']);
+
 		// -- bank accounts
-		if ($this->readOnly)
-		{
-			if ($this->recData['bankAccount'] !== '')
-				$this->addStatic(['text' => $this->recData['bankAccount'], 'icon' => 'tables/e10doc.base.bankaccounts']);
+		if ($this->recData['personType'] == 1)
+		{ // people
+			if ($this->readOnly)
+			{
+				if ($this->recData['bankAccount'] !== '')
+					$this->addStatic(['text' => $this->recData['bankAccount'], 'icon' => 'tables/e10doc.base.bankaccounts']);
+			}
+			else
+			{
+				$bankAccounts = [];
+
+				if ($this->testNewPersons)
+				{
+					$qba [] = 'SELECT [ba].* ';
+					array_push ($qba, ' FROM [e10_persons_personsBA] AS [ba]');
+					array_push ($qba, ' WHERE 1');
+					array_push ($qba, ' AND [ba].[person] = %i', $personNdx);
+					$baRows = $this->app()->db()->query($qba);
+					foreach ($baRows as $ba)
+					{
+						$bankAccounts[$ba['bankAccount']] = [['text' => $ba['bankAccount']]];
+						if (!$this->readOnly)
+						{
+							$bankAccounts[$ba['bankAccount']][] = [
+								'text' => '', 'class' => 'pull-right', 'docAction' => 'edit',
+								'_actionClass' => 'pull-right', 'type' => 'span', 'icon' => 'system/actionOpen',
+								'table' => 'e10.persons.personsBA', 'pk' => $ba['ndx'],
+								'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid
+							];
+						}
+					}
+				}
+				else
+				{
+					if (isset($properties[$personNdx]['payments']))
+					{
+						foreach ($properties[$personNdx]['payments'] as $ba)
+						{
+							$bankAccounts[$ba['text']] = ['text' => $ba['text']];
+							if (isset($ba['prefix']))
+								$bankAccounts[$ba['text']]['suffix'] = $ba['prefix'];
+						}
+					}
+				}
+				if ($this->recData['bankAccount'] === '' || !isset($bankAccounts[$this->recData['bankAccount']]))
+				{
+					$this->recData['bankAccount'] = key($bankAccounts);
+					if (!$this->recData['bankAccount'])
+						$this->recData['bankAccount'] = '';
+				}
+				$baLabel = [['text' => 'Účet pro úhradu:', 'icon' => 'tables/e10doc.base.bankaccounts', 'class' => 'h4']];
+				if ($this->testNewPersons)
+				$baLabel[] = [
+					'text' => '', 'class' => 'pull-right', 'docAction' => 'new',
+					'type' => 'span', 'icon' => 'system/actionAdd',
+					'table' => 'e10.persons.personsBA',
+					'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid,
+					'addParams' => '__person='.$this->recData['person']
+				];
+				if (count($bankAccounts))
+				{
+					$this->addStatic($baLabel);
+					$this->addInputEnum2('bankAccount', NULL, $bankAccounts);
+				}
+				else
+				{
+					$baLabel[] = ['text' => 'Není zadán žádný účet', 'icon' => 'system/iconWarning', 'class' => 'e10-error break'];
+					$this->addStatic($baLabel);
+				}
+			}
+		}
+
+		if ($this->recData['personType'] == 1)
+		{ // human
+			$this->recData['otherAddress1Mode'] = 0;
 		}
 		else
 		{
-			$bankAccounts = [];
-			if (isset($properties[$personNdx]['payments']))
-			{
-				foreach ($properties[$personNdx]['payments'] as $ba)
-				{
-					$bankAccounts[$ba['text']] = ['text' => $ba['text']];
-					if (isset($ba['prefix']))
-						$bankAccounts[$ba['text']]['suffix'] = $ba['prefix'];
-				}
-				if ($this->recData['bankAccount'] === '')
-					$this->recData['bankAccount'] = key($bankAccounts);
-				if (!isset($bankAccounts[$this->recData['bankAccount']]))
-					$bankAccounts[$this->recData['bankAccount']] = $this->recData['bankAccount'];
-			}
-			if (count($bankAccounts))
-			{
-				$this->addStatic(['text' => 'Účet pro úhradu:', 'icon' => 'tables/e10doc.base.bankaccounts', 'class' => 'block']);
-				$this->addInputEnum2('bankAccount', NULL, $bankAccounts);
-			}
+			$this->addInputEnum2('otherAddress1Mode', NULL, ['0' => 'Provozovna', '1' => 'ORP'], self::INPUT_STYLE_RADIO, DataModel::coSaveOnChange|self::coInline);
 		}
 
 		// -- address
-		$addresses = [];
-		$deliveryAddress = 0;
-		$addressesOther1 = [];
-		$other1Address = 0;
-
-		$q = [];
-		array_push($q, 'SELECT * FROM [e10_persons_address]');
-		array_push($q, ' WHERE tableid = %s ', 'e10.persons.persons', ' AND recid = %i', $personNdx);
-		array_push($q, ' AND [docState] != %i', 9800);
-
-		$rows = $this->table->db()->query ($q);
-		foreach ($rows as $r)
+		if ($this->recData['otherAddress1Mode'] == 0)
 		{
-			$title = [];
-			if ($r['specification'] !== '')
-				$title[] = ['text' => $r['specification']];
-			if ($r['street'] !== '')
-				$title[] = ['text' => $r['street']];
-			$title[] = ['text' => $r['city'].' '.$r['zipcode']];
+			$addrPosts = [];
+			$addrOffices = [];
+			$suggestedAddrPost = 0;
+			$suggestedAddrOffice = 0;
 
-			if ($r['type'] !== 99)
+			$q = [];
+			array_push($q, 'SELECT [addrs].*');
+			array_push($q, ' FROM [e10_persons_personsContacts] AS [addrs]');
+			array_push($q, ' WHERE [addrs].[person] = %i', $personNdx);
+			array_push($q, ' AND [addrs].[docState] = %i', 4000);
+			array_push($q, ' AND [addrs].[flagAddress] = %i', 1);
+			array_push($q, ' ORDER BY [addrs].[onTop], [addrs].[systemOrder], [addrs].[adrCity]');
+			$rows = $this->app()->db()->query($q);
+			foreach ($rows as $r)
 			{
-				$addresses[$r['ndx']] = [$title];
-				if ($r['type'] == 4)
-					$deliveryAddress = $r['ndx'];
-			}
-			if ($r['type'] === 99)
-			{
-				$addressesOther1[$r['ndx']] = [$title];
-				$other1Address = $r['ndx'];
-			}
-
-			$classification = UtilsBase::loadClassification ($this->table->app(), 'e10.persons.address', [$r['ndx']], 'ml1 label');
-			if (isset ($classification [$r['ndx']]))
-			{
-				forEach ($classification [$r['ndx']] as $clsfGroup)
+				$title = [];
+				if (!$this->readOnly)
 				{
-					if ($r['type'] == 99)
-						$addressesOther1[$r['ndx']] = array_merge ($addressesOther1[$r['ndx']], $clsfGroup);
-					if ($r['type'] != 99)
-						$addresses[$r['ndx']] = array_merge ($addresses[$r['ndx']], $clsfGroup);
+					$title[] = [
+							'text' => '', 'class' => 'pull-right', 'docAction' => 'edit',
+							'_actionClass' => 'pull-right', 'type' => 'span', 'icon' => 'system/actionOpen',
+							'table' => 'e10.persons.personsContacts', 'pk' => $r['ndx'],
+							'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid
+					];
+				}
+				$ap = [];
+				if ($r['adrSpecification'] !== '')
+					$ap[] = $r['adrSpecification'];
+				if ($r['adrStreet'] !== '')
+					$ap[] = $r['adrStreet'];
+				if ($r['adrCity'] !== '')
+					$ap[] = $r['adrCity'];
+				if ($r['adrZipCode'] !== '')
+					$ap[] = $r['adrZipCode'];
+
+				$title[] = ['text' => implode(', ', $ap), 'class' => ''];
+
+				if ($r['flagOffice'])
+					$title[] = ['text' => 'IČP: '.$r['id1'], 'class' => 'label label-default'];
+				if ($r['flagMainAddress'])
+					$title[] = ['text' => 'Sídlo', 'class' => 'label label-default'];
+
+				$addrPosts[$r['ndx']] = [$title];
+				$suggestedAddrPost = $r['ndx'];
+
+				if ($r['flagOffice'] || $r['flagMainAddress'])
+				{
+					$addrOffices[$r['ndx']] = [$title];
+					$suggestedAddrOffice = $r['ndx'];
 				}
 			}
+			if ($this->recData['personType'] == 1)
+			{
+				if ($this->readOnly)
+				{
+					$addrTitle = 'Doručovací adresa';
+				}
+				else
+				{
+					$this->recData['otherAddress1'] = 0;
+					$addrTitle = [
+						['text' => 'Doručovací adresa:', 'icon' => 'system/iconHome', 'class' => 'h4'],
+						[
+							'text' => '', 'class' => 'pull-right', 'docAction' => 'new',
+							'type' => 'span', 'icon' => 'system/actionAdd',
+							'table' => 'e10.persons.personsContacts',
+							'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid,
+							'addParams' => '__person='.$this->recData['person'].'&__flagAddress=1&__flagPostAddress=1'
+						]
+					];
+				}
+				$this->addFormPersonInfo_Address ($addrPosts, 'deliveryAddress', $suggestedAddrPost, $addrTitle);
+			}
+			if ($this->recData['personType'] == 2)
+			{
+				if ($this->readOnly)
+				{
+					$addrTitle = 'Provozovna';
+				}
+				else
+				{
+					$this->recData['deliveryAddress'] = 0;
+					$addrTitle = [
+						['text' => 'Provozovna:', 'icon' => 'system/iconHome', 'class' => 'h4'],
+						[
+							'text' => '', 'class' => 'pull-right', 'docAction' => 'new',
+							'type' => 'span', 'icon' => 'system/actionAdd',
+							'class' => 'pull-right',
+							'table' => 'e10.persons.personsContacts',
+							'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid,
+							'addParams' => '__person='.$this->recData['person'].'&__flagAddress=1&__flagOffice=1'
+						],
+					];
+
+					if (1)
+					{
+						$companyIds = Utils::searchArray($properties[$personNdx]['ids'], 'pid', 'oid');
+						$companyId = '';
+						if (isset($companyIds['text']))
+							$companyId = trim($companyIds['text']);
+						if ($companyId !== '')
+						{
+							$addrTitle[] = [
+								'text' => '', 'type' => 'action', 'action' => 'addwizard', 'icon' => 'user/wifi',
+								'title' => 'Načíst provozovny',
+								'class' => 'pull-right',
+								'element' => 'span',
+								'btnClass' => 'pull-right',
+								'data-class' => 'e10.persons.libs.register.AddOfficesWizard',
+								'table' => 'e10.persons.persons',
+								'data-addparams' => 'personId='.$companyId.'&personNdx='.$personNdx,
+								'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid,
+							];
+						}
+					}
+				}
+				if (count($addrOffices) > 1)
+				{
+					$fk = key($addrOffices);
+					unset($addrOffices[$fk]);
+				}
+
+				$this->addFormPersonInfo_Address ($addrOffices, 'otherAddress1', $suggestedAddrOffice, $addrTitle);
+			}
 		}
-		$this->addFormPersonInfo_Address ($addresses, 'deliveryAddress', $deliveryAddress, 'Doručovací adresa');
-		$this->addFormPersonInfo_Address ($addressesOther1, 'otherAddress1', $other1Address, 'Provozovna');
+		else
+		{
+			$this->addColumnInput('personNomencCity', self::coNoLabel);
+		}
 	}
 
 	public function addFormPersonInfo_Address ($addresses, $columnId, $suggestedAddressNdx, $labelText)
 	{
+		$classification = UtilsBase::loadClassification ($this->table->app(), 'e10.persons.personsContacts', array_keys($addresses), 'ml1 label');
+		foreach ($classification as $pcNdx => $clsf)
+		{
+			forEach ($clsf as $clsfGroup)
+			{
+				$addresses[$pcNdx] = array_merge ($addresses[$pcNdx], $clsfGroup);
+			}
+		}
+
 		if ($this->readOnly)
 		{
 			if ($this->recData[$columnId])
 			{
-				$this->addStatic(['text' => $labelText, 'icon' => 'system/iconHome', 'class' => 'block']);
+				if (is_string($labelText))
+					$this->addStatic(['text' => $labelText, 'icon' => 'system/iconHome', 'class' => 'block']);
+				else
+					$this->addStatic($labelText);
 				$a = $addresses[$this->recData[$columnId]];
 				$this->addStatic($a);
 			}
 		}
 		else
 		{
-			$this->addStatic(['text' => $labelText, 'icon' => 'system/iconHome', 'class' => 'block']);
-			$this->addInputEnum2($columnId, NULL, $addresses);
+			if (is_string($labelText))
+				$this->addStatic(['text' => $labelText, 'icon' => 'system/iconHome', 'class' => 'block']);
+			else
+				$this->addStatic($labelText);
+			$this->addInputEnum2($columnId, NULL, $addresses, self::INPUT_STYLE_RADIO, self::coBorder);
 			if ($this->recData[$columnId] === 0 || !isset($addresses[$this->recData[$columnId]]))
 				$this->recData[$columnId] = ($suggestedAddressNdx) ? $suggestedAddressNdx : key($addresses);
+		}
+	}
+
+	public function checkBeforeSave (&$saveData)
+	{
+		parent::checkBeforeSave($saveData);
+
+		if ($saveData ['recData']['personType'] == 1)
+		{ // human
+			$saveData ['recData']['otherAddress1'] = 0;
+		}
+		elseif ($saveData ['recData']['personType'] == 2)
+		{ // company
+			$saveData ['recData']['deliveryAddress'] = 0;
 		}
 	}
 }

@@ -8,6 +8,9 @@ use E10Pro\Zus\zusutils, \e10\utils, \e10\str;
 class WebFormPrihlaska extends \Shipard\Base\WebForm
 {
 	var $valid = FALSE;
+	var $pobocky;
+	var $oddeleni;
+	var $spamScore = '';
 
 	public function fields ()
 	{
@@ -26,33 +29,61 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 
 	public function createFormCode ($options = 0)
 	{
-		$c = "<form class='form-horizontal zus-prihlaska-form' method='POST'>";
+		$useReCaptcha = ($this->template && isset($this->template->pageParams['recaptcha-v3-site-key']));
+
+		$this->nacistPobocky();
+
+		$c = '';
+
+		if ($useReCaptcha)
+		{
+			$c .= "<noscript><p>";
+			$c .= Utils::es('Kontaktní formulář vyžaduje javascript...');
+			$c .= "</p></noscript>";
+		}
+
+		$c .= "<form class='form-horizontal zus-prihlaska-form' method='POST'";
+		if ($useReCaptcha)
+			$c .= " style='display: none;'";
+
+		$c .= ">";
 		$c .= "<input type='hidden' name='webFormState' value='1'/>";
 		$c .= "<input type='hidden' name='webFormId' value='e10pro.zus.libs.WebFormPrihlaska'/>";
+		if ($useReCaptcha)
+		{
+			$c .= "<input type='hidden' id='recaptcha-response' name='webFormReCaptchtaResponse' value=''/>";
+		}
 
 		$c.= "<div class='row pt-3 zus-prihlaska-obor'>";
 		$c.= "<div class='col col-4'>";
-		$obory = zusutils::obory($this->app, FALSE);
-
+		$obory = zusutils::obory($this->app, TRUE, '-- Vyberte obor --');
 		$c .= $this->addFormInput ('Obor', 'select', 'svpObor', ['select' => $obory, 'labelAbove' => 1, 'mandatory' => 1]);
 		$c.= "</div>";
+
 		$c.= "<div class='col col-4' id='studijni-zamereni'>";
 		$oddeleni = $this->app->cfgItem ("e10pro.zus.oddeleni");
 		$oddeleniEnum = [];
+		$oddeleniEnum[0] = '-- Vyberte studijní zaměření --';
 		foreach ($oddeleni as $oddeleniNdx => $oddeleniCfg)
 		{
 			if (intval($oddeleniNdx))
-				$oddeleniEnum[$oddeleniCfg['obor']][$oddeleniNdx] = $oddeleniCfg['nazev'];
+			{
+				$oddeleniEnum[$oddeleniNdx] = $oddeleniCfg['nazev'];
+				$this->oddeleni[$oddeleniCfg['obor']][] = $oddeleniNdx;
+			}
 		}
-		foreach ($oddeleniEnum as $obor => $enm)
-		{
-			$c .= $this->addFormInput ('Studijní zaměření', 'select', 'svpOddeleni', ['select' => $enm, 'labelAbove' => 1, 'mandatory' => 1, 'id' => 'svpOddeleni'.$obor]);
-		}
+		$c .= $this->addFormInput ('Studijní zaměření', 'select', 'svpOddeleni', ['select' => $oddeleniEnum, 'labelAbove' => 1, 'mandatory' => 1]);
 		$c.= "</div>";
+
 		$c.= "<div class='col col-4'>";
-		$c .= $this->addFormInput ('Studium na pobočce', 'select', 'misto', ['select' => zusutils::pobocky($this->app, FALSE), 'labelAbove' => 1, 'mandatory' => 1]);
+		$c .= $this->addFormInput ('Studium na pobočce', 'select', 'misto', ['select' => zusutils::pobocky($this->app, TRUE, '-- Vyberte pobočku --'), 'labelAbove' => 1, 'mandatory' => 1]);
 		$c.= "</div>";
 		$c.= "</div>";
+
+		$c.= "<small class='text-mutted' id='stop-stav-info'>";
+		$c.= "tady by mohlo být něco pěkného";
+		$c.= "</small>";
+
 
 		//$c.= "<div class='row'>";
 		$c .= "<h4>".'Osobní údaje žáka'.'</h4>';
@@ -165,7 +196,7 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 					<li>jestliže zákonný zástupce nezletilého žáka nebo zletilý žák neuhradil úplatu za vzdělání ve stanoveném termínu
 					<li>jestliže o to písemně požádá zákonný zástupce nezletilého žáka nebo zletilý žák
 				</ol>
-				<li>Beru na vědomí, že zaplatím úplatu za vzdělání (školné) v termínech, které určí škola. (do 30. 10. za 1. pololetí, do 31. 3. za 2. pololetí)
+				<li>Beru na vědomí, že zaplatím úplatu za vzdělání (školné) v termínech, které určí škola. (do 31. 8. za 1. pololetí, do 31. 3. za 2. pololetí)
 				<li>Dle §22 odst. 3 zákona č. 561/2004 Sb. v platném znění jsou zákonní zástupci dětí a nezletilých žáků povinni informovat školu o změně zdravotní způsobilosti, zdravotních obtížích
 						dítěte a jiných závažných skutečnostech, které by mohly mít vliv na průběh vzdělávání.
 		</ul>
@@ -178,6 +209,8 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 
 		$c .= "
 			<script>
+			var pobockyNaZamerenich = ".json_encode($this->pobocky).";
+			var oddeleniNaOborech = ".json_encode($this->oddeleni).";
 			document.addEventListener('DOMContentLoaded', function() {
 				$('form.form-horizontal').on ('change', 'input, select', function(event) {
 					prihlaska(event, $(this));
@@ -189,16 +222,6 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 
 			function prihlaska(event, element)
 			{
-				if (element.attr('id') === 'svpObor')
-				{
-					/*
-					if (element.val() === '4')
-						$('#svpOddeleni').parent().css({'display': 'none'});
-					else
-						$('#svpOddeleni').parent().css({'display': 'block'});
-					*/
-				}
-
 				if (element.attr('id') === 'zdravotniPostizeni')
 				{
 					if (element.val() === '0')
@@ -212,11 +235,8 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 
 			function nastavitPrihlasku()
 			{
-				var svpObor = $('#svpObor').val();
-				$('#studijni-zamereni').find('select').parent().hide();
-				$('#studijni-zamereni').find('select').prop('disabled', true);
-				$('#svpOddeleni'+svpObor).parent().show();
-				$('#svpOddeleni'+svpObor).prop('disabled', false);
+				let stopStav = 0;
+				let stopStavMsg = '';
 
 				if ($('#useAddressM').is(':checked'))
 				{
@@ -252,7 +272,63 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 					$('#zipcodeF').val($('#zipcode').val());
 				}
 
+				var oborId = parseInt($('#svpObor').val());
+				$('#svpOddeleni > option').each(function() {
+					var thisOption = $(this);
+					const oddeleni = parseInt(thisOption.attr('value'));
+					if (oddeleni)
+					{
+						if (oddeleniNaOborech[oborId] === undefined || oddeleniNaOborech[oborId].indexOf(oddeleni) === -1)
+							thisOption.hide();
+						else
+						{
+							thisOption.show();
+
+							if (pobockyNaZamerenich[oddeleni] === undefined || pobockyNaZamerenich[oddeleni].lenght === 0)
+							{
+								this.disabled = true;
+								stopStav = 1;
+								if (stopStavMsg !== '')
+									stopStavMsg += ', ';
+								stopStavMsg += thisOption.text();
+							}
+							else
+								this.disabled = false;
+						}
+					}
+				});
+				var oddeleniId = parseInt($('#svpOddeleni').val());
+				if (oddeleniNaOborech[oborId] === undefined || oddeleniNaOborech[oborId].indexOf(oddeleniId) === -1)
+					$('#svpOddeleni').val('0');
+
+
+				var zamereniId = parseInt($('#svpOddeleni').val());
+				$('#misto > option').each(function() {
+					var thisOption = $(this);
+					const pobocka = parseInt(thisOption.attr('value'));
+					if (pobocka)
+					{
+						if (pobockyNaZamerenich[zamereniId] === undefined || pobockyNaZamerenich[zamereniId].indexOf(pobocka) === -1)
+							this.disabled = true;
+						else
+							this.disabled = false;
+					}
+				});
+
+				var mistoId = parseInt($('#misto').val());
+				if (pobockyNaZamerenich[zamereniId] === undefined || pobockyNaZamerenich[zamereniId].indexOf(mistoId) === -1)
+					$('#misto').val('0');
+
+				if (stopStav)
+				{
+					$('#stop-stav-info').show().text('U některých studijních zaměření máme bohužel naplněnou kapacitu a nepřijímáme nové žáky: ' + stopStavMsg + '.');
+				}
+				else
+				{
+					$('#stop-stav-info').hide().text('');
+				}
 			}
+
 			nastavitPrihlasku();
 			</script>
 		";
@@ -272,22 +348,79 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 		$this->checkValidField('street', 'Ulice není vyplněna');
 		$this->checkValidField('city', 'Obec není vyplněna');
 		$this->checkValidField('zipcode', 'PSČ není vyplněno');
-		$this->checkValidField('svpOddeleni', 'Nástroj není vyplněn');
+		$this->checkValidField('svpObor', 'Obor není vyplněn');
+		$this->checkValidField('svpOddeleni', 'Studijní zaměření není vyplněno');
 		$this->checkValidField('skolaNazev', 'Název školy není vyplněn');
 		$this->checkValidField('fullNameM', 'Jméno není vyplněno');
 		$this->checkValidField('phoneM', 'Telefon není vyplněn');
 		$this->checkValidField('emailM', 'E-mail není vyplněn');
+		$this->checkValidField('misto', 'Není vybrána pobočka');
+
+		$reCaptchaResponse = $this->app->testPostParam ('webFormReCaptchtaResponse', NULL);
+		if ($reCaptchaResponse !== NULL)
+		{
+			if ($reCaptchaResponse === '')
+			{
+				$this->formErrors ['msg'] = 'Odeslání formuláře se nezdařilo.';
+				return FALSE;
+			}
+
+			$validateUrl = 'https://www.google.com/recaptcha/api/siteverify?secret='.$this->template->pageParams['recaptcha-v3-secret-key'].'&response='.$reCaptchaResponse.'&remoteip='.$_SERVER ['REMOTE_ADDR'];
+			$validateResult =  \E10\http_post ($validateUrl, '');
+			$validateResultData = json_decode($validateResult['content'], TRUE);
+			if ($validateResultData && isset($validateResultData['success']))
+			{
+				if ($validateResultData['success'])
+				{
+					if ($validateResultData['score'] < 0.5)
+					{
+						$this->formErrors ['msg'] = 'Vaše zpráva bohužel vypadá jako SPAM.';
+						return FALSE;
+					}
+					$this->spamScore = strval($validateResultData['score']);
+				}
+				else
+				{
+					$this->formErrors ['msg'] = 'Odeslání formuláře se nezdařilo.';
+					return FALSE;
+				}
+			}
+		}
 
 		return $this->valid;
 	}
 
 	public function checkValidField ($id, $msg)
 	{
+		if ($id === 'misto')
+		{
+			$misto = intval($this->app->testPostParam ('misto'));
+			if (!$misto)
+			{
+				$this->formErrors [$id] = $msg;
+				$this->valid = FALSE;
+				return;
+			}
+		}
+		if ($id === 'svpObor')
+		{
+			$svpObor = intval($this->app->testPostParam ('svpObor'));
+			if (!$svpObor)
+			{
+				$this->formErrors [$id] = $msg;
+				$this->valid = FALSE;
+				return;
+			}
+		}
 		if ($id === 'svpOddeleni')
 		{
-			$svpObor = $this->app->testPostParam ('svpObor');
-			if ($svpObor != '3')
+			$svpOddeleni = intval($this->app->testPostParam ('svpOddeleni'));
+			if (!$svpOddeleni)
+			{
+				$this->formErrors [$id] = $msg;
+				$this->valid = FALSE;
 				return;
+			}
 		}
 
 		if ($this->app->testPostParam ($id) == '')
@@ -345,7 +478,7 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 
 			'webSentDate' => new \DateTime(),
 
-			'docState' => 1200, 'docStateMain' => 1
+			'docState' => 1000, 'docStateMain' => 0,
 		];
 		$newNdx = $tablePrihlasky->dbInsertRec($newRegistration);
 		$tablePrihlasky->docsLog($newNdx);
@@ -356,5 +489,21 @@ class WebFormPrihlaska extends \Shipard\Base\WebForm
 	public function successMsg ()
 	{
 		return $this->dictText('Hotovo. Během několika minut Vám pošleme e-mail s potvrzením.');
+	}
+
+	protected function nacistPobocky()
+	{
+		$this->pobocky = [];
+
+		$q = [];
+		array_push($q, 'SELECT pobocky.*, oddeleni.[stop] AS oddeleniStop FROM [e10pro_zus_oddeleniPobocky] AS pobocky');
+		array_push($q, ' LEFT JOIN [e10pro_zus_oddeleni] AS oddeleni ON pobocky.oddeleni = oddeleni.ndx');
+		$rows = $this->app()->db()->query($q);
+		foreach ($rows as $r)
+		{
+			if ($r['stop'] || $r['oddeleniStop'])
+				continue;
+			$this->pobocky[$r['oddeleni']][] = $r['pobocka'];
+		}
 	}
 }

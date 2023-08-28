@@ -19,6 +19,10 @@ class DocDataFile extends Utility
 
 	var $impData = NULL;
 	var $docRecData = NULL;
+	var $srcImpData = NULL;
+
+	var $inboxNdx = 0;
+	var $automaticImport = 0;
 
 	public function init()
 	{
@@ -70,7 +74,7 @@ class DocDataFile extends Utility
 	{
 	}
 
-	public function createDocument($fromRecData)
+	public function createDocument($fromRecData, $checkNewRec = FALSE)
 	{
 	}
 }

@@ -597,8 +597,8 @@
     {
         "_title:cs":"Vlaštovka",
         "_title:en":"Paper plane",
-        "_tags:cs":"vlaštovka; papírová vlaštovka; poslat",
-        "_tags:en":"paper plane; sent",
+        "_tags:cs":"vlaštovka; papírová vlaštovka; poslat; posláno; odeslané",
+        "_tags:en":"paper plane; send; sent",
         "fa5":"fa-paper-plane",
         "fa6pro":"fa-paper-plane",
         "bsi":"bi-envelope",
@@ -984,10 +984,10 @@
         "_title:en":"Automobile",
         "_tags:cs":"osobní automobil; automobil; auto; dopravní prostředek; doprava; přeprava",
         "_tags:en":"automobile; car; vehicle; mean of transport; transport",
-        "fa5": "fa-hand-pointer",
-		"fa6pro": "fa-hand-pointer",
-		"bsi": "bi-hand-index",
-		"mdi": "touch_app"
+        "fa5": "fa-car",
+		"fa6pro": "fa-car",
+		"bsi": "bi-car-front-fill",
+		"mdi": ""
     },
     "user/bicycle":
     {
@@ -1725,5 +1725,71 @@
         "fa6pro":"fa-piggy-bank",
         "bsi":"bi-piggy-bank",
         "mdi":"savings"
+    },
+    "user/table":
+    {
+        "_title:cs":"Tabulka",
+        "_title:en":"Table",
+        "_tags:cs":"tabulka; buňka; rozvrh",
+        "_tags:en":"table; cell; timetable",
+        "fa5":"fa-table",
+        "fa6pro":"fa-table",
+        "bsi":"bi-table",
+        "mdi":""
+    },
+    "user/pin":
+    {
+        "_title:cs":"Připínáček",
+        "_title:en":"Pin",
+        "_tags:cs":"připínáček; připnout; nástěnka; připnuto",
+        "_tags:en":"pin; notice board; board; pinned",
+        "fa5":"fa-thumbtack",
+        "fa6pro":"fa-thumbtack",
+        "bsi":"bi-pin",
+        "mdi":""
+    },
+    "user/message":
+    {
+        "_title:cs":"Zpráva",
+        "_title:en":"Message",
+        "_tags:cs":"zpráva; text; chat; komentář",
+        "_tags:en":"message; text; chat; comment",
+        "fa5":"fa-comment-dots",
+        "fa6pro":"fa-comment-dots",
+        "bsi":"bi-chat-dots",
+        "mdi":""
+    },
+    "user/blockedUser":
+    {
+        "_title:cs":"Zablokovaný uživatel",
+        "_title:en":"Blocked user",
+        "_tags:cs":"uživatel; zablokovaný uživatel; blok",
+        "_tags:en":"user; blocked user; block",
+        "fa5":"fa-user-times",
+        "fa6pro":"fa-comment-dots",
+        "bsi":"bi-person-slash",
+        "mdi":""
+    },
+    "user/medal":
+    {
+        "_title:cs":"Medaile",
+        "_title:en":"Medal",
+        "_tags:cs":"medaile; výhra; ocenění",
+        "_tags:en":"medal; achievement; prize; award",
+        "fa5":"fa-medal",
+        "fa6pro":"fa-medal",
+        "bsi":"bi-award",
+        "mdi":""
+    },
+    "user/happy":
+    {
+        "_title:cs":"Štastný smajlík",
+        "_title:en":"Happy emoji",
+        "_tags:cs":"štěstí; úsměv; smajlík; emoji",
+        "_tags:en":"happy; smile; emoji; face",
+        "fa5":"fa-grin-beam",
+        "fa6pro":"fa-grin-beam",
+        "bsi":"bi-emoji-laughing-fill",
+        "mdi":""
     }
 }

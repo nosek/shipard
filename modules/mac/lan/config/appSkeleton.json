@@ -32,6 +32,8 @@
 							"macs": {"t1": "Všechny", "object": "viewer", "table": "mac.lan.macs", "viewer": "default", "order": 600100, "beforeSeparator": {"text": "MAC adresy", "class": "block pl05 pt1", "icon":  "iconSquare"}},
 							"macsOnPorts" :{"t1": "Podle portů", "object": "viewer", "table": "mac.lan.macsOnPorts", "viewer": "default", "order": 600200},
 
+							"wifiClients": {"t1": "Wifi klienti", "object": "viewer", "table": "mac.lan.wifiClients", "viewer": "default", "order": 700100, "beforeSeparator": {"text": "WiFi", "class": "block pl05 pt1", "icon":  "iconSquare"}},
+
 							"watchdogs": {"t1": "Watchdogs", "object": "viewer", "table": "mac.lan.watchdogs", "viewer": "default", "order": 700100, "beforeSeparator": {"text": "Monitor", "class": "block pl05 pt1", "icon":  "iconSquare"}},
 							"alerts": {"t1": "Výstrahy", "object": "viewer", "table": "mac.lan.alerts", "viewer": "default", "order": 700200}
 						}
@@ -51,6 +53,11 @@
 							"controls": {"t1": "Ovládací prvky", "object": "viewer", "table": "mac.iot.controls", "viewer": "default", "order": 30200},
 							"scPlacements": {"t1": "Zařazení", "object": "viewer", "table": "mac.iot.scPlacements", "viewer": "default", "order": 30400},
 
+							"params": {"t1": "Parametry", "object": "viewer", "table": "mac.iot.params", "viewer": "default", "order": 41000, "beforeSeparator": 1},
+
+							"cams": {"t1": "Kamery", "object": "viewer", "table": "mac.iot.cams", "viewer": "default", "order": 43000, "beforeSeparator": 1},
+
+
 							"users": {"t1": "Uživatelé", "object": "viewer", "table": "mac.iot.users", "viewer": "default", "order": 90100, "beforeSeparator": 1}
 						}
 					}
@@ -67,7 +74,8 @@
 
 							"tagsAssignments": {"t1": "Přiřazení klíčů", "object": "viewer", "table": "mac.access.tagsAssignments", "viewer": "default", "order": 65100, "beforeSeparator":  1},
 
-							"macZones": {"t1": "Zóny", "object": "viewer", "table": "mac.base.zones", "viewer": "default", "order": 70100, "beforeSeparator":  1}
+							"macZones": {"t1": "Zóny", "object": "viewer", "table": "mac.base.zones", "viewer": "default", "order": 70100, "beforeSeparator":  1},
+							"places": {"t1": "Místa", "object": "viewer", "table": "e10.base.places", "viewer": "default", "order": 88800}
 						}
 					}
 				},

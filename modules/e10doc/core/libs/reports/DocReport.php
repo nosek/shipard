@@ -21,9 +21,15 @@ class DocReport extends DocReportBase
 
 	public function loadData()
 	{
+		$this->testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+
 		$this->app()->printMode = TRUE;
 
+		$this->loadData_MainPerson('person');
+
 		parent::loadData();
+		if ($this->testNewPersons)
+			$this->loadAddresses();
 
 		$this->docReportsItemCodesMode = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsItemCodes', 0));
 
@@ -54,7 +60,7 @@ class DocReport extends DocReportBase
 
 		// -- rows
 		$q = [];
-		array_push($q, 'SELECT [rows].*, items.fullName AS itemFullName, items.id AS itemID, items.description AS itemDecription');
+		array_push($q, 'SELECT [rows].*, items.fullName AS itemFullName, items.id AS itemID, items.manufacturerId AS itemManufacturerId, items.description AS itemDecription');
 		array_push($q, ' FROM [e10doc_core_rows] as [rows]');
 		array_push($q, ' LEFT JOIN e10_witems_items as items ON [rows].item = items.ndx');
 		array_push($q, ' WHERE [document] = %i', $this->recData ['ndx']);
@@ -107,7 +113,7 @@ class DocReport extends DocReportBase
 			}
 
 			// -- addtions / marks
-			$adds = $this->table->docAdditionsOur($this->recData, $r);
+			$adds = $this->table->docAdditionsOur($this->recData, $r, $this->sendReportNdx);
 			if ($adds !== FALSE)
 			{
 				if (!isset($this->data ['additions']))
@@ -203,9 +209,9 @@ class DocReport extends DocReportBase
 		}
 		$this->data ['taxNotes'] = array_values($this->data ['taxNotes']);
 
-		// -- person
-		$this->loadData_MainPerson('person');
+		// -- persons
 		$this->loadDataPerson('personHandover');
+		$this->loadDataPerson('transportPersonDriver');
 
 		// delivery address
 		if ($this->recData ['deliveryAddress'] && $this->recData ['deliveryAddress'] !== $this->data ['person']['address']['ndx'])
@@ -283,13 +289,16 @@ class DocReport extends DocReportBase
 		// -- texts
 		/** @var \e10doc\base\TableReportsTexts */
 		$tableReportsTexts = $this->app()->table('e10doc.base.reportsTexts');
-		$this->data ['reportTexts'] = $tableReportsTexts->loadReportTexts($this->recData, $this->reportMode);
+		$this->data ['reportTexts'] ??= [];
+		$tableReportsTexts->loadReportTexts($this->recData, $this->reportMode, $this->data ['reportTexts']);
 		if (count($this->data ['reportTexts']))
 		{
 			$this->data ['_subtemplatesItems'] ??= [];
-			$this->data ['_subtemplatesItems'][] = 'reportTexts';
+			if (!count($this->data ['_subtemplatesItems']))
+				$this->data ['_subtemplatesItems'][] = 'reportTexts';
 			$this->data ['_textRenderItems'] ??= [];
-			$this->data ['_textRenderItems'][] = 'reportTexts';
+			if (!count($this->data ['_textRenderItems']))
+				$this->data ['_textRenderItems'][] = 'reportTexts';
 		}
 
 		// -- items codes
@@ -313,6 +322,9 @@ class DocReport extends DocReportBase
 
 				foreach ($row ['rowItemCodesData'] as $ckNdx => $icData)
 				{
+					$ckCfg = $this->app()->cfgItem('e10.witems.codesKinds.'.$ckNdx);
+					if (!isset($ckCfg['showInDocRows']) || $ckCfg['showInDocRows'] === 0)
+						continue;
 					$row ['rowItemCodes'][$ckNdx] = $icData;
 				}
 
@@ -345,5 +357,29 @@ class DocReport extends DocReportBase
 			$documentInfo['outboxSystemKind'] = $docType['outboxSystemKind'];
 		if (isset($docType['outboxSystemSection']))
 			$documentInfo['outboxSystemSection'] = $docType['outboxSystemSection'];
+	}
+
+	public function loadAddresses()
+	{
+		$this->data['personsAddress'] = [];
+
+		if ($this->recData['ownerOffice'])
+		{
+			$this->data['personsAddress']['ownerOffice'] = $this->loadPersonAddress(0, 0, $this->recData['ownerOffice']);
+			$this->data ['flags']['useAddressOwnerOffice'] = 1;
+			$this->data ['flags']['usePersonsAddress'] = 1;
+		}
+		if ($this->recData['deliveryAddress'])
+		{
+			$this->data['personsAddress']['deliveryAddress'] = $this->loadPersonAddress(0, 0, $this->recData['deliveryAddress']);
+			$this->data ['flags']['useAddressPersonDelivery'] = 1;
+			$this->data ['flags']['usePersonsAddress'] = 1;
+		}
+		if ($this->recData['otherAddress1'])
+		{
+			$this->data['personsAddress']['personOffice'] = $this->loadPersonAddress(0, 0, $this->recData['otherAddress1']);
+			$this->data ['flags']['useAddressPersonOffice'] = 1;
+			$this->data ['flags']['usePersonsAddress'] = 1;
+		}
 	}
 }

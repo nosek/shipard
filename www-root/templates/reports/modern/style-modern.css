@@ -21,7 +21,7 @@ table {
 }
 
 div.reportTextHeader {font-size: 90%; padding-bottom: 2pt;}
-div#reportTextFooter {font-size: 90%; padding-bottom: 2pt; text-align: right; margin-top: 10pt;}
+div.reportTextFooter {font-size: 90%; padding-bottom: 2pt; margin-top: 10pt;}
 div.latestNews{font-size: 40%; }
 
 div.news {
@@ -95,7 +95,7 @@ div.heading {font-weight: bold; font-size: 14pt; padding-top: 8pt; padding-botto
 
 div.headingAlt {font-weight: bold; font-size: 14pt; padding-top: 8pt; padding-bottom: 5pt; text-align: left;}
 
-table.signed {width: 100%; text-align: center; margin-top: 36pt; font-size: 10pt; border-collapse: collapse;}
+table.signed {width: 100%; text-align: center; margin-top: 50pt; font-size: 10pt; border-collapse: collapse;}
 table.signed td.empty {width:60%;}
 table.signed tr td {vertical-align: top;}
 table.signed tr td span {text-align: center; border-top: .8pt solid black;  padding: 3pt;  display: block;}
@@ -200,10 +200,10 @@ table#head3 {clear: both; width: 100%; border-collapse: collapse; margin-bottom:
 
 table#rows2 {width: 100%; border-collapse: collapse; line-height: 1.4;}
 table#rows2:not(:last-child) {margin-bottom: 10pt;}
-table#rows2 th {text-align: left; padding-left: 6pt; padding-right: 6pt; font-size: 12pt; padding-bottom: 3pt;}
+table#rows2 th {text-align: left; font-size: 12pt; padding-bottom: 3pt;}
 table#rows2 td {border: 1pt solid #5B7F8C; padding-left: 6pt; padding-right: 6pt;}
 
-table#sign2 {text-align: center; width: 100%; padding-top: 3.5cm; background-repeat: no-repeat; background-size: contain;}
+table#sign2 {text-align: center; width: 100%; margin-top: 1.5cm; background-repeat: no-repeat; background-size: contain;}
 table#sign2 td.name {width: 50%; text-align: center;  vertical-align: top; padding: 10pt;}
 table#sign2 td.name div {border-top: 1pt solid #5B7F8C; padding-top: 3pt;}
 
@@ -236,6 +236,33 @@ table.purchaseSigned {border-collapse: collapse; border: 3pt solid black;}
 table.purchaseSigned td {padding: 5pt;}
 div.vkp-vykup-podpis-dod-prevzal {height: 95pt; font-size: 10pt;}
 div.vkp-vykup-podpis-dod-podpis {border-top: 2pt dotted black; border-collapse: collapse; font-size: 9pt; text-align: center;}
+
+table.additionalAddresses {font-size: 8pt; border-bottom: 2pt solid lightgray; padding-bottom: 3pt; margin-bottom: 3pt;}
+
+table.additionalAddresses td {width: 33.3%; padding-bottom: 5pt; vertical-align: top;}
+
+table.additionalAddresses td span.hdr {font-size: 10pt;}
+
+table.additionalAddresses td.deliveryAddress div.hdr {font-size: 10pt;}
+
+table.additionalAddresses td div.hdr {font-size: 10pt;}
+
+/* Objednávky */
+div.orderDescription {margin-top: 5pt;}
+
+/* výdejky a dodací listy */
+
+table.deliveryInfo td{
+	vertical-align: top;
+	width: 50%;
+}
+
+table.deliveryInfo {
+	width: 100%;
+	padding-bottom: 3pt;
+	border-bottom: 1pt solid lightgray;
+	border-collapse: collapse;
+}
 
 /*** universal app styles */
 

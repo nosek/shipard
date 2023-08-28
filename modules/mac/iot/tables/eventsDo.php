@@ -2,8 +2,8 @@
 
 namespace mac\iot;
 
-use \Shipard\Form\TableForm, \Shipard\Table\DbTable, \Shipard\Viewer\TableView, \Shipard\Viewer\TableViewDetail, \Shipard\Utils\Utils;
-
+use \Shipard\Form\TableForm, \Shipard\Table\DbTable, \Shipard\Viewer\TableView, \Shipard\Viewer\TableViewDetail;
+use \Shipard\Utils\Utils, \Shipard\Utils\Json;
 
 /**
  * Class TableEventsDo
@@ -40,7 +40,7 @@ class TableEventsDo extends DbTable
 					$properties = $iotDevicesUtils->devicesGroupProperties($recData['iotDevicesGroup']);
 				else
 					$properties = $iotDevicesUtils->deviceProperties($recData['iotDevice']);
-			
+
 				$dp = $properties[$recData['iotDeviceProperty']] ?? NULL;
 				if ($dp)
 				{
@@ -76,7 +76,7 @@ class TableEventsDo extends DbTable
 			{
 				$enumSetValue = $dp['enumSet'][$recData['iotDevicePropertyValueEnum']] ?? NULL;
 
-				if (isset($enumSetValue['fields']))	
+				if (isset($enumSetValue['fields']))
 					return $enumSetValue['fields'];
 
 
@@ -141,7 +141,7 @@ class TableEventsDo extends DbTable
 			if (!$events)
 				return [];
 
-			$event = $events[$form->recData['iotDeviceProperty']] ?? NULL;	
+			$event = $events[$form->recData['iotDeviceProperty']] ?? NULL;
 			if (!$event)
 				return [];
 
@@ -176,16 +176,70 @@ class TableEventsDo extends DbTable
 		return parent::columnInfoEnum ($columnId, $valueType, $form);
 	}
 
-	public function getEventLabels($eventRow, &$dest, $prefixLabel = NULL)
+	public function getEventLabels($eventRow, &$dest, $prefixLabel = NULL, $showTitle = FALSE)
 	{
+		if ($showTitle)
+		{
+			$dest[] = [
+				'text' => $eventRow['fullName'], 'class' => '_block e10-bold',
+				'docAction' => 'edit', 'pk' => $eventRow['ndx'], 'table' => 'mac.iot.eventsDo'
+			];
+
+			//if ($eventRow['disabled'])
+			//	$dest[] = ['text' => 'Zakázáno', 'class' => 'label label-danger'];
+
+			$eventType = $this->app()->cfgItem('mac.iot.events.doEventTypes.'.$eventRow['eventType'], NULL);
+			if ($eventType)
+				$dest[] = ['text' => $eventType['fn'].':', 'class' => 'break e10-small'];
+		}
+
 		if ($prefixLabel)
 			$dest[] = $prefixLabel;
 
+		if ($eventRow['when'])
+		{
+			if ($eventRow['whenType'] === 'sensorValue')
+			{
+				if (!$eventRow['whenSensor'])
+				{
+					$dest[] = ['text' => 'senzor není vybrán', 'class' => 'label label-warning', 'icon' => 'formFilter'];
+				}
+				else
+				{
+					$sensorRecData = $this->app()->loadItem($eventRow['whenSensor'], 'mac.iot.sensors');
+					if ($sensorRecData)
+					{
+						$dest[] = ['text' => $sensorRecData['idName'], 'class' => 'label label-warning', 'icon' => 'formFilter', 'title' => 'Hodnota senzoru'];
+					}
+					else
+					{
+						$dest[] = ['text' => 'unknown sensor #'.$eventRow['iotSensor'], 'class' => 'label label-warning'];
+					}
+				}
+				$dest[] = ['text' => ' = ', 'class' => 'label label-default'];
+				$dest[] = ['text' => '`'.$eventRow['whenSensorValue'].'`', 'class' => 'label label-info'];
+				$dest[] = ['text' => ' : ', 'class' => 'label label-default'];
+			}
+		}
+
 		if ($eventRow['eventType'] === 'sendMqttMsg')
 		{
-			//$this->addColumnInput ('mqttTopic');
-			//$this->addColumnInput ('mqttTopicPayloadValue');
-
+			$dest[] = ['text' => $eventRow['mqttTopic'], 'class' => 'label label-default', '__icon' => 'tables/mac.iot.setups'];
+			if (strlen($eventRow['mqttTopicPayloadValue']) < 51)
+				$dest[] = ['text' => $eventRow['mqttTopicPayloadValue'], 'class' => 'label label-info'];
+			else
+			{
+				if ($eventRow['mqttTopicPayloadValue'] === '!')
+				{
+					$data = Json::decode($eventRow['mqttTopicPayloadValue']);
+					if ($data)
+						$dest[] = ['code' => "<code><pre>".Json::lint($data)."</pre></code>", 'class' => 'block'];
+				}
+				else
+				{
+					$dest[] = ['code' => "<code><pre>".$eventRow['mqttTopicPayloadValue']."</pre></code>", 'class' => 'block'];
+				}
+			}
 			return;
 		}
 		elseif ($eventRow['eventType'] === 'sendSetupRequest')
@@ -194,16 +248,26 @@ class TableEventsDo extends DbTable
 			$dest[] = ['text' => $eventRow['iotSetupRequest'], 'class' => 'label label-info'];
 			return;
 		}
-	
+
 		if ($eventRow['useGroup'])
 		{
 			$dest[] = ['text' => $eventRow['devicesGroupName'], 'class' => 'label label-primary'];
 		}
 		else
 		{
-			$dest[] = ['text' => $eventRow['deviceFriendlyId'], 'class' => 'label label-primary'];
+			if ($showTitle)
+				$dest[] = [
+					'text' => $eventRow['deviceFriendlyId'], 'class' => 'label label-default',
+					'docAction' => 'edit', 'pk' => $eventRow['iotDevice'], 'table' => 'mac.iot.devices'
+				];
+			else
+				$dest[] = ['text' => $eventRow['deviceFriendlyId'], 'class' => 'label label-primary'];
 
 		}
+
+		$iotDevicesUtils = new \mac\iot\libs\IotDevicesUtils($this->app());
+		$dp = $iotDevicesUtils->deviceProperty($eventRow['iotDevice'], $eventRow['iotDeviceProperty']);
+		$pv = $iotDevicesUtils->deviceSetPropertyValue ($eventRow, $dp);
 
 		if ($eventRow['eventType'] === 'setDeviceProperty')
 		{
@@ -223,6 +287,15 @@ class TableEventsDo extends DbTable
 			$dest[] = ['text' => ' - ', 'class' => 'label label-danger'];
 			$dest[] = ['text' => $eventRow['iotDevicePropertyValue'], 'class' => 'label label-default'];
 		}
+		elseif ($eventRow['eventType'] === 'assignDeviceProperty')
+		{
+			$dest[] = ['text' => $eventRow['iotDeviceProperty'], 'class' => 'label label-warning'];
+			$dest[] = ['text' => ' => ', 'class' => 'label label-danger'];
+			$dest[] = ['text' => $eventRow['iotDevicePropertyValue'], 'class' => 'label label-default'];
+		}
+
+		if ($eventRow['iotDevicePropertyValue'] != $pv)
+			$dest[] = ['text' => $pv, 'class' => 'label label-default'];
 	}
 }
 
@@ -266,7 +339,7 @@ class ViewEventsDoForm extends TableView
 
 		$listItem ['i1'] = ['text' => '#'.$item['ndx'], 'class' => 'id'];
 		$listItem ['t1'] = $item['fullName'];
-		
+
 
 		$listItem ['t2'] = [];
 		$this->table->getEventLabels($item, $listItem ['t2']);
@@ -376,7 +449,7 @@ class FormEventDo extends TableForm
 							$this->addSubColumns('eventValueCfg');
 						}
 					}
-					elseif ($this->recData['eventType'] === 'incDeviceProperty' || $this->recData['eventType'] === 'decDeviceProperty')
+					elseif ($this->recData['eventType'] === 'incDeviceProperty' || $this->recData['eventType'] === 'decDeviceProperty' || $this->recData['eventType'] === 'assignDeviceProperty')
 					{
 						if ($this->recData['useGroup'])
 							$this->addColumnInput ('iotDevicesGroup');
@@ -397,6 +470,16 @@ class FormEventDo extends TableForm
 
 					$this->addSeparator(self::coH4);
 					$this->addColumnInput ('rowOrder');
+
+					$this->addSeparator(self::coH4);
+					$this->addColumnInput ('when', self::coRight);
+					if ($this->recData['when'])
+					{
+						$this->addColumnInput ('whenType');
+						$this->addColumnInput ('whenSensor');
+						$this->addColumnInput ('whenSensorValue');
+					}
+
 				$this->closeTab ();
 			$this->closeTabs ();
 		$this->closeForm ();

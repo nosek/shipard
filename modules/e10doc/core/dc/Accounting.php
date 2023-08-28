@@ -275,8 +275,8 @@ class Accounting extends \e10\DocumentCard
 		}
 
 		$h = [
-			'reportTitle' => 'Přiznání', 'filingTitle' => 'Podání', 'cc' => 'Země', 'tc' => 'Sazba', 'taxPercents' => ' %', 
-			'baseDC' => ' Základ', 'taxDC' => ' Daň', 'docCurrency' => ' Měna', 
+			'reportTitle' => 'Přiznání', 'filingTitle' => 'Podání', 'cc' => 'Země', 'tc' => 'Sazba', 'taxPercents' => ' %',
+			'baseDC' => ' Základ', 'taxDC' => ' Daň', 'docCurrency' => ' Měna',
 			'baseTC' => ' Základ EUR', 'taxTC' => ' Daň EUR'
 		];
 		$t = [['icon' => 'report/generalLedger', 'text' => 'Záznamy pro přiznání OSS']];
@@ -301,8 +301,18 @@ class Accounting extends \e10\DocumentCard
 		$rosType = $rosTypes[$rosReg['rosType']];
 
 		$rosEngine = $this->app()->createObject($rosType['engine']);
-		$content = $rosEngine->documentDetail ($recData);
-		$this->addContent('body', $content);
+		if ($rosEngine)
+		{
+			$content = $rosEngine->documentDetail ($recData);
+			$this->addContent('body', $content);
+		}
+		else
+		{
+			$this->addContent('body', [
+				'type' => 'line', 'pane' => 'e10-pane e10-pane-table e10-warning3',
+				'line' => ['text' => 'Chybný typ evidence tržeb `'.$recData['rosReg'].'`', 'class' => 'h1', 'icon' => 'system/iconWarning']
+			]);
+		}
 	}
 
 	function createInventory($recData)
@@ -406,12 +416,17 @@ class Accounting extends \e10\DocumentCard
 			]);
 	}
 
-	public function createContent ()
+	public function init()
 	{
 		$this->tablePersons = new \E10\Persons\TablePersons ($this->app());
 		$this->tableRows = $this->app()->table('e10doc.core.rows');
 
 		$this->docTypes = $this->table->app()->cfgItem ('e10.docs.types');
+	}
+
+	public function createContent ()
+	{
+		$this->init();
 
 		$this->createContentAccounting();
 		$this->createBalances($this->recData);

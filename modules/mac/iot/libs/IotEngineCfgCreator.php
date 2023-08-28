@@ -3,12 +3,25 @@
 namespace mac\iot\libs;
 
 use e10\Utility, \e10\utils, \e10\json, e10\uiutils;
+use mac\iot\TableeventsOn;
+use mac\iot\Tableparams;
+
+
+enum OnEventType: int {
+	case deviceAction = 0;
+	case mqttMsg = 1;
+	case readerValue = 2;
+	case setupAction = 3;
+	case sensorValue = 9;
+	case sensorValueChange = 10;
+}
 
 /**
  * Class IotEngineCfgCreator
  */
 class IotEngineCfgCreator extends Utility
 {
+
 	var $siteNdx = 0;
 
 	var \mac\iot\libs\IotDevicesUtils $iotDevicesUtils;
@@ -21,8 +34,10 @@ class IotEngineCfgCreator extends Utility
 		$this->iotDevicesUtils = new \mac\iot\libs\IotDevicesUtils($this->app());
 		$this->tableIotDevices = $this->app()->table('mac.iot.devices');
 
+		$this->cfg['params'] = [];
 		$this->cfg['topics'] = [];
 		$this->cfg['listenTopics'] = [];
+		$this->cfg['zigbee2mqttTopics'] = [];
 	}
 
 	protected function addTopic($topic, $data)
@@ -75,7 +90,17 @@ class IotEngineCfgCreator extends Utility
 		{
 			return $eo['mqttTopic'];
 		}
+		elseif ($eo['eventType'] === 'mqttTopic')
+		{
+			return $eo['mqttTopic'];
+		}
 		elseif ($eo['eventType'] === 'sensorValue')
+		{
+			$sensorRecData = $this->app()->loadItem($eo['iotSensor'], 'mac.iot.sensors');
+			if ($sensorRecData)
+				return $sensorRecData['srcMqttTopic'];
+		}
+		elseif ($eo['eventType'] === 'sensorValueChange')
 		{
 			$sensorRecData = $this->app()->loadItem($eo['iotSensor'], 'mac.iot.sensors');
 			if ($sensorRecData)
@@ -88,7 +113,7 @@ class IotEngineCfgCreator extends Utility
 	protected function eventDoTopic($ed, $deviceNdx = 0)
 	{
 		$t = NULL;
-		if ($ed['eventType'] === 'setDeviceProperty' || $ed['eventType'] === 'incDeviceProperty' || $ed['eventType'] === 'decDeviceProperty')
+		if ($ed['eventType'] === 'setDeviceProperty' || $ed['eventType'] === 'incDeviceProperty' || $ed['eventType'] === 'decDeviceProperty' || $ed['eventType'] === 'assignDeviceProperty')
 		{
 			$dm = $this->iotDeviceDataModel($deviceNdx ? $deviceNdx : $ed['iotDevice']);
 			if ($dm)
@@ -135,38 +160,70 @@ class IotEngineCfgCreator extends Utility
 
 		if ($eo['eventType'] === 'deviceAction')
 		{
-			$item['type'] = 0;
+			$item['type'] = OnEventType::deviceAction;
 			$item['dataItem'] = $eo['iotDeviceEvent'];
 			$item['dataValue'] = $eo['iotDeviceEventValueEnum'];
 		}
 		elseif ($eo['eventType'] === 'setupAction')
 		{
-			$item['type'] = 3;
+			$item['type'] = OnEventType::setupAction;
 			$item['dataItem'] = 'action';
 			$item['dataValue'] = $eo['iotSetupEvent'];
 		}
 		elseif ($eo['eventType'] === 'readerValue')
 		{
-			$item['type'] = 2;
+			$item['type'] = OnEventType::readerValue;
 		}
 		elseif ($eo['eventType'] === 'mqttMsg')
 		{
 			if ($eo['mqttTopicPayloadItemId'] === '')
 			{
-				$item['type'] = 1;
+				$item['type'] = OnEventType::mqttMsg;
 				$item['dataItem'] = '';
 				$item['dataValue'] = $eo['mqttTopicPayloadValue'];
 			}
 			else
 			{
-				$item['type'] = 0;
+				$item['type'] = OnEventType::deviceAction;
 				$item['dataItem'] = $eo['mqttTopicPayloadItemId'];
 				$item['dataValue'] = $eo['mqttTopicPayloadValue'];
 			}
 		}
 		elseif ($eo['eventType'] === 'sensorValue')
 		{
-			$item['type'] = 9;
+			$item['type'] = OnEventType::sensorValue;
+
+			//$item['sensorValueFrom'] = $eo['iotSensorValueFrom'];
+			if ($eo['iotSensorValueFromType'] == TableEventsOn::svtValue)
+				$item['sensorValueFrom'] = strval($eo['iotSensorValueFrom']);
+			elseif ($eo['iotSensorValueFromType'] == TableEventsOn::svtTemplate)
+				$item['sensorValueFrom'] = $eo['iotSensorValueFromTemplate'];
+			elseif ($eo['iotSensorValueFromType'] == TableEventsOn::svtParam)
+			{
+				$paramRecData = $this->app()->loadItem($eo['iotSensorValueFromParam'], 'mac.iot.params');
+				if ($paramRecData)
+					$item['sensorValueFrom'] = '{{params.'.$paramRecData['idName'].'}}';
+				else
+					$item['sensorValueFrom'] = '{{params.'.'UNKNOWN-PARAM'.'}}';
+			}
+
+			//$item['sensorValueTo'] = $eo['iotSensorValueTo'];
+			if ($eo['iotSensorValueToType'] == TableEventsOn::svtValue)
+				$item['sensorValueTo'] = strval($eo['iotSensorValueTo']);
+			elseif ($eo['iotSensorValueToType'] == TableEventsOn::svtTemplate)
+				$item['sensorValueTo'] = $eo['iotSensorValueToTemplate'];
+			elseif ($eo['iotSensorValueToType'] == TableEventsOn::svtParam)
+			{
+				$paramRecData = $this->app()->loadItem($eo['iotSensorValueToParam'], 'mac.iot.params');
+				if ($paramRecData)
+					$item['sensorValueTo'] = '{{params.'.$paramRecData['idName'].'}}';
+				else
+					$item['sensorValueTo'] = '{{params.'.'UNKNOWN-PARAM'.'}}';
+			}
+		}
+		elseif ($eo['eventType'] === 'sensorValueChange')
+		{
+			$item['type'] = OnEventType::sensorValueChange;
 			$item['sensorValueFrom'] = $eo['iotSensorValueFrom'];
 			$item['sensorValueTo'] = $eo['iotSensorValueTo'];
 		}
@@ -192,10 +249,17 @@ class IotEngineCfgCreator extends Utility
 
 		foreach ($rows as $r)
 		{
+			$when = NULL;
+			if ($r['when'])
+				$when = $this->eventWhen($r);
+
 			if ($r['eventType'] === 'sendMqttMsg')
 			{
 				$destTopic = $this->eventDoTopic($r);
-				$dst['sendMqtt'][$destTopic]['payload'] = $r['mqttTopicPayloadValue'];
+				$pl = ['value' => $r['mqttTopicPayloadValue']];
+				if ($when)
+					$pl['when'] = $when;
+				$dst['sendMqtt'][$destTopic]['payloads'][] = $pl;
 				continue;
 			}
 			if ($r['eventType'] === 'sendSetupRequest')
@@ -230,15 +294,18 @@ class IotEngineCfgCreator extends Utility
 						{
 							$enumSetValue = $dp['enumSet'][$r['iotDevicePropertyValueEnum']] ?? NULL;
 
-							$dst['setProperties'][$destTopic]['data'][$r['iotDeviceProperty']] = $this->enumSetValue ($r, $dp, $enumSetValue);
+							$dst['setProperties'][$destTopic]['data'][$r['iotDeviceProperty']] = ['value' => $this->enumSetValue ($r, $dp, $enumSetValue)];
 						}
 						elseif ($dp['data-type'] === 'numeric')
-							$dst['setProperties'][$destTopic]['data'][$r['iotDeviceProperty']] = intval($r['iotDevicePropertyValue']);
+							$dst['setProperties'][$destTopic]['data'][$r['iotDeviceProperty']] = ['value' => intval($r['iotDevicePropertyValue'])];
+
+						if ($when)
+							$dst['setProperties'][$destTopic]['data'][$r['iotDeviceProperty']]['when'] = $when;
 						/*else
 							$dst['setProperties'][$destTopic]['data'][$r['iotDeviceProperty']] = $r['iotDevicePropertyValueEnum'];*/
 					}
 				}
-				elseif ($r['eventType'] === 'incDeviceProperty' || $r['eventType'] === 'decDeviceProperty')
+				elseif ($r['eventType'] === 'incDeviceProperty' || $r['eventType'] === 'decDeviceProperty' || $r['eventType'] === 'assignDeviceProperty')
 				{
 					$srcDeviceDataModel = $this->iotDevicesUtils->deviceDataModel($srcEvent['iotDevice']);
 					$srcDeviceAction = $srcDeviceDataModel['properties'][$srcEvent['iotDeviceEvent']] ?? [];
@@ -248,18 +315,19 @@ class IotEngineCfgCreator extends Utility
 					$dp = $this->iotDevicesUtils->deviceProperty($iotDeviceNdx, $r['iotDeviceProperty']);
 					if ($dp)
 					{
-						$loopId = $srcTopic.'.'.$srcEvent['iotDeviceEvent'].'.'.$srcDeviceActionEnum['stopAction'];
-						if (!isset($dst['startLoop']))
-							$dst['startLoop'] = [
+						$loopId = $srcTopic.'.'.$srcEvent['iotDeviceEvent'];
+						if (!isset($dst['stepValues']))
+							$dst['stepValues'] = [
 								'id' => $loopId,
-								'stopTopic' => $srcTopic,
-								'stopProperty' => $srcEvent['iotDeviceEvent'],
-								'stopPropertyValue' => $srcDeviceActionEnum['stopAction'],
-								'op' => $r['eventType'] === 'decDeviceProperty' ? '-' : '+',
+								'op' => match($r['eventType']) {
+									 				'decDeviceProperty' => '-',
+													'incDeviceProperty' => '+',
+													'assignDeviceProperty' => '=>'
+												},
 								'properties' => [],
 						];
 
-						$dst['startLoop']['properties'][] = [
+						$dst['stepValues']['properties'][] = [
 							'property' => $r['iotDeviceProperty'],
 							'value-min' => $dp['value-min'] ?? 0,
 							'value-max' => $dp['value-max'] ?? 254,
@@ -278,6 +346,35 @@ class IotEngineCfgCreator extends Utility
 				$topicItem['payload'] = json_encode($topicItem['data']);
 		}
 		*/
+	}
+
+	protected function eventWhen ($eventRow)
+	{
+		$when = ['type' => $eventRow['whenType']];
+
+		if ($eventRow['whenType'] === 'sensorValue')
+		{
+			if (!$eventRow['whenSensor'])
+			{
+				return NULL;
+			}
+			else
+			{
+				$sensorRecData = $this->app()->loadItem($eventRow['whenSensor'], 'mac.iot.sensors');
+				if ($sensorRecData)
+				{
+					$when['sensorId'] = $sensorRecData['idName'];
+				}
+				else
+				{
+					return NULL;
+				}
+			}
+
+			$when['value'] = $eventRow['whenSensorValue'];
+		}
+
+		return $when;
 	}
 
 	protected function enumSetValue ($eventRecData, $deviceProperty, $enumSetValue)
@@ -372,6 +469,7 @@ class IotEngineCfgCreator extends Utility
 		array_push ($qeo, ' AND [eventsOn].[tableId] = %s', $tableId);
 		array_push ($qeo, ' AND [eventsOn].[recId] = %i', $recId);
 		array_push ($qeo, ' AND [eventsOn].[docState] != %i', 9800);
+		array_push ($qeo, ' AND [eventsOn].[disabled] = %i', 0);
 		$eoRows = $this->db()->query($qeo);
 		foreach ($eoRows as $eor)
 		{
@@ -451,7 +549,7 @@ class IotEngineCfgCreator extends Utility
 		$rows = $this->db()->query($q);
 		foreach ($rows as $r)
 		{
-			$item = ['type' => 'sensor', 'ndx' => $r['ndx'], 'qt' => $r['quantityType']];
+			$item = ['type' => 'sensor', 'ndx' => $r['ndx'], 'qt' => $r['quantityType'], 'id' => $r['idName']];
 
 			if ($r['place'])
 			{
@@ -473,8 +571,32 @@ class IotEngineCfgCreator extends Utility
 		return $cfg;
 	}
 
+	protected function doParams()
+	{
+		$q = [];
+		array_push ($q, 'SELECT [params].*');
+		array_push ($q, ' FROM [mac_iot_params] AS [params]');
+		array_push ($q, ' WHERE 1');
+		array_push ($q, ' AND [params].docState = %i', 4000);
+
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			$paramId = $r['idName'];
+			$item = ['id' => $paramId, 'type' => $r['paramType']];
+
+			if ($r['paramType'] == TableParams::ptNumber)
+				$item['defaultValue'] = $r['defaultValueNum'];
+    	elseif ($r['paramType'] == TableParams::ptString)
+				$item['defaultValue'] = $r['defaultValueStr'];
+
+			$this->cfg['params'][$paramId] = $item;
+		}
+	}
+
 	public function run()
 	{
+		$this->doParams();
 		$this->doDevices();
 		$this->doSetups();
 		$this->doScenes();

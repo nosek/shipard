@@ -1,0 +1,56 @@
+.card {
+	background-color: var(--cardBackground);
+    border-color: var(--cardBorder);
+}
+
+a.card {
+	text-decoration: none;
+}
+
+.card-body pre {
+	white-space: break-spaces;
+	font-family: sans-serif;
+}
+
+.card-body :last-child {
+	margin-bottom: 0 !important;
+}
+
+/*toggle*/
+.form-check-input:checked {
+	background-color: #{$shipard-primary};
+	border-color: #{$shipard-primary};
+}
+
+.accordion {
+	margin-top: 1rem;
+	border: 1pt solid var(--accordionBorder);
+	.accordion-header {
+		padding: 0;
+		background-color: var(--accordionBackground);
+	}
+	li {
+		background-color: transparent;
+		border: none;
+	}
+	li:first-child {
+		border-top: 1pt solid var(--accordionBorder) !important;
+	}
+	ol.list-group{
+	border: none !important;
+	}
+  }
+
+.accordion-body {
+	background-color: var(--accordionBackground);
+	padding: 0;
+}
+
+ol.grades li.list-group-item {
+	border-radius: 0;
+}
+
+ol.grades li.list-group-item:not(:last-child){
+	border-bottom: 1px solid var(--accordionBorder);
+}
+

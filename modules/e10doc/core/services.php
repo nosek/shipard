@@ -366,8 +366,66 @@ class ModuleServices extends \E10\CLI\ModuleServices
 
 	protected function cliValidatePersons()
 	{
+		$maxCount = intval($this->app->arg('maxCount'));
+		$debug = intval($this->app->arg('debug'));
+
 		$e = new \e10doc\core\libs\PersonValidator($this->app);
+		if ($maxCount)
+			$e->maxCount = $maxCount;
+		if ($debug)
+			$e->debug = $debug;
 		$e->batchCheck();
+	}
+
+	protected function cliRepairPersons()
+	{
+		$maxCount = intval($this->app->arg('maxCount'));
+		$debug = intval($this->app->arg('debug'));
+
+		$e = new \e10doc\core\libs\PersonValidator($this->app);
+		if ($maxCount)
+			$e->maxCount = $maxCount;
+		if ($debug)
+			$e->debug = $debug;
+		$e->batchRepair();
+	}
+
+	public function cliNewDocFromAtt()
+	{
+		$paramAttNdx = intval($this->app->arg('attNdx'));
+		if (!$paramAttNdx)
+		{
+			echo "ERROR: missing param `--attNdx`\n";
+			return FALSE;
+		}
+
+		$e = new \e10doc\core\libs\DocFromAttachment($this->app());
+		$e->init();
+		$e->setAttNdx($paramAttNdx);
+		$e->import();
+	}
+
+	public function cliResetDocFromAtt()
+	{
+		$paramAttNdx = intval($this->app->arg('attNdx'));
+		if (!$paramAttNdx)
+		{
+			echo "ERROR: missing param `--attNdx`\n";
+			return FALSE;
+		}
+
+		$paramDocNdx = intval($this->app->arg('docNdx'));
+		if (!$paramDocNdx)
+		{
+			echo "ERROR: missing param `--docNdx`\n";
+			return FALSE;
+		}
+
+		$e = new \e10doc\core\libs\DocFromAttachment($this->app());
+		$e->init();
+		$e->setAttNdx($paramAttNdx);
+		$e->replaceDocumentNdx = $paramDocNdx;
+		$e->reset($paramDocNdx);
 	}
 
 	public function onCliAction ($actionId)
@@ -379,6 +437,9 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			case 'docs-checks-wrong-journal': return $this->cliDocsChecksWrongJournal();
 			case 'copy-witems': return $this->cliCopyWitems();
 			case 'validate-persons': return $this->cliValidatePersons();
+			case 'repair-persons': return $this->cliRepairPersons();
+			case 'new-doc-from-att': return $this->cliNewDocFromAtt();
+			case 'reset-doc-from-att': return $this->cliResetDocFromAtt();
 		}
 
 		parent::onCliAction($actionId);

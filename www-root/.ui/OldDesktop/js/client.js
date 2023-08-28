@@ -838,9 +838,10 @@ e10ViewerPrintDetail(e){var
 table=searchParentAttr(e,"data-table");var
 reportClass=e.attr('data-report');var
 pk=searchParentAttr(e,"data-pk");var
-url=httpApiRootPath+'/api/formreport/'+table+'/'+reportClass+'/'+pk;var
-params=elementAttributes(e,'data-param');if(params)url+='?'+params;if(e.attr('data-saveas')!==undefined){if(params)url+='&';else
-url+='?';url+='saveas='+e.attr('data-saveas');window.location=url;}else{if(e10embedded){window.location=url;}else{var
+printer=searchParentAttr(e,"data-printer");if(printer===undefined)printer=0;var
+url=httpApiRootPath+'/api/formreport/'+table+'/'+reportClass+'/'+pk+'?vvv='+Date.now();var
+params=elementAttributes(e,'data-param');if(params)url+='&'+params;url+='&printer='+printer;if(e.attr('data-saveas')!==undefined){if(params)url+='&';else
+url+='&';url+='saveas='+e.attr('data-saveas');window.location=url;}else{if(e10embedded){window.location=url;}else{var
 width=(screen.width*0.85)|0;var
 height=(screen.height*0.85)|0;window.open(url,"test","location=no,status=no,resizable,width="+width+",height="+height);}}}function
 e10ViewerPrintDetailDirect(e){var
@@ -849,7 +850,7 @@ table=searchParentAttr(e,"data-table");var
 reportClass=e.attr('data-report');var
 pk=searchParentAttr(e,"data-pk");var
 printer=e.attr('data-printer');var
-url=httpApiRootPath+'/api/formreport/'+table+'/'+reportClass+'/'+pk+"?printer="+printer;$.get(url);}function
+url=httpApiRootPath+'/api/formreport/'+table+'/'+reportClass+'/'+pk+"?printer="+printer;if(e.attr('data-print')!==undefined)url+='&print='+e.attr('data-print');$.get(url);}function
 e10ViewerPrint(e){var
 viewerId=searchObjectId(e,'viewer');var
 viewer=$('#'+viewerId);var
@@ -1224,7 +1225,7 @@ if(nameParts.length==4){dataMainPart=nameParts[0];dataSubPart=nameParts[1];dataR
 if(nameParts.length==5){dataMainPart=nameParts[0];dataSubPart=nameParts[1];dataRowPart=nameParts[2];dataColumnPart=nameParts[3];dataLastPart=nameParts[4];}if(dataMainPart==='extra')continue;var
 thisInputValue=null;if(dataMainPart=='recData')thisInputValue=data[dataMainPart][dataColumnPart];else
 if(nameParts.length==2)thisInputValue=data[dataMainPart][dataColumnPart];else
-if(nameParts.length==3)thisInputValue=data[dataMainPart][dataSubPart][dataColumnPart];else
+if(nameParts.length==3&&data[dataMainPart]!==undefined)thisInputValue=data[dataMainPart][dataSubPart][dataColumnPart];else
 if(nameParts.length==4){if((data[dataMainPart]!=undefined)&&(data[dataMainPart][dataSubPart]!=undefined)&&(data[dataMainPart][dataSubPart][dataRowPart]!=undefined)&&(data[dataMainPart][dataSubPart][dataRowPart][dataColumnPart]!=undefined))thisInputValue=data[dataMainPart][dataSubPart][dataRowPart][dataColumnPart];}else
 if(nameParts.length==5){if((data[dataMainPart]!=undefined)&&(data[dataMainPart][dataSubPart]!=undefined)&&(data[dataMainPart][dataSubPart][dataRowPart]!=undefined)&&(data[dataMainPart][dataSubPart][dataRowPart][dataColumnPart]!=undefined)&&(data[dataMainPart][dataSubPart][dataRowPart][dataColumnPart][dataLastPart]!=undefined))thisInputValue=data[dataMainPart][dataSubPart][dataRowPart][dataColumnPart][dataLastPart];}if(thisInput.hasClass("e10-fromSensor")){var
 btnInputId=thisInput.attr('id')+'_sensor';var
@@ -1291,8 +1292,10 @@ listGroup='';var
 sideBarType='column';if(e.attr('data-column'))columnId=e.attr('data-column');else
 if(e.attr('data-listid')){sideBarType='list';listId=e.attr('data-listid');listGroup=e.attr('data-listgroup');refInputId=e.attr('id');}else
 if(e.attr('data-sidebar-remote')){var
-sidebar=$("#"+formId+'Sidebar');if(sidebar.length){if(sidebar.attr('data-sidebar-local-column-target')===e.attr('id'))return;}sideBarType='remote';columnId=e.attr('data-column');refInputId=e.attr('id');}else{sideBarType='main';var
-sidebarViewer=$("#"+formId+'Sidebar').find("div.df2-viewer");if(sidebarViewer.is('DIV')&&sidebarViewer.attr('data-combo-rows-target')==='rows')return;}var
+sidebar=$("#"+formId+'Sidebar');if(sidebar.length){if(sidebar.attr('data-sidebar-local-column-target')===e.attr('id'))return;}sideBarType='remote';columnId=e.attr('data-column');refInputId=e.attr('id');}else{var
+form=$("#"+formId+'Form');sideBarType='main';var
+sidebarViewer=$("#"+formId+'Sidebar').find("div.df2-viewer");var
+sidebarRefresh=form.attr('data-flag-sidebarrefresh');if(sidebarViewer.is('DIV')&&sidebarViewer.attr('data-combo-rows-target')==='rows'&&sidebarRefresh!=='always')return;}var
 columnName=e.attr('name');var
 srcTableId=e.attr('data-srctable');var
 url='';if(table)url="/api/form/"+table+"/sidebar/"+pk+'/'+sideBarType+'/'+srcTableId+'/';else{var
@@ -1609,16 +1612,17 @@ e10WizardNext(input){var
 id=input.attr('data-form');var
 form=$("#"+id);var
 uploadedFiles=[];var
+viewersPks=[];var
 fileInput=form.find(':input.e10-att-input-file').first();if(fileInput){var
 infoPanel=fileInput.parent().find('div.e10-att-input-files');if(infoPanel.attr('data-fip')){var
 fip=parseInt(infoPanel.attr('data-fip'));if(fip!==0){setTimeout(function(){e10WizardNext(input);},100);return;}}else
-if(fileInput.val()){e10AttWidgetUploadFile(fileInput);setTimeout(function(){e10WizardNext(input);},100);return;}form.find('div.e10-att-input-files >table td').each(function(){if($(this).attr("data-ufn"))uploadedFiles.push($(this).attr("data-ufn"));});}var
+if(fileInput.val()){e10AttWidgetUploadFile(fileInput);setTimeout(function(){e10WizardNext(input);},100);return;}form.find('div.e10-att-input-files >table td').each(function(){if($(this).attr("data-ufn"))uploadedFiles.push($(this).attr("data-ufn"));});}form.find('ul.df2-viewer-list >li.active').each(function(){if($(this).attr("data-pk"))viewersPks.push($(this).attr("data-pk"));});var
 e=$("#"+id);var
 codeTarget=e.parent().parent();var
 wizardClass=e.attr("data-formid");var
 wizardPage=parseInt(e.attr("data-wizardpage"))+1;var
 url="/api/wizard/"+wizardClass+"/"+wizardPage+"?callback=?&newFormId="+id;if(input.attr('data-docstate')!==undefined)url+='&setNewDocState='+input.attr('data-docstate');var
-formData=df2collectEditFormData(e,$.myFormsData[id]);formData['recData']['uploadedFiles']=uploadedFiles;var
+formData=df2collectEditFormData(e,$.myFormsData[id]);formData['recData']['uploadedFiles']=uploadedFiles;formData['recData']['viewersPks']=viewersPks;var
 focusedId=input.attr('id');var
 btns=$("#"+id+'Buttons');btns.html("<i class='fa fa-spinner fa-spin fa-2x'></i> Čekejte, prosím...");e10.server.post(url,formData,function(data){codeTarget.html(data.mainCode);var
 sidebar=$("#"+id+'Sidebar');var
@@ -1632,7 +1636,8 @@ srcObjectType=modalElement.attr('data-srcObjectType');var
 srcObjectId=modalElement.attr('data-srcObjectId');e10ViewerCancelForm(form);if(srcObjectType==='viewer'){if(srcObjectId==='default')srcObjectId=$('#mainBrowserContent div.e10-mainViewer').attr('id');if(data.stepResult&&data.stepResult.refreshDetail==1){var
 activeItem=$("#"+srcObjectId+"Items li.active");if(activeItem.is('LI')){viewerItemClick(activeItem);viewerItemClick(activeItem);}}else
 viewerRefresh($('#'+srcObjectId),data.recData['ndx']);}else
-if(srcObjectType==='widget')e10WidgetAction(null,null,srcObjectId);if(data.stepResult.addDocument==1)e10DocumentAdd(0,data.stepResult.params);else
+if(srcObjectType==='widget')e10WidgetAction(null,null,srcObjectId);else
+if(srcObjectType=='form-to-save'){e10SaveOnChange($('#'+srcObjectId));}if(data.stepResult.addDocument==1)e10DocumentAdd(0,data.stepResult.params);else
 if(data.stepResult.editDocument==1)e10DocumentEdit(0,data.stepResult.params);}else
 if(data.stepResult&&data.stepResult.restartApp==1){e10CloseModals();location.replace(httpApiRootPath+'/app/dashboard');}else
 if(data.stepResult&&data.stepResult.reloadPage==1){e10CloseModals();location.reload();}$('#'+focusedId).focusNextInputField();});}var

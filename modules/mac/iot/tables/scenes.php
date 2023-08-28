@@ -68,6 +68,8 @@ class ViewScenes extends TableView
 
 		$listItem['t2']	= $t2;
 
+		$listItem ['i2'] = ['text' => $item['friendlyId'], 'class' => 'label label-default'];
+
 		return $listItem;
 	}
 
@@ -91,7 +93,7 @@ class ViewScenes extends TableView
 			array_push ($q, ')');
 		}
 
-		$this->queryMain ($q, 'scenes.', ['[order], [fullName]', '[ndx]']);
+		$this->queryMain ($q, 'scenes.', ['[setups].[shortName], [order], [fullName]', '[ndx]']);
 		$this->runQuery ($q);
 	}
 }
@@ -147,5 +149,9 @@ class FormScene  extends TableForm
  */
 class ViewDetailScene extends TableViewDetail
 {
+	public function createDetailContent ()
+	{
+		$this->addDocumentCard('mac.iot.libs.dc.DCScene');
+	}
 }
 

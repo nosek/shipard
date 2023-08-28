@@ -111,7 +111,7 @@ class Item extends \e10\DocumentCard
 			$item = [
 				'code' => [
 					['text' => $r['itemCodeText'], 'class' => 'e10-bold block'],
-					['text' => $codeKind['sn'], 'class' => 'e10-small'],
+					['text' => $codeKind['sn'] ?? '-- chybný kód položky --', 'class' => 'e10-small'],
 				],
 				'info' => [],
 			];
@@ -167,8 +167,8 @@ class Item extends \e10\DocumentCard
 		foreach ($rows as $r)
 		{
 			$item = [
-				'itemId' => $r['itemId'],
-				'supplier' => ['text' => $r['supplierName'], 'url' => $r['url']],
+				'itemId' => $r['url'] != '' ? ['text' => $r['itemId'], 'url' => $r['url'], 'icon' => 'system/iconLink'] : $r['itemId'],
+				'supplier' => $r['supplierName'],
 			];
 
 			$this->dataSuppliers[] = $item;

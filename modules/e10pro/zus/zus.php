@@ -24,13 +24,8 @@ function monthName2 ($month_int)
 
 
 function aktualniSkolniRok ()
-{ // TODO: refactor to zusutils::aktualniSkolniRok ()
-	$d = getdate ();
-	$m = $d ['mon'];
-	$y = $d ['year'];
-	if ($m <= 7)
-		return $y - 1;
-	return $y;
+{
+	return zusutils::aktualniSkolniRok();
 }
 
 
@@ -40,11 +35,11 @@ function aktualniSkolniRok ()
  */
 class zusutils
 {
-	static function pobocky ($app, $enableAll = TRUE)
+	static function pobocky ($app, $enableAll = TRUE, $enableAllText = 'Vše')
 	{
 		$pobocky = $app->db()->query('SELECT ndx, fullName FROM [e10_base_places] WHERE docStateMain < 4 AND placeType = %s ORDER BY [fullName]', 'lcloffc')->fetchPairs ('ndx', 'fullName');
 		if ($enableAll)
-			return ['0' => 'Vše'] + $pobocky;
+			return ['0' => $enableAllText] + $pobocky;
 		return $pobocky;
 	}
 
@@ -82,7 +77,7 @@ class zusutils
 		array_push ($q, 'SELECT e10pro_zus_vyukyrozvrh.ucitel FROM e10pro_zus_vyukyrozvrh');
 		array_push ($q, ' LEFT JOIN e10pro_zus_vyuky ON e10pro_zus_vyukyrozvrh.vyuka = e10pro_zus_vyuky.ndx');
 		array_push ($q, ' WHERE persons.ndx = e10pro_zus_vyukyrozvrh.ucitel ');
-		array_push ($q, ' AND e10pro_zus_vyuky.skolniRok = %s', zusutils::aktualniSkolniRok());
+		array_push ($q, ' AND e10pro_zus_vyuky.skolniRok = %s', zusutils::aktualniSkolniRok($app));
 		if ($officeNdx)
 			array_push ($q, ' AND e10pro_zus_vyukyrozvrh.pobocka = %i', $officeNdx);
 		array_push ($q, ')');
@@ -97,11 +92,11 @@ class zusutils
 		return $ucitele;
 	}
 
-	static function obory($app, $enableAll = TRUE)
+	static function obory($app, $enableAll = TRUE, $textAll = 'Vše')
 	{
 		$enum = [];
 		if ($enableAll)
-			$enum[0] = 'Vše';
+			$enum[0] = $textAll;
 		$obory = $app->cfgItem('e10pro.zus.obory');
 		foreach ($obory as $oborNdx => $obor)
 		{
@@ -152,12 +147,16 @@ class zusutils
 		return ['0' => 'Vše'] + $skolniroky;
 	}
 
-	static function aktualniSkolniRok ()
+	static function aktualniSkolniRok ($app = NULL)
 	{
-		$d = getdate ();
+		/*$d = getdate ();
 		$m = $d ['mon'];
-		$y = $d ['year'];
-		if ($m <= 7)
+		$y = $d ['year'];*/
+
+		$d = Utils::today('', $app);
+		$m = intval($d->format('m'));
+		$y = intval($d->format('Y'));
+		if ($m <= 6)
 			return $y - 1;
 		return $y;
 	}
@@ -173,6 +172,9 @@ class zusutils
 
 	static function uhradySkolneho ($app, $student, $skolniRok, $cisloStudia, $rozliseniPlatby, $style) {
 		$uhrady = [];
+		if ($skolniRok == '')
+			return $uhrady;
+
 		$q[] = 'SELECT heads.dateAccounting as date, journal.docHead as docHead, heads.docType as docType, heads.docNumber, SUM(journal.request) as predpis, SUM(journal.payment) as vyrovnani';
 		array_push($q, ' FROM e10doc_balance_journal AS journal');
 		array_push($q, '	LEFT JOIN e10doc_core_heads as heads ON journal.docHead = heads.ndx');
@@ -441,7 +443,10 @@ class ViewStudents extends \e10\persons\ViewPersonsBase
 		// -- others
 		$chbxOthers = [
 			'withoutPID' => ['title' => 'Bez rodného čísla', 'id' => 'withoutPID'],
-			'withoutEmail' => ['title' => 'Bez e-mailu', 'id' => 'withoutEmail']
+			'withoutEmail' => ['title' => 'Bez e-mailu', 'id' => 'withoutEmail'],
+			'badContacts' => ['title' => 'Vadné kontakty', 'id' => 'badContacts'],
+			'withoutContacts' => ['title' => 'Bez kontaktů', 'id' => 'withoutContacts'],
+			'badAddress' => ['title' => 'Vadné adresy', 'id' => 'badAddress'],
 		];
 		$paramsOthers = new \E10\Params ($this->app());
 		$paramsOthers->addParam ('checkboxes', 'query.others', ['items' => $chbxOthers]);
@@ -520,6 +525,39 @@ class ViewStudents extends \e10\persons\ViewPersonsBase
 				'WHERE persons.ndx = e10_base_properties.recid AND tableid = %s', 'e10.persons.persons',
 				' AND [group] = %s', 'ids', ' AND [property] = %s', 'pid',
 				')');
+		}
+
+
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+		if ($testNewPersons)
+		{
+			if (isset ($qv['others']['withoutContacts']))
+			{
+				array_push ($q, ' AND persons.ndx IN ');
+				array_push ($q, ' (select * FROM (');
+				array_push ($q, ' SELECT person FROM e10_persons_personsContacts WHERE docState = 4000 GROUP BY person HAVING count(*) < 2');
+				array_push ($q, ' ) AS [persWithoutContacts] )');
+			}
+
+			if (isset ($qv['others']['badContacts']))
+			{
+				array_push ($q, ' AND persons.ndx IN ');
+				array_push ($q, ' (select * FROM (');
+				array_push ($q, ' SELECT person FROM e10_persons_personsContacts WHERE flagContact = 1 ',
+														'AND docState = 4000 AND contactEmail = %s', '', ' AND contactPhone = %s', '',
+														'GROUP BY person HAVING count(*) > 0');
+				array_push ($q, ' ) AS [persBadContacts] )');
+			}
+
+			if (isset ($qv['others']['badAddress']))
+			{
+				array_push ($q, ' AND persons.ndx IN ');
+				array_push ($q, ' (select * FROM (');
+				array_push ($q, ' SELECT person FROM e10_persons_personsContacts WHERE flagAddress = 1 AND flagMainAddress = 1 ',
+														'AND docState = 4000 AND adrStreet = %s', '', ' AND adrCity = %s', '',
+														'GROUP BY person HAVING count(*) > 0');
+				array_push ($q, ' ) AS [persBadAddress] )');
+			}
 		}
 	}
 
@@ -1882,18 +1920,19 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 	var $teacher;
 	var $pololeti;
 
-	var $invHead = array ();
-	var $invRows = array ();
+	var $invHead = [];
+	var $invRows = [];
 
 	var $periodBegin;
 	var $periodEnd;
+	var $dateIssue;
 	var $dateDue;
 	var $aktSkolniRok;
 
 	function createHead ($row, $pololeti)
 	{
 		$tableDocs = new \E10Doc\Core\TableHeads ($this->app);
-		$this->invHead = array ('docType' => 'invno');
+		$this->invHead = ['docType' => 'invno'];
 		$tableDocs->checkNewRec($this->invHead);
 
 		$this->invHead ['docState'] = 4000;
@@ -1905,7 +1944,10 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 		$this->invHead ['datePeriodBegin'] = $this->periodBegin;
 		$this->invHead ['datePeriodEnd'] = $this->periodEnd;
 
-		$this->invHead ['person'] = $row['student'];
+		if ($row['platce'])
+			$this->invHead ['person'] = $row['platce'];
+		else
+			$this->invHead ['person'] = $row['student'];
 		$this->invHead ['symbol1'] = $row['cisloStudia'];
 		$this->invHead ['centre'] = $row['pobocka'];
 
@@ -1918,7 +1960,14 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 		$this->invHead ['symbol2'] = $specSymb;
 
 		$this->invHead ['title'] = 'Školné ' . $pololeti . '.pololetí ' . $this->aktSkolniRok . '/'. $nextYear . ' - odd. ' . $oddeleni;
-		$this->invHead ['dateIssue'] = $this->periodBegin;
+		if ($row['platce'])
+		{
+			$personRecData = $this->app()->loadItem($row['student'], 'e10.persons.persons');
+			if ($personRecData)
+				$this->invHead ['title'] .= ' ('.$personRecData['fullName'].')';
+		}
+
+		$this->invHead ['dateIssue'] = $this->dateIssue;
 		$this->invHead ['dateTax'] = $this->periodBegin;
 		$this->invHead ['dateDue'] = $this->dateDue;
 		$this->invHead ['dateAccounting'] = $this->periodBegin;
@@ -1927,8 +1976,8 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 		$this->invHead ['roundMethod'] = intval($this->app->cfgItem ('options.e10doc-sale.roundInvoice', 0));
 		$this->invHead ['author'] = intval($this->app->cfgItem ('options.e10doc-sale.author', 0));
 
-		$this->invRows = array ();
-	} // createHead
+		$this->invRows = [];
+	}
 
 	function createRow ($row, $pololeti)
 	{
@@ -1938,7 +1987,7 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 
 		$oddeleni = $this->app->cfgItem ("e10pro.zus.oddeleni.{$row ['svpOddeleni']}.nazev");
 
-		$nextYear = zusutils::aktualniSkolniRok ();
+		$nextYear = $this->schoolYear;
 		$nextYear++;
 
 		$r['item'] = $this->app->cfgItem('options.e10-pro-zus.itemInvoicesFeeSchool', 0);
@@ -1962,16 +2011,19 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 	function setPeriod ($today, $pololeti)
 	{
 		$todayYear = intval($today->format ('Y'));
+		$this->dateIssue = Utils::today();
+		$this->dateDue = Utils::today();
+		$this->dateDue->add (new \DateInterval('P30D'));
 
 		switch ($pololeti)
 		{
 			case 1:
-				$this->dateDue = sprintf ("%04d-10-31", $todayYear);
+				//$this->dateDue = sprintf ("%04d-08-01", $todayYear);
 				$beginDateStr = sprintf ("%04d-09-01", $todayYear);
 				$endDateStr = sprintf ("%04d-01-31", $todayYear+1);
 				break;
 			case 2:
-				$this->dateDue = sprintf ("%04d-03-31", $todayYear);
+				//$this->dateDue = sprintf ("%04d-03-31", $todayYear);
 				$beginDateStr = sprintf ("%04d-02-01", $todayYear);
 				$endDateStr = sprintf ("%04d-06-30", $todayYear);
 				break;
@@ -2014,9 +2066,11 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 		$nextYear++;
 		$specSymb = ($nextYear - 2001) * 1000 + ($nextYear - 2000) * 10 + $pololeti;
 
+		$dbCounterNdx = intval($this->app->cfgItem('options.e10-pro-zus.dbCounterInvoicesFeeSchool'));
+
 		$q [] = 'SELECT COUNT(*) as cnt FROM e10doc_core_heads';
 		array_push($q, ' WHERE docType = %s AND docState <= 4000', 'invno');
-    array_push($q, ' AND dbCounter = %i AND symbol1 = %s', 3, $row['cisloStudia']);
+    array_push($q, ' AND dbCounter = %i AND symbol1 = %s', $dbCounterNdx, $row['cisloStudia']);
 		array_push($q, ' AND symbol2 = %s', $specSymb);
 		//array_push($q, ' AND person = %i', $row['student']);
 		array_push($q, 'ORDER BY [ndx]');
@@ -2062,7 +2116,7 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 		$this->teacher = $t;
 		$this->pololeti = $pol;
 
-		$this->aktSkolniRok = zusutils::aktualniSkolniRok();
+		$this->aktSkolniRok = $this->schoolYear;
 	}
 
 	function run()
@@ -2177,7 +2231,12 @@ class GenerovaniFakturPujcovneEngine extends \E10\Utility
 		$this->invHead ['datePeriodBegin'] = $this->periodBegin;
 		$this->invHead ['datePeriodEnd'] = $this->periodEnd;
 
-		$this->invHead ['person'] = $row['student'];
+//		$this->invHead ['person'] = $row['student'];
+		if ($row['platce'])
+			$this->invHead ['person'] = $row['platce'];
+		else
+			$this->invHead ['person'] = $row['student'];
+
 		$this->invHead ['symbol1'] = $row['cisloStudia'];
 		$this->invHead ['centre'] = $row['pobocka'];
 
@@ -2190,7 +2249,14 @@ class GenerovaniFakturPujcovneEngine extends \E10\Utility
 		$this->invHead ['symbol2'] = $specSymb;
 
 		$this->invHead ['title'] = 'Půjčovné ' . $this->aktSkolniRok . '/'. $nextYear . ' - odd. ' . $oddeleni;
-		$this->invHead ['dateIssue'] = $this->periodBegin;
+		if ($row['platce'])
+		{
+			$personRecData = $this->app()->loadItem($row['student'], 'e10.persons.persons');
+			if ($personRecData)
+				$this->invHead ['title'] .= ' ('.$personRecData['fullName'].')';
+		}
+
+		$this->invHead ['dateIssue'] = Utils::today();//$this->periodBegin;
 		$this->invHead ['dateTax'] = $this->periodBegin;
 		$this->invHead ['dateDue'] = $this->dateDue;
 		$this->invHead ['dateAccounting'] = $this->periodBegin;
@@ -2227,9 +2293,13 @@ class GenerovaniFakturPujcovneEngine extends \E10\Utility
 	{
 		$todayYear = intval($today->format ('Y'));
 
-		$this->dateDue = sprintf ("%04d-10-31", $todayYear);
+		$this->dateDue = Utils::today();
+		$this->dateDue->add (new \DateInterval('P30D'));
+
+
+		//$this->dateDue = sprintf ("%04d-10-31", $todayYear);
 		$beginDateStr = sprintf ("%04d-09-01", $todayYear);
-		$endDateStr = sprintf ("%04d-06-30", $todayYear + 1);
+		$endDateStr = sprintf ("%04d-08-31", $todayYear + 1);
 
 		$this->periodBegin = new \DateTime ($beginDateStr);
 		$this->periodEnd = new \DateTime ($endDateStr);
@@ -2311,7 +2381,7 @@ class GenerovaniFakturPujcovneEngine extends \E10\Utility
 		$this->schoolYear = $schY;
 		$this->teacher = $t;
 
-		$this->aktSkolniRok = zusutils::aktualniSkolniRok();
+		$this->aktSkolniRok = $this->schoolYear;
 	}
 
 	function run()

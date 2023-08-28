@@ -37,16 +37,20 @@ class TableCodesKinds extends DbTable
 	{
 		$codeTypes = $this->app()->cfgItem('e10.witems.codeTypes', []);
 		$list = [];
-		
+
 		$rows = $this->app()->db->query ('SELECT * from [e10_witems_codesKinds] WHERE [docState] != 9800 ORDER BY [order], [shortName]');
 
 		foreach ($rows as $r)
 		{
 			$item = [
-				'ndx' => $r ['ndx'], 
-				'fn' => $r ['fullName'], 
+				'ndx' => $r ['ndx'],
+				'fn' => $r ['fullName'],
 				'sn' => $r ['shortName'],
 				'codeType' => $r['codeType'],
+				'reportSwitchTitle' => $r ['reportSwitchTitle'],
+				'reportPersonTitle' => $r ['reportPersonTitle'],
+				'reportPersonOutTitle' => $r ['reportPersonOutTitle'],
+				'showInDocRows' => $r ['showInDocRows'],
 			];
 
 			$ct = $codeTypes[$r['codeType']];
@@ -140,6 +144,12 @@ class FormCodeKind extends TableForm
 			$this->addColumnInput ('codeType');
 			$this->addColumnInput ('icon');
 			$this->addColumnInput ('order');
+
+			$this->addSeparator(self::coH4);
+			$this->addColumnInput ('reportSwitchTitle');
+			$this->addColumnInput ('reportPersonTitle');
+			$this->addColumnInput ('reportPersonOutTitle');
+			$this->addColumnInput ('showInDocRows');
 		$this->closeForm ();
 	}
 }

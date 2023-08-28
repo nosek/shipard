@@ -5,7 +5,7 @@ use \Shipard\Viewer\TableViewPanel;
 use \e10\base\libs\UtilsBase;
 use \Shipard\Utils\Utils, \Shipard\Application\DataModel, \Shipard\Viewer\TableView, \Shipard\Viewer\TableViewDetail;
 use \Shipard\Form\TableForm, \Shipard\Table\DbTable;
-
+use \Shipard\Utils\Str;
 
 /**
  * class TablePersons
@@ -68,7 +68,10 @@ class TablePersons extends DbTable
 		if ($recData ['docStateMain'] === 2 || $recData ['docStateMain'] === 2)
 		{
 			// -- set validate request
-			$this->app()->db()->query ('UPDATE [e10_persons_personsValidity] SET [revalidate] = 1 WHERE [person] = %i', $recData['ndx']);
+			if ($recData['disableRegsChecks'] == 1)
+				$this->app()->db()->query ('UPDATE [e10_persons_personsValidity] SET [revalidate] = 0, [valid] = 1 WHERE [person] = %i', $recData['ndx']);
+			else
+				$this->app()->db()->query ('UPDATE [e10_persons_personsValidity] SET [revalidate] = 1 WHERE [person] = %i', $recData['ndx']);
 		}
 	}
 
@@ -109,7 +112,7 @@ class TablePersons extends DbTable
 		else
 		{ // company
 			$recData ['firstName'] = '';
-			$recData ['lastName'] = $recData ['fullName']; // for better order
+			$recData ['lastName'] = Str::upToLen($recData ['fullName'], 80); // for better order
 			$recData ['beforeName'] = '';
 			$recData ['afterName'] = '';
 			$recData ['middleName'] = '';
@@ -212,6 +215,12 @@ class TablePersons extends DbTable
 
 	public function formId ($recData, $ownerRecData = NULL, $operation = 'edit')
 	{
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+		if ($testNewPersons)
+		{
+			return 'personNew';
+		}
+
 		if (isset($recData['personType']) && $recData['personType'] == 3)
 			return 'robot';
 
@@ -264,6 +273,55 @@ class TablePersons extends DbTable
 
 	public function loadAddresses ($pkeys, $asRecs = FALSE)
 	{
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+		if ($testNewPersons)
+		{
+			$addresses = [];
+			if (count($pkeys))
+			{
+				$q = [];
+				array_push($q, 'SELECT addrs.*');
+				array_push($q, ' FROM [e10_persons_personsContacts] AS [addrs]');
+				array_push($q, ' WHERE 1');
+				array_push($q, ' AND [person] IN %in', $pkeys);
+				array_push($q, ' AND flagAddress = %i', 1);
+				array_push($q, ' AND docState = %i', 4000);
+				array_push($q, ' ORDER BY systemOrder');
+
+				$addrs = $this->db()->query ($q);
+				if ($asRecs)
+				{
+					forEach ($addrs as $a)
+						$addresses [$a ['recid']][] = $a;
+				}
+				else
+				{
+					forEach ($addrs as $item)
+					{
+						$ap = [];
+
+						if ($item['adrSpecification'] != '')
+							$ap[] = $item['adrSpecification'];
+						if ($item['adrStreet'] != '')
+							$ap[] = $item['adrStreet'];
+						if ($item['adrCity'] != '')
+							$ap[] = $item['adrCity'];
+						if ($item['adrZipCode'] != '')
+							$ap[] = $item['adrZipCode'];
+
+						//$country = World::country($this->app(), $item['adrCountry']);
+						//$ap[] = /*$country['f'].' '.*/$country['t'];
+						$addressText = implode(', ', $ap);
+
+
+						$addresses [$item ['person']][] = ['text' => $addressText, 'icon' => 'system/iconMapMarker', 'class' => 'nowrap'];
+					}
+				}
+			}
+
+			return $addresses;
+		}
+
 		$addresses = [];
 		if (count($pkeys))
 		{
@@ -337,6 +395,96 @@ class TablePersons extends DbTable
 		}
 
 		return $properties;
+	}
+
+	public function loadContacts ($personNdx)
+	{
+		$list = [];
+
+		$q = [];
+		array_push($q, 'SELECT contacts.* FROM [e10_persons_personsContacts] AS contacts');
+		array_push($q, ' WHERE [contacts].[person] = %i', $personNdx);
+		array_push($q, ' AND [contacts].[flagContact] = %i', 1);
+		array_push($q, ' AND [contacts].[docState] = %i', 4000);
+		array_push($q, ' ORDER BY [contacts].[onTop], [contacts].[systemOrder], [contacts].[ndx]');
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			$list[] = $r->toArray();
+		}
+
+		return $list;
+	}
+
+	public function loadEmailsForReport ($persons, $reportClass)
+	{
+		if (!count($persons))
+			return '';
+
+		$emails = [];
+
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+
+		if ($testNewPersons)
+		{
+			$allSendReports = $this->app()->cfgItem('e10.reports.sendReports', []);
+			$sendReportCfg = Utils::searchArray($allSendReports, 'classId', $reportClass);
+
+			if ($sendReportCfg)
+			{
+				$emails = [];
+				$q = [];
+				array_push($q, 'SELECT links.ndx, links.linkId as linkId, links.dstTableId, links.srcRecId, links.dstRecId,');
+				array_push($q, ' [contacts].contactEmail');
+				array_push($q, ' FROM [e10_base_doclinks] AS [links] ');
+				array_push($q, ' LEFT JOIN [e10_persons_personsContacts] AS [contacts] ON [links].[srcRecId] = [contacts].[ndx]');
+				array_push($q, ' WHERE [links].[srcTableId] = %s', 'e10.persons.personsContacts');
+				array_push($q, ' AND [dstTableId] = %s', 'e10.reports.reports');
+				array_push($q, ' AND links.dstRecId = %i', $sendReportCfg['ndx']);
+				array_push($q, ' AND [contacts].[person] IN %in', $persons);
+				array_push($q, ' AND [contacts].[docState] = %i', 4000);
+
+				$rows = $this->db()->query($q);
+				foreach ($rows as $r)
+				{
+					$emails[] = $r['contactEmail'];
+				}
+
+				if (count($emails))
+					return implode (', ', $emails);
+			}
+		}
+
+		if ($testNewPersons)
+		{
+			$q = [];
+			array_push($q, 'SELECT contacts.* FROM [e10_persons_personsContacts] AS contacts');
+			array_push($q, ' WHERE [contacts].[person] IN %in', $persons);
+			array_push($q, ' AND [contacts].[flagContact] = %i', 1);
+			array_push($q, ' AND [contacts].[contactEmail] != %s', '');
+			array_push($q, ' AND [contacts].[docState] = %i', 4000);
+
+			array_push ($q, ' AND NOT EXISTS (',
+				' SELECT ndx FROM e10_base_doclinks ',
+				' WHERE contacts.ndx = srcRecId AND srcTableId = %s', 'e10.persons.personsContacts',
+				' AND dstTableId = %s', 'e10.reports.reports', ')',
+			);
+
+			$rows = $this->db()->query($q);
+			foreach ($rows as $r)
+			{
+				$emails[] = $r['contactEmail'];
+			}
+			if (count($emails))
+				return implode (', ', $emails);
+		}
+
+		$sql = 'SELECT valueString FROM [e10_base_properties] where [tableid] = %s AND [recid] IN %in AND [property] = %s AND [group] = %s ORDER BY ndx';
+		$emailsRows = $this->db()->query ($sql, 'e10.persons.persons', $persons, 'email', 'contacts')->fetchPairs ();
+		if (count($emailsRows))
+			return implode (', ', $emailsRows);
+
+		return '';
 	}
 
 	public function createHeader ($recData, $options)
@@ -494,6 +642,7 @@ class ViewPersonsBase extends TableView
 	public $addresses = array();
 	protected $loadAddresses = FALSE;
 	protected $searchInProperties = TRUE;
+	protected $searchInBA = 0;
 	protected $showValidity = TRUE;
 	protected $ftsInArchive = TRUE;
 
@@ -504,6 +653,8 @@ class ViewPersonsBase extends TableView
 
 		if ($this->mainGroup)
 			$this->addAddParam ('maingroup', $this->mainGroup);
+
+		$this->searchInBA =	intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
 
 		parent::init();
 	}
@@ -573,6 +724,9 @@ class ViewPersonsBase extends TableView
 
 			if ($this->searchInProperties)
 				array_push ($q, " OR EXISTS (SELECT ndx FROM e10_base_properties WHERE persons.ndx = e10_base_properties.recid AND valueString LIKE %s AND tableid = %s)", '%'.$fts.'%', 'e10.persons.persons');
+
+			if ($this->searchInBA)
+				array_push ($q, " OR EXISTS (SELECT ndx FROM e10_persons_personsBA WHERE persons.ndx = e10_persons_personsBA.person AND bankAccount LIKE %s)", '%'.$fts.'%');
 
 			if ($numItems === 1)
 				array_push ($q, ' OR ([id] LIKE %s)', $fts.'%');
@@ -673,6 +827,39 @@ class ViewPersonsBase extends TableView
 		$unused = isset ($qv['others']['unused']);
 		if ($unused)
 			array_push($q, ' AND persons.lastUseDate IS NULL');
+
+		$withoutMainAddress = isset ($qv['others']['withoutMainAddress']);
+		if ($withoutMainAddress)
+		{
+			array_push ($q, ' AND NOT EXISTS (SELECT ndx FROM e10_persons_personsContacts WHERE persons.ndx = person ');
+			array_push ($q, ' AND e10_persons_personsContacts.flagAddress = 1 AND e10_persons_personsContacts.flagMainAddress = 1');
+			array_push ($q, ')');
+		}
+
+		$withMoreMainAddress = isset ($qv['others']['withMoreMainAddress']);
+		if ($withMoreMainAddress)
+		{
+			array_push ($q, ' AND persons.ndx IN ');
+			array_push ($q, ' (select * FROM (');
+			array_push ($q, ' SELECT person FROM e10_persons_personsContacts WHERE flagAddress = 1 AND flagMainAddress = 1 AND docState = 4000 GROUP BY person HAVING count(*) > 1');
+			array_push ($q, ' ) AS [persMainAddrDups] )');
+		}
+
+		$withoutCompanyId = isset ($qv['others']['withoutCompanyId']);
+		if ($withoutCompanyId)
+		{
+			array_push ($q, ' AND (persons.company = %i', 1);
+
+			array_push ($q, ' AND EXISTS (SELECT ndx FROM e10_persons_personsContacts WHERE persons.ndx = person ');
+			array_push ($q, ' AND e10_persons_personsContacts.flagAddress = 1 AND e10_persons_personsContacts.adrCountry = %i', 60);
+			array_push ($q, ')');
+
+			array_push ($q, ' AND NOT EXISTS (SELECT ndx FROM e10_base_properties WHERE persons.ndx = e10_base_properties.recid ',
+							' AND tableid = %s', 'e10.persons.persons',
+							' AND [group] = %s', 'ids', ' AND [property] = %s', 'oid',
+							')');
+			array_push ($q, ')');
+		}
 	}
 
 	public function selectRows2 ()
@@ -776,7 +963,7 @@ class ViewPersonsBase extends TableView
 		{
 			$chbxPersonCountries = [];
 			forEach ($countriesRows as $r)
-				$chbxPersonCountries[$r['country']] = ['title' => $countriesCfg[$r['country']]['name'], 'id' => $r['country']];
+				$chbxPersonCountries[$r['country']] = ['title' => $countriesCfg[$r['country']]['name'] ?? '---', 'id' => $r['country']];
 
 			$paramsPersonCountries->addParam ('checkboxes', 'query.personCountries', ['items' => $chbxPersonCountries]);
 			$qry[] = array ('id' => 'personCountries', 'style' => 'params', 'title' => 'Zeměpis', 'params' => $paramsPersonCountries);
@@ -789,10 +976,20 @@ class ViewPersonsBase extends TableView
 		UtilsBase::addClassificationParamsToPanel($this->table, $panel, $qry);
 
 		// -- others
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+
 		$chbxOthers = [
 				'withError' => ['title' => 'S chybou', 'id' => 'withError'],
-				'unused' => ['title' => 'Nepoužité', 'id' => 'unused']
+				'unused' => ['title' => 'Nepoužité', 'id' => 'unused'],
 		];
+
+		if ($testNewPersons)
+		{
+			$chbxOthers['withoutMainAddress'] = ['title' => 'Bez sídla', 'id' => 'withoutMainAddress'];
+			$chbxOthers['withMoreMainAddress'] = ['title' => 'S více sídly', 'id' => 'withMoreMainAddress'];
+			$chbxOthers['withoutCompanyId'] = ['title' => 'Firmy bez IČ', 'id' => 'withoutCompanyId'];
+		}
+
 		$paramsOthers = new \E10\Params ($this->app());
 		$paramsOthers->addParam ('checkboxes', 'query.others', ['items' => $chbxOthers]);
 		$qry[] = ['id' => 'errors', 'style' => 'params', 'title' => 'Ostatní', 'params' => $paramsOthers];
@@ -832,7 +1029,11 @@ class ViewDetailPersons extends TableViewDetail
 {
 	public function createDetailContent ()
 	{
-		$this->addDocumentCard('e10.persons.DocumentCardPerson');
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+		if ($testNewPersons)
+			$this->addDocumentCard('e10.persons.libs.dc.DCPersonOverview');
+		else
+			$this->addDocumentCard('e10.persons.DocumentCardPerson');
 	}
 
 	public function createToolbar ()
@@ -859,6 +1060,8 @@ class ViewDetailPersons extends TableViewDetail
 		$properties = $this->table->loadProperties ($this->item['ndx']);
 		if (isset ($properties[$this->item['ndx']]['contacts']))
 			return $properties[$this->item['ndx']]['contacts'];
+
+		return [];
 	}
 }
 

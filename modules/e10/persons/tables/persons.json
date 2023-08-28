@@ -31,6 +31,16 @@
 	  {"id": "gid", "name": "Globální ID", "type": "long"},
     {"id": "roles", "sql": "roles", "name": "Role", "type": "enumString", "len": 160, "enumMultiple": 1,
 	    "enumCfg": {"cfgItem": "e10.persons.roles", "cfgValue": "", "cfgText": "name"}},
+
+		{"id": "optBuyDocImport", "name": "Automaticky importovat nákupní doklady z došlé pošty", "type": "logical"},
+		{"id": "optBuyDocImportItem", "name": "Výchozí Položka pro řádek dokladu", "type": "int", "reference": "e10.witems.items", "comboViewer": "combo"},
+		{"id": "optBuyItemsImport", "name": "Automaticky importovat Položky", "type": "logical"},
+		{"id": "optBuyItemsImportItemType", "name": "Typ položky", "type": "int", "reference": "e10.witems.itemtypes"},
+
+		{"id": "optSendDocsAttsUnited", "name": "Přílohy dokladů odesílat v PDF dokladu", "type": "logical"},
+
+		{"id": "disableRegsChecks", "name": "Nekontrolovat správnost v registrech", "type": "logical"},
+
 		{"id": "docState", "name": "Stav", "type": "int"},
 		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}
   ],
@@ -62,12 +72,25 @@
   "forms": [
     {"id": "default", "class": "e10.persons.FormPersons", "help": "prirucka/202"},
 	  {"id": "robot", "class": "e10.persons.FormPersonsRobot"},
-		{"id": "personDefault", "class": "e10.persons.libs.forms.PersonDefault", "help": "prirucka/202"}
+		{"id": "personDefault", "class": "e10.persons.libs.forms.PersonDefault", "help": "prirucka/202"},
+		{"id": "personNew", "class": "e10.persons.libs.forms.PersonNew"}
   ],
 	"states": {"stateColumn": "docState", "mainStateColumn": "docStateMain", "statesCfg": "e10.persons.docStates"},
 	"documentCard": "e10.persons.DocumentCardPerson",
   "autocomplete": {"columnValue": "ndx", "columnTitle": "fullName"},
-	"addWizard": {"class": "e10.persons.AddWizard"},
+	"addWizard": [
+		{"class": "e10.persons.AddWizard", "disabledCfgItem": "options.persons.testNewPersons"},
+		{
+			"text": "Nový člověk",
+			"class": "e10.persons.libs.AddWizardHuman",
+			"enabledCfgItem": "options.persons.testNewPersons", "icon": "system/iconUser"
+		},
+		{
+			"text": "Nová firma",
+			"class": "e10.persons.libs.register.AddWizardCompany",
+			"enabledCfgItem": "options.persons.testNewPersons", "icon": "user/wifi"
+		}
+	],
   "order": [{"column": "fullName", "order": "ASC"}],
   "fullText": ["fullName"],
 	"ndx": 1000,

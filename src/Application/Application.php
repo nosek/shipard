@@ -27,6 +27,7 @@ class Application extends \Shipard\Application\ApplicationCore
 	var $appCfg;
 	var $printMode = FALSE;
 	var $mobileMode = FALSE;
+	var $ngg = 0;
 	var $remote = '';
 	var $appSkeleton;
 	var $requestPath;
@@ -39,6 +40,9 @@ class Application extends \Shipard\Application\ApplicationCore
 	var $oldBrowser = 0;
 	var $authenticator = null;
 	var $user;
+	var $uiUser = NULL;
+	var $uiUserContext = NULL;
+	var $uiUserContextId = '';
 	var $dataModel;
 	var $errorCode = 0;
 	var $errorMsg;
@@ -576,6 +580,16 @@ class Application extends \Shipard\Application\ApplicationCore
 
 		if ($this->deviceId !== '')
 			$this->workplace = $this->searchWorkplace ($this->deviceId);
+		else
+		{
+			$workplaceGID = $this->testCookie ('_shp_gwid');
+			if ($workplaceGID !== '')
+			{
+				$wkp = $this->searchWorkplaceByGID($workplaceGID);
+				if ($wkp)
+					$this->workplace = $wkp;
+			}
+		}
 
 		$userParams = $this->testCookie ('e10-user-params');
 		if ($userParams !== '')
@@ -588,6 +602,14 @@ class Application extends \Shipard\Application\ApplicationCore
 
 	public function searchWorkplace ($deviceId)
 	{
+		$workplaceGID = $this->testCookie ('_shp_gwid');
+		if ($workplaceGID !== '')
+		{
+			$wkp = $this->searchWorkplaceByGID($workplaceGID);
+			if ($wkp)
+				return $wkp;
+		}
+
 		$founded = FALSE;
 
 		$workplaces = $this->cfgItem('e10.workplaces', FALSE);
@@ -595,7 +617,7 @@ class Application extends \Shipard\Application\ApplicationCore
 			return FALSE;
 		foreach ($workplaces as $w)
 		{
-			if (isset($w['devices']) && !in_array($deviceId, $w['devices']))
+			if (isset($w['devices']) && count($w['devices']) && !in_array($deviceId, $w['devices']))
 				continue;
 
 			if (isset($w['allowedFrom']) && count($w['allowedFrom']))
@@ -619,6 +641,41 @@ class Application extends \Shipard\Application\ApplicationCore
 		}
 
 		return $founded;
+	}
+
+	public function searchWorkplaceByGID ($gid)
+	{
+		$workplaces = $this->cfgItem('e10.workplaces', NULL);
+		if (!$workplaces)
+			return NULL;
+
+		foreach ($workplaces as $w)
+		{
+			if (!isset($w['gid']) || $w['gid'] !== $gid)
+				continue;
+
+			return $w;
+			/*
+			if (isset($w['allowedFrom']) && count($w['allowedFrom']))
+			{
+				$enabled = FALSE;
+				forEach ($w['allowedFrom'] as $af)
+				{
+					if ($af === substr($_SERVER['REMOTE_ADDR'], 0, strlen($af)))
+					{
+						$enabled = TRUE;
+						break;
+					}
+				}
+				if ($enabled === FALSE)
+					continue;
+
+				return $w;
+			}
+			*/
+		}
+
+		return NULL;
 	}
 
 	public function detectParams ()
@@ -1457,6 +1514,15 @@ class Application extends \Shipard\Application\ApplicationCore
 			header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 		}
 
+		header ("Cache-control: no-store");
+
+		$object = isset($this->requestPath [1]) ? $this->requestPath [1] : '';
+		if ($object === 'v2')
+		{
+			self::$appLog->setTaskType(AppLog::ttHttpApi, AppLog::tkApiV2);
+			return $this->routeApiV2();
+		}
+
 		if (!$this->checkUserRights (NULL, 'user'))
 			return new Response ($this, 'need authentication', 403);
 
@@ -1682,6 +1748,25 @@ class Application extends \Shipard\Application\ApplicationCore
 		return $this->response;
 	}
 
+	function routeApiV2()
+	{
+		$requestParamsStr = $this->postData();
+		if ($requestParamsStr === '')
+		{
+			return new Response ($this, "blank request", 404);
+		}
+
+		$requestParams = json_decode($requestParamsStr, TRUE);
+		if (!$requestParams)
+		{
+			return new Response ($this, "invalid request data", 404);
+		}
+
+		$o = new \Shipard\Api\v2\Router($this);
+		$o->setRequestParams($requestParams);
+		return $o->run();
+	}
+
 	function routeDisplay ()
 	{
 		$this->mobileMode = TRUE;
@@ -1693,6 +1778,13 @@ class Application extends \Shipard\Application\ApplicationCore
 	function routeMobile ()
 	{
 		$router = $this->createObject ('Shipard.UI.OldMobile.Router');
+		return $router->run ();
+	}
+
+	function routeUI ($uiId = NULL)
+	{
+		$router = $this->createObject ('Shipard.UI.ng.Router');
+		$router->setUIId($uiId);
 		return $router->run ();
 	}
 
@@ -1894,6 +1986,7 @@ class Application extends \Shipard\Application\ApplicationCore
 		}
 
 		$nonAppsHosts = $this->cfgItem ('e10.web.servers.nonAppsHosts', NULL);
+		$uiDomains = $this->cfgItem ('e10.ui.domains', NULL);
 		if ($nonAppsHosts && in_array($_SERVER['HTTP_HOST'], $nonAppsHosts))
 		{
 			$page = $this->callFunction ('e10.web.checkWebPage');
@@ -1901,6 +1994,10 @@ class Application extends \Shipard\Application\ApplicationCore
 			if (isset ($page['mimeType']))
 				$response->setMimeType($page['mimeType']);
 			return $response;
+		}
+		elseif ($uiDomains && isset($uiDomains[$_SERVER['HTTP_HOST']]))
+		{
+			return $this->routeUI ($uiDomains[$_SERVER['HTTP_HOST']]);
 		}
 		elseif ($this->requestPath [0] === 'www' && $nonAppsHosts && in_array($this->requestPath [1], $nonAppsHosts))
 		{
@@ -1924,6 +2021,8 @@ class Application extends \Shipard\Application\ApplicationCore
 				return $this->routeApi ();
 			case 'mapp':
 				return $this->routeMobile ();
+			case 'ui':
+				return $this->routeUI ();
 			case 'dspl':
 				return $this->routeDisplay ();
 			case 'feed':
@@ -2131,6 +2230,55 @@ class Application extends \Shipard\Application\ApplicationCore
 		if (isset($this->user))
 			return $this->user->data('id');
 		return 0;
+	}
+
+	public function uiUserNdx ()
+	{
+		if (isset($this->uiUser))
+			return $this->uiUser['ndx'] ?? 0;
+		return 0;
+	}
+
+	public function uiUserContext ()
+	{
+		if ($this->uiUserContext)
+			return $this->uiUserContext;
+
+		$contextCreator = new \e10\users\libs\UserContextCreator($this);
+		$contextCreator->setUserNdx($this->uiUserNdx());
+		$contextCreator->run();
+
+		$this->uiUserContext = $contextCreator->contextData;
+		$this->detectUIUserContext();
+
+		return $this->uiUserContext;
+	}
+
+	public function setUIUserContext($contextId)
+	{
+		setCookie ('shp-user-context', $contextId, 0, $this->urlRoot . "/", $_SERVER['HTTP_HOST'], 1, 1);
+	}
+
+	public function detectUIUserContext()
+	{
+		if (!$this->uiUserContext || !isset($this->uiUserContext['contexts']) || !count($this->uiUserContext['contexts']))
+			return;
+
+		$this->uiUserContextId = $_COOKIE ['shp-user-context'] ?? '';
+
+		if (!isset($this->uiUserContext['contexts'][$this->uiUserContextId]))
+		{
+			if (count($this->uiUserContext['contexts']))
+			{
+				$this->uiUserContextId = key($this->uiUserContext['contexts']);
+				setCookie ('shp-user-context', $this->uiUserContextId, 0, $this->urlRoot . "/", $_SERVER['HTTP_HOST'], 1, 1);
+			}
+		}
+
+		if (isset($this->uiUserContext['contexts'][$this->uiUserContextId]))
+			$this->uiUserContext['contexts'][$this->uiUserContextId]['active'] = 1;
+
+		$this->uiUserContext['activeContextId'] = $this->uiUserContextId;
 	}
 
 	public function addLogEvent ($event)

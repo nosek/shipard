@@ -13,6 +13,8 @@ use \Shipard\Form\TableForm;
 use \e10doc\core\libs\DocsModes;
 use \Shipard\Utils\World;
 use \e10doc\core\libs\E10Utils;
+use \e10\base\libs\UtilsBase;
+use \Shipard\Utils\Str;
 
 
 CONST docDir_None = 0, docDir_In = 1, docDir_Out = 2;
@@ -324,6 +326,9 @@ class TableHeads extends DbTable
 		if ($this->app()->model()->table ('e10doc.debs.journal') !== FALSE)
 			$this->doAccounting ($recData);
 
+		if ($this->app()->model()->table ('e10pro.reports.waste_cz.returnRows') !== FALSE)
+			$this->doWaste ($recData);
+
 		$this->doTaxReports($recData);
 		$this->doRos($recData);
 		$this->doInbox($recData);
@@ -502,6 +507,22 @@ class TableHeads extends DbTable
 			$saveData['recData']['personVATIN'] = '';
 
 			$this->resetPersonType ($saveData['recData']);
+			return;
+		}
+
+		if ($changedInput === 'transport')
+		{
+			$transportCfg = $this->app()->cfgItem('e10doc.transports.'.$saveData['recData']['transport'], NULL);
+			if ($transportCfg)
+			{
+				$saveData['recData']['transportVLP'] = $transportCfg['vehicleLP'];
+				$saveData['recData']['transportPersonDriver'] = $transportCfg['vehicleDriver'];
+			}
+			else
+			{
+				$saveData['recData']['transportVLP'] = '';
+				$saveData['recData']['transportPersonDriver'] = 0;
+			}
 			return;
 		}
 
@@ -842,6 +863,17 @@ class TableHeads extends DbTable
 		else
 			$this->recData ['paymentMethod'] = 0;
 
+		// -- owner office
+		if (!isset($recData['ownerOffice']) || !$recData['ownerOffice'])
+		{
+			if ($recData['warehouse'])
+			{
+				$whCfg =  $this->app()->cfgItem('e10doc.warehouses.'.$recData['warehouse'], NULL);
+				if ($whCfg && isset($whCfg['ownerOffice']) && $whCfg['ownerOffice'])
+					$recData['ownerOffice'] = $whCfg['ownerOffice'];
+			}
+		}
+
 		$this->checkColumnsSettings($recData);
 	}
 
@@ -861,19 +893,70 @@ class TableHeads extends DbTable
 		if (!$srcIssueRecData)
 			return;
 
-		// -- dates
+		$recData['paymentMethod'] = $srcIssueRecData['docPaymentMethod'];
+		if ($srcIssueRecData['docCurrency'])
+		{
+			$ccfg = World::currency($this->app(), $srcIssueRecData['docCurrency']);
+			if ($ccfg)
+				$recData['currency'] = $ccfg['i'];
+		}
+
+		if ($srcIssueRecData['docId'] !== '')
+			$recData['docId'] = Str::upToLen($srcIssueRecData['docId'], 40);
+		if ($srcIssueRecData['docSymbol1'] !== '')
+			$recData['symbol1'] = Str::upToLen($srcIssueRecData['docSymbol1'], 20);
+		if ($srcIssueRecData['docSymbol2'] !== '')
+			$recData['symbol2'] = Str::upToLen($srcIssueRecData['docSymbol2'], 20);
+
+		if (!utils::dateIsBlank($srcIssueRecData['docDateIssue']))
+			$recData['dateIssue'] = $srcIssueRecData['docDateIssue'];
+		if (!utils::dateIsBlank($srcIssueRecData['docDateDue']))
+			$recData['dateDue'] = $srcIssueRecData['docDateDue'];
+		if (!utils::dateIsBlank($srcIssueRecData['docDateAccounting']))
+			$recData['dateAccounting'] = $srcIssueRecData['docDateAccounting'];
+		if (!utils::dateIsBlank($srcIssueRecData['docDateTax']))
+			$recData['dateTax'] = $srcIssueRecData['docDateTax'];
+		if (!utils::dateIsBlank($srcIssueRecData['docDateTaxDuty']))
+			$recData['dateTaxDuty'] = $srcIssueRecData['docDateTaxDuty'];
+
 		if (!utils::dateIsBlank($srcIssueRecData['dateIncoming']))
 		{
-			$recData['dateIssue'] = $srcIssueRecData['dateIncoming'];
-			$recData['dateAccounting'] = $srcIssueRecData['dateIncoming'];
+			if (!isset($recData['dateIssue']) || utils::dateIsBlank($recData['dateIssue']))
+				$recData['dateIssue'] = $srcIssueRecData['dateIncoming'];
+			if (!isset($recData['dateIssue']) || utils::dateIsBlank($recData['dateAccounting']))
+				$recData['dateAccounting'] = $srcIssueRecData['dateIncoming'];
+		}
+
+		if ($srcIssueRecData['docCentre'])
+			$recData['centre'] = $srcIssueRecData['docCentre'];
+
+		if ($srcIssueRecData['docProject'])
+			$recData['wkfProject'] = $srcIssueRecData['docProject'];
+
+		if ($srcIssueRecData['workOrder'])
+			$recData['workOrder'] = $srcIssueRecData['workOrder'];
+
+		if ($srcIssueRecData['docWarehouse'])
+			$recData['warehouse'] = $srcIssueRecData['docWarehouse'];
+
+		if ($srcIssueRecData['docProperty'])
+			$recData['property'] = $srcIssueRecData['docProperty'];
+
+		if (isset($srcIssueRecData['subject']) && $srcIssueRecData['subject'] !== '')
+		{
+			if (!isset($recData['title']) || $recData['title'] === '')
+				$recData['title'] = $srcIssueRecData['subject'];
 		}
 
 		// -- person
-		$persons = $this->app()->db()->query('SELECT dstRecId FROM [e10_base_doclinks] WHERE srcRecId = %i', $issueNdx,
-			' AND srcTableId = %s', 'wkf.core.issues', ' AND dstTableId = %s', 'e10.persons.persons',
-			' AND linkId = %s', 'wkf-issues-from')->fetch();
-		if ($persons)
-			$recData['person'] = $persons['dstRecId'];
+		if (!isset($recData['person']) || !$recData['person'])
+		{
+			$persons = $this->app()->db()->query('SELECT dstRecId FROM [e10_base_doclinks] WHERE srcRecId = %i', $issueNdx,
+				' AND srcTableId = %s', 'wkf.core.issues', ' AND dstTableId = %s', 'e10.persons.persons',
+				' AND linkId = %s', 'wkf-issues-from')->fetch();
+			if ($persons)
+				$recData['person'] = $persons['dstRecId'];
+		}
 	}
 
 	public function checkSaveData (&$saveData, &$saveResult)
@@ -1205,6 +1288,16 @@ class TableHeads extends DbTable
 
 		$rosEngine = $this->app()->createObject($rosType['engine']);
 		$rosEngine->doDocument ($rosRegNdx, $recData);
+	}
+
+	public function doWaste (&$recData)
+	{
+		if ($recData['docType'] !== 'purchase' && $recData['docType'] !== 'invno')
+			return;
+
+		$wre = new \e10pro\reports\waste_cz\libs\WasteReturnEngine($this->app);
+		$wre->year = intval(Utils::createDateTime($recData['dateAccounting'])->format('Y'));
+		$wre->resetDocument($recData['ndx']);
 	}
 
 	public function documentStates ($recData)
@@ -1662,7 +1755,7 @@ class TableHeads extends DbTable
 		$addressLabels = [];
 		if ($addressNdx)
 		{
-			$labelsRows = $this->db()->query ('SELECT * FROM [e10_base_clsf] WHERE [tableid] = %s', 'e10.persons.address',
+			$labelsRows = $this->db()->query ('SELECT * FROM [e10_base_clsf] WHERE [tableid] = %s', 'e10.persons.personsContacts',
 																				' AND [recid] = %i', $addressNdx);
 			forEach ($labelsRows as $lr)
 			{
@@ -1783,6 +1876,9 @@ class TableHeads extends DbTable
 	{
 		$this->checkPrepayment($recData);
 
+		/** @var \e10\persons\TablePersons */
+		$tablePersons = $this->app()->table('e10.persons.persons');
+
 		foreach ($docState['printAfterConfirm'] as $r)
 		{
 			if (isset($r['ask']) && !isset($saveData['extra']['confirm']))
@@ -1845,7 +1941,9 @@ class TableHeads extends DbTable
 				$documentInfo = $formReportTable->getRecordInfo($formReportRecData);
 				$emails = '';
 				if (isset($documentInfo['persons']['to']))
-					$emails = $this->loadEmails($documentInfo['persons']['to']);
+				{
+					$emails = $tablePersons->loadEmailsForReport($documentInfo['persons']['to'], $r['class']);
+				}
 				//if ($emails !== '')
 				{
 					$msgSubject = $formReport->createReportPart('emailSubject');
@@ -2141,7 +2239,7 @@ class TableHeads extends DbTable
 			}
 		}
 
-		if ($fc || $tc)
+		if ($fc /*|| $tc*/)
 			$h = array ('#' => '#', 'title' => 'Sazba', 'percents' => ' %', 'curr' => 'Měna', 'base' => ' Základ', 'tax' => ' Daň', 'total' => ' Celkem');
 		else
 			$h = array ('#' => '#', 'title' => 'Sazba', 'percents' => ' %', 'base' => ' Základ', 'tax' => ' Daň', 'total' => ' Celkem');
@@ -2686,7 +2784,7 @@ class TableHeads extends DbTable
 		*/
 	}
 
-	public function docAdditionsOur ($head, $row)
+	public function docAdditionsOur ($head, $row, $sendReportNdx = 0)
 	{
 		$list = [];
 		$allAdditionsTypes = $this->app()->cfgItem ('e10doc.additionsTypes');
@@ -2707,8 +2805,7 @@ class TableHeads extends DbTable
 		array_push($q, 'SELECT * FROM e10doc_base_additions AS a');
 
 		array_push($q, 'WHERE 1');
-
-
+		array_push($q, ' AND docState != %i', 9800);
 
 		if (!utils::dateIsBlank($date))
 		{
@@ -2741,6 +2838,16 @@ class TableHeads extends DbTable
 		foreach ($rows as $r)
 		{
 			$type = $allAdditionsTypes[$r['additionType']];
+
+			if ($sendReportNdx)
+			{
+				$sendReports = UtilsBase::linkedSendReports($this->app(), 'e10doc.base.additions', $r['ndx']);
+				if (count($sendReports))
+				{
+					if (!isset($sendReports[$sendReportNdx]))
+						continue;
+				}
+			}
 
 			$rowMark = $r['rowMark'];
 
@@ -3373,11 +3480,19 @@ class FormHeads extends TableForm
 
 	protected function addRecapitulation ()
 	{
+		$sendDocsAttachments = intval($this->app()->cfgItem ('options.experimental.sendDocsAttachments', 0));
+
 		$docType = $this->app()->cfgItem ('e10.docs.types.' . $this->recData ['docType'], FALSE);
 
 		$this->layoutOpen (TableForm::ltGrid);
 			$this->addColumnInput ("title", TableForm::coColW12);
 			$this->addList ('doclinks', '', TableForm::loAddToFormLayout|TableForm::coColW12);
+
+			if ($sendDocsAttachments)
+			{
+				if ($this->recData ['docType'] === 'invno')
+					$this->addList ('sendAtts', '', TableForm::loAddToFormLayout|TableForm::coColW12);
+			}
 			$this->addList ('clsf', '', TableForm::loAddToFormLayout|TableForm::coColW12);
 		$this->layoutClose ();
 
@@ -3971,6 +4086,33 @@ class FormHeads extends TableForm
 			return $cp;
 		}
 
+		if ($srcTableId === 'e10doc.core.heads' && $srcColumnId === 'ownerOffice')
+		{
+			$cp = [
+				'personNdx' => strval ($allRecData ['recData']['owner'])
+			];
+
+			return $cp;
+		}
+
+		if ($srcTableId === 'e10doc.core.heads' && $srcColumnId === 'otherAddress1')
+		{
+			$cp = [
+				'personNdx' => strval ($allRecData ['recData']['person'])
+			];
+
+			return $cp;
+		}
+
+		if ($srcTableId === 'e10doc.core.heads' && $srcColumnId === 'personNomencCity')
+		{
+			$level = ($recData['docType'] === 'purchase' && $recData['personType'] == 2) ? 1 : 2;
+			$cp = [
+				'level' => strval ($level),
+			];
+			return $cp;
+		}
+
 		return parent::comboParams ($srcTableId, $srcColumnId, $allRecData, $recData);
 	}
 
@@ -3981,7 +4123,8 @@ class FormHeads extends TableForm
 			$cp = [
 				'docType' => strval ($recData['docType']),
 				'srcCurrency' => $recData['homeCurrency'], 'dstCurrency' => $recData['currency'],
-				'dateAccounting' => utils::createDateTime ($recData['dateAccounting'])->format('Y-m-d')
+				'dateAccounting' => utils::createDateTime ($recData['dateAccounting'])->format('Y-m-d'),
+				'srcDocNdx' => $recData['ndx'],
 			];
 			return $cp;
 		}

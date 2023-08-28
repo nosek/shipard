@@ -35,7 +35,7 @@ class FormDeliveryNote extends \E10Doc\Core\FormHeads
 					$this->layoutOpen (self::ltHorizontal);
 						$this->layoutOpen (self::ltForm);
 							$this->addColumnInput ('person');
-
+							$this->addColumnInput ('otherAddress1');
 
 							$this->addColumnInput ('dateIssue');
 
@@ -45,18 +45,31 @@ class FormDeliveryNote extends \E10Doc\Core\FormHeads
 								$this->addColumnInput ('workOrder');
 							if ($this->table->app()->cfgItem ('options.core.useProjects', 0))
 								$this->addColumnInput ('project');
+
+							$this->addSeparator(self::coH4);
 							$this->addColumnInput ('transport');
+
+							$transportCfg = $this->app()->cfgItem('e10doc.transports.'.$this->recData['transport'], NULL);
+							if ($transportCfg && intval($transportCfg['askVehicleLP'] ?? 0))
+								$this->addColumnInput ('transportVLP');
+							if ($transportCfg && intval($transportCfg['askVehicleWeight'] ?? 0))
+								$this->addColumnInput ('transportVWeight');
+
+							if ($transportCfg && intval($transportCfg['askVehicleDriver'] ?? 0))
+								$this->addColumnInput ('transportPersonDriver');
+
+							$this->addSeparator(self::coH4);
+
+
 							if ($this->table->warehouses())
 								$this->addColumnInput ('warehouse');
+
 							$this->addCurrency();
 						$this->layoutClose ('width50');
 
 						$this->layoutOpen (self::ltForm);
-
 							if ($useDocKinds === 2)
 								$this->addColumnInput ('docKind');
-							$this->addList ('address', '', self::loAddToFormLayout);
-
 						$this->layoutClose ();
 
 					$this->layoutClose ();
@@ -84,6 +97,7 @@ class FormDeliveryNote extends \E10Doc\Core\FormHeads
 					$this->addColumnInput ('author');
 					$this->addColumnInput ('owner');
 					$this->addColumnInput ('roundMethod');
+					$this->addColumnInput ('ownerOffice');
 
 					if ($useDocKinds !== 2)
 						$this->addColumnInput ('docKind');

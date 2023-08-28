@@ -2,7 +2,8 @@
 
 namespace e10pro\zus;
 use \e10\utils;
-
+use \e10\base\libs\UtilsBase;
+use \Shipard\Utils\Str;
 
 /**
  * Class ModuleServices
@@ -20,6 +21,75 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$this->doSqlScripts ($s);
 
 		//$this->upgradeSkupinoveDochazkyBezStudentu();
+	}
+
+	protected function addUsers()
+	{
+		$uiNdx = intval($this->app()->arg('uiNdx'));
+		if (!$uiNdx)
+			$uiNdx = 1;
+
+		$this->db()->query('DELETE FROM e10_users_users');
+		$this->db()->query('DELETE FROM e10_users_requests');
+		$this->db()->query('DELETE FROM e10_users_pwds');
+
+		$schoolYear = 2022;
+		$q = [];
+		array_push($q, 'SELECT studium.*');
+		array_push($q, ' FROM [e10pro_zus_studium] as studium ');
+		array_push($q, ' WHERE [stav] = %i', 1200);
+		array_push($q, ' AND skolniRok = %s', $schoolYear);
+		//array_push($q, '');
+		//array_push($q, '');
+
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			echo "# ".$r['nazev']."\n";
+			$this->addUsersFromContact($r['student'], $uiNdx);
+		}
+	}
+
+	protected function addUsersFromContact($personNdx, $uiNdx)
+	{
+		$tableUsers = new \e10\users\TableUsers($this->app());
+		$tableRequests = new \e10\users\TableRequests($this->app());
+
+    $q = [];
+    array_push($q, 'SELECT contacts.*,');
+    array_push($q, ' persons.fullName AS personName');
+    array_push($q, ' FROM e10_persons_personsContacts AS [contacts]');
+    array_push($q, ' LEFT JOIN [e10_persons_persons] AS [persons] ON [contacts].person = [persons].ndx');
+    array_push($q, ' WHERE 1');
+    array_push($q, ' AND [persons].[docState] = %i', 4000);
+		array_push($q, ' AND [contacts].[flagContact] = %i', 1);
+		array_push($q, ' AND [contacts].[contactEmail] != %s', '');
+		array_push($q, ' AND [person] = %i', $personNdx);
+		array_push($q, ' ORDER BY [persons].ndx');
+
+    $rows = $this->db()->query($q);
+    foreach ($rows as $r)
+    {
+      $item = [
+        'fullName' => trim($r['contactName']),
+        'login' => Str::tolower(trim($r['contactEmail'])),
+				'email' => Str::tolower(trim($r['contactEmail'])),
+        'person' => 0,
+				'docState' => 4000, 'docStateMain' => 2,
+      ];
+
+			$exist = $this->db()->query('SELECT * FROM e10_users_users WHERE [login] = %s', $item['login'])->fetch();
+			if ($exist)
+				continue;
+
+			//echo "* ".json_encode($item)."\n";
+
+			$newUserNdx = $tableUsers->dbInsertRec($item);
+			$tableUsers->docsLog ($newUserNdx);
+
+			$newRequest = ['user' => $newUserNdx, 'ui' => $uiNdx];
+			$newRequestNdx = $tableRequests->dbInsertRec($newRequest);
+    }
 	}
 
 	public function anonymizeVyuky ()
@@ -205,12 +275,220 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		echo "\n------TOTAL: $cnt \n\n";
 	}
 
+	protected function repairFees()
+	{
+		$yearParam = $this->app()->arg('year');
+		if (!$yearParam)
+		{
+			echo "Missing `--year` param!\n";
+			return FALSE;
+		}
+
+		$halfParam = intval($this->app()->arg('half'));
+		if ($halfParam !== 1 && $halfParam !== 2)
+		{
+			echo "Missing / bad `--half` param!\n";
+			return FALSE;
+		}
+
+		$addFeeParam = intval($this->app()->arg('addFee'));
+
+		$e = new \e10pro\zus\libs\RepairFeesEngine($this->app());
+		$e->schoolYear = $yearParam;
+		$e->half = $halfParam;
+		$e->addFee = $addFeeParam;
+		$e->run();
+
+		return TRUE;
+	}
+
+	protected function repairInvoices()
+	{
+		$yearParam = $this->app()->arg('year');
+		if (!$yearParam)
+		{
+			echo "Missing `--year` param!\n";
+			return FALSE;
+		}
+
+		$halfParam = intval($this->app()->arg('half'));
+		if ($halfParam !== 1 && $halfParam !== 2)
+		{
+			echo "Missing / bad `--half` param!\n";
+			return FALSE;
+		}
+
+		$e = new \e10pro\zus\libs\RepairInvoicesEngine($this->app());
+		$e->schoolYear = $yearParam;
+		$e->half = $halfParam;
+		$e->run();
+
+		return TRUE;
+	}
+
+	public function importContacts()
+	{
+		$tableContacts = $this->app()->table ('e10.persons.personsContacts');
+
+		$q = [];
+		array_push ($q, 'SELECT * FROM e10_persons_persons');
+		array_push ($q, ' WHERE 1');
+		//array_push ($q, ' AND [ndx] = %i', 2126);
+		array_push ($q, ' ORDER BY [ndx]');
+
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			$personNdx = $r['ndx'];
+			echo "* ".$r['fullName']."\n";
+
+			$properties = UtilsBase::getPropertiesTable ($this->app(), 'e10.persons.persons', $personNdx);
+
+			if (isset($properties['e10-zus-zz-1']))
+			{
+				$this->importContactsAdd($tableContacts,
+					$properties['e10-zus-zz-1']['e10-zus-zz-jmeno'][0]['value'] ?? '',
+					$properties['e10-zus-zz-1']['e10-zus-zz-email'][0]['value'] ?? '',
+					$properties['e10-zus-zz-1']['e10-zus-zz-telefon'][0]['value'] ?? '',
+					'Zákonný zástupce 1',
+					$personNdx
+				);
+			}
+
+			if (isset($properties['e10-zus-zz-2']))
+			{
+				$this->importContactsAdd($tableContacts,
+					$properties['e10-zus-zz-2']['e10-zus-zz2-jmeno'][0]['value'] ?? '',
+					$properties['e10-zus-zz-2']['e10-zus-zz2-email'][0]['value'] ?? '',
+					$properties['e10-zus-zz-2']['e10-zus-zz2-telefon'][0]['value'] ?? '',
+					'Zákonný zástupce 2',
+					$personNdx
+				);
+			}
+
+			$this->db()->query('DELETE FROM [e10_base_properties] WHERE [tableid] = %s', 'e10.persons.persons',
+												 ' AND [group] IN %in', ['e10-zus-zz-1', 'e10-zus-zz-2'],
+												 ' AND [recid] = %i', $personNdx);
+
+			//print_r($properties);
+		}
+	}
+
+	protected function importContactsAdd(\e10\persons\TablePersonsContacts $tableContacts, $name, $email, $phone, $role, $personNdx)
+	{
+		$newAddress = [
+			'person' => $personNdx,
+
+			'flagAddress' => 0,
+			'flagMainAddress' => 0,
+			'flagOffice' => 0,
+			'onTop' => 0,
+			'flagContact' => 1,
+
+			'contactName' => $name,
+			'contactEmail' => $email,
+			'contactPhone' => $phone,
+
+			'contactRole' => $role,
+
+			'docState' => 4000,
+			'docStateMain' => 2,
+		];
+
+		$tableContacts->dbInsertRec($newAddress);
+
+		if ($name !== '')
+		{
+			$this->db()->query('DELETE FROM [e10_base_properties] WHERE [tableid] = %s', 'e10.persons.persons',
+				' AND [group] = %s', 'contacts', ' AND [property] = %s', 'email',
+				' AND [valueString] = %s', $email,
+				' AND [recid] = %i', $personNdx);
+			$this->db()->query('DELETE FROM [e10_base_properties] WHERE [tableid] = %s', 'e10.persons.persons',
+				' AND [group] = %s', 'contacts', ' AND [property] = %s', 'phone',
+				' AND [valueString] = %s', $phone,
+				' AND [recid] = %i', $personNdx);
+		}
+	}
+
+	public function repairEntries()
+	{
+		$q = [];
+		array_push($q, 'SELECT * FROM e10pro_zus_prihlasky');
+		array_push($q, ' WHERE 1');
+
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			$pid = $r ['rodneCislo'];
+			if (strlen($pid) === 10)
+			{
+				echo $r['fullNameS'].': '.$pid;
+				$pid = substr($r ['rodneCislo'], 0, 6).'/'.substr($r['rodneCislo'], 6);
+				echo ' --> '.$pid."\n";
+				$this->db()->query('UPDATE e10pro_zus_prihlasky SET rodneCislo = %s', $pid, ' WHERE ndx = %i', $r['ndx']);
+			}
+		}
+	}
+
+	public function repairPIDs()
+	{
+		$q = [];
+		array_push($q, 'SELECT props.*, persons.fullName AS fullNameS');
+		array_push($q, ' FROM e10_base_properties AS props');
+		array_push($q, ' LEFT JOIN e10_persons_persons AS persons ON props.recid = persons.ndx');
+		array_push($q, ' WHERE 1');
+		array_push($q, ' AND props.[group] = %s', 'ids');
+		array_push($q, ' AND props.[property] = %s', 'pid');
+		array_push($q, ' AND props.[tableid] = %s', 'e10.persons.persons');
+
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			$pid = $r ['valueString'];
+			if (strlen($pid) === 10 && !strchr($r ['valueString'], '/'))
+			{
+				echo $r['fullNameS'].': '.$pid;
+				$pid = substr($r ['valueString'], 0, 6).'/'.substr($r['valueString'], 6);
+				echo ' --> '.$pid./*' -> '.json_encode($r->toArray()).*/"\n";
+				$this->db()->query('UPDATE e10_base_properties SET valueString = %s', $pid, ' WHERE ndx = %i', $r['ndx']);
+			}
+		}
+	}
+
+	public function entriesStudents()
+	{
+		$e = new \e10pro\zus\libs\EntriesEngine($this->app());
+		$e->debug = 1;
+		$e->doIt = 1;
+		$e->run();
+
+		return TRUE;
+	}
+
+	public function createStudies()
+	{
+		$e = new \e10pro\zus\libs\StudiesEngine($this->app());
+		$e->debug = 1;
+		$e->doIt = 1;
+		$e->run();
+
+		return TRUE;
+	}
+
 	public function onCliAction ($actionId)
 	{
 		switch ($actionId)
 		{
 			case 'upgrade-skupinove-dochazky': return $this->upgradeSkupinoveDochazky();
 			case 'send-entries-emails': return $this->sendEntriesEmails();
+			case 'repair-fees': return $this->repairFees();
+			case 'repair-invoices': return $this->repairInvoices();
+			case 'import-contacts': return $this->importContacts();
+			case 'repair-entries': return $this->repairEntries();
+			case 'repair-pids': return $this->repairPIDs();
+			case 'entries-students': return $this->entriesStudents();
+			case 'create-studies': return $this->createStudies();
+			case 'add-users': return $this->addUsers();
 		}
 
 		parent::onCliAction($actionId);

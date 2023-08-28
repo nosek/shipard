@@ -291,7 +291,7 @@ class Utils
 		else
 			$timeStampStr = $day->format ('Y-m-d ');
 
-		$timeParts = explode (':', $time);
+		$timeParts = preg_split ('/[\:,\.,\-]/', $time);
 		$timePartsRemain = 3;
 		if (isset ($timeParts[0]) && $timeParts[0] >= 0 && $timeParts[0] <= 23)
 		{
@@ -329,6 +329,44 @@ class Utils
 		else
 			$t = sprintf('%d:%02d', $h, $m);
 		return $t;
+	}
+
+	static function secondsToTime ($inputSeconds, $withSeconds = FALSE)
+	{
+    $secondsInAMinute = 60;
+    $secondsInAnHour = 60 * $secondsInAMinute;
+    $secondsInADay = 24 * $secondsInAnHour;
+
+		$separator = '';
+
+    $days = floor($inputSeconds / $secondsInADay);
+
+    $hourSeconds = $inputSeconds % $secondsInADay;
+    $hours = floor($hourSeconds / $secondsInAnHour);
+
+    $minuteSeconds = $hourSeconds % $secondsInAnHour;
+    $minutes = floor($minuteSeconds / $secondsInAMinute);
+
+    $remainingSeconds = $minuteSeconds % $secondsInAMinute;
+    $seconds = ceil($remainingSeconds);
+
+    $timeParts = [];
+    $sections = [
+        'd' => (int)$days,
+        'h' => (int)$hours,
+        'm' => (int)$minutes,
+        //'s' => (int)$seconds,
+    ];
+		if ($withSeconds)
+			$sections['s'] = (int)$seconds;
+
+    foreach ($sections as $name => $value)
+		{
+			if ($value > 0)
+				$timeParts[] = $value.$separator.$name;
+    }
+
+    return implode(' ', $timeParts);
 	}
 
 	static function createRecId($recData, $formula)
@@ -782,14 +820,16 @@ class Utils
 		$ii = $dateBegin->diff($dateEnd);
 		$len = '';
 
-		if ($ii->m < 60 && $ii->h === 0)
+		if ($ii->i < 60 && $ii->h === 0 && $ii->d === 0 && $ii->m === 0 && $ii->y === 0)
 			$len = $ii->format ('%i min');
-		elseif ($ii->d === 0)
+		elseif ($ii->d === 0 && $ii->m === 0 && $ii->y === 0)
 			$len = $ii->format ('%hh %I min');
-		elseif ($ii->m === 0 )
+		elseif ($ii->m === 0 && $ii->y === 0)
 			$len = $ii->format ('%dd %hh %I min');
 		elseif ($ii->y === 0 )
 			$len = $ii->format ('%M měs %dd %hh %I min');
+		elseif ($ii->y > 0 )
+			$len = $ii->format ('%Yr %M měs %dd %hh %I min');
 
 		return $len;
 	}
@@ -904,7 +944,8 @@ class Utils
 			[
 				'http'=> [
 					'method'=>'GET',
-					'timeout' => 30
+					'timeout' => 30,
+					'header'=> "Connection: close\r\n"
 				]
 			]
 		);

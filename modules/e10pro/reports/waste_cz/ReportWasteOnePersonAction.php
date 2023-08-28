@@ -2,7 +2,7 @@
 
 namespace e10pro\reports\waste_cz;
 
-use \e10\DocumentAction, e10\MailMessage, \e10\utils;
+use \Shipard\Base\DocumentAction, \Shipard\Report\MailMessage, \Shipard\Utils\Utils;
 
 
 /**
@@ -36,6 +36,9 @@ class ReportWasteOnePersonAction extends DocumentAction
 
 		$report = new \e10pro\reports\waste_cz\ReportWasteOnePerson($documentTable, $person);
 		$report->calendarYear = intval($this->params['data-param-calendar-year']);
+		$report->periodBegin = $report->calendarYear.'-01-01';
+		$report->periodEnd = $report->calendarYear.'-12-31';
+
 		$report->init();
 		$report->renderReport ();
 		$report->createReport ();
@@ -50,7 +53,7 @@ class ReportWasteOnePersonAction extends DocumentAction
 		$msg->setBody($msgBody);
 		$msg->setDocument ('e10.persons.persons', $personNdx, $report);
 
-		$attachmentFileName = utils::safeChars($report->createReportPart ('fileName'));
+		$attachmentFileName = Utils::safeChars($report->createReportPart ('fileName'));
 		if ($attachmentFileName === '')
 			$attachmentFileName = 'priloha';
 
@@ -77,8 +80,12 @@ class ReportWasteOnePersonAction extends DocumentAction
 
 	public function run ()
 	{
-		$report = new \e10pro\reports\waste_cz\ReportWasteByPersons($this->app());
-		$report->year = intval($this->params['data-param-calendar-year']);
+		$report = new \e10pro\reports\waste_cz\libs\ReportWasteCompanies($this->app());
+		$report->subReportId = 'companiesIn';
+		$report->sendStatus = 'toSend';
+		$report->calendarYear = intval($this->params['data-param-calendar-year']);
+		$report->periodBegin = $this->params['data-param-period-begin'];
+		$report->periodEnd = $this->params['data-param-period-end'];
 		$report->createPdf();
 
 		foreach ($report->persons as $personNdx)
@@ -89,8 +96,11 @@ class ReportWasteOnePersonAction extends DocumentAction
 
 	public function runFromCli($year)
 	{
-		$this->testRun = 1;
-		$this->setParams(['data-param-calendar-year' => $year]);
+		$this->setParams([
+			'data-param-calendar-year' => $year,
+			'data-param-period-begin' => $year.'-01-01',
+			'data-param-period-end' => $year.'-12-31',
+		]);
 		$this->run();
 	}
 

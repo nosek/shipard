@@ -1,0 +1,24 @@
+{
+	"fields": {
+		"groups": [
+			{"id":  "pla", "title":  "Zástavní smlouva"}
+		],
+		"columns": [
+			{
+				"id": "pledgeAgreementNumber", "group":  "pla", "name": "Číslo zástavní smlouvy", "type": "string", "len": 30
+			},
+			{
+				"id": "pledgeAgreementDate", "group":  "pla", "name": "Datum zástavní smlouvy", "type": "date"
+			},
+			{
+				"id": "pledgeAgreementAppendixNum", "group":  "pla", "name": "Číslo dodatku", "type": "int"
+			},
+			{
+				"id": "minAmount", "group":  "pla", "name": "Minimální částka pohledávky", "type": "int"
+			},
+			{
+				"id": "maxTotalAmount", "group":  "pla", "name": "Maximální celková částka", "type": "int"
+			}
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+	"id": "hosting.core.dsPersons", "sql": "hosting_core_dsPersons", "name": "Osoby Zdrojů dat",
+	"columns": [
+		{"id": "ndx", "name": "id", "type": "int_ai"},
+		{"id": "person", "name": "Osoba", "type": "int", "reference": "e10.persons.persons"},
+		{"id": "dataSource", "name": "Zdroj dat", "type": "int", "reference": "hosting.core.dataSources"},
+
+		{"id": "isAdmin", "name": "Správce zdroje dat", "type": "logical"},
+		{"id": "isSupport", "name": "Technická podpora zákazníků", "type": "logical"},
+
+		{"id": "docState", "name": "Stav", "type": "int"},
+		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}
+	],
+	"states": {"stateColumn": "docState", "mainStateColumn": "docStateMain", "statesCfg": "e10.base.defaultDocStatesArchive"},
+	"views": [
+		{"id": "default", "class": "hosting.core.ViewDSPersons", "detail": "hosting.core.ViewDetailDSPerson"}
+	],
+	"forms": [
+		{"id": "default", "class": "hosting.core.FormDSPerson"}
+	]
+}

@@ -1,0 +1,10 @@
+{
+  "default":{
+    "id":"default",
+    "name":"default ng theme",
+    "integrity":{
+      "sha384":"2a29187057526819327e7ee7efccd134e6ab4bf3a3ab79d3e38d46670f6116a215014446241a076685f20cbdd7d77e52",
+      "md5":"e85e6458eb0eec59e84d15ced145f5aa"
+    }
+  }
+}

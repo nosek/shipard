@@ -1,0 +1,27 @@
+{
+	"id": "vds.base.codeBasesDefs", "sql": "vds_base_codeBasesDefs", "name": "Definice vlastních číselníků",
+	"columns": [
+		{"id": "ndx", "name": "id", "type": "int_ai"},
+		{"id": "fullName", "name": "Název", "type": "string", "len":  120},
+
+		{"id": "vds", "name": "Struktura", "type": "int", "reference":  "vds.base.defs"},
+
+		{"id": "useFullName", "name": "Zadávat název", "type": "logical"},
+		{"id": "useShortName", "name": "Zadávat zkrácený název", "type": "logical"},
+    {"id": "useDates", "name": "Používat datumy", "type": "enumInt",
+			"enumValues": {"0": "Ne", "1": "Datum", "2": "Datum OD - DO"}},
+
+		{"id": "docState", "name": "Stav", "type": "int"},
+		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}
+	],
+	"states": {"stateColumn": "docState", "mainStateColumn": "docStateMain", "statesCfg": "e10.base.defaultDocStatesArchive"},
+	"views": {
+		"default": {"id": "default", "class": "vds.base.ViewCodeBasesDefs"}
+	},
+	"forms": [
+		{"id": "default", "class": "vds.base.FormCodeBaseDef"}
+	],
+	"autocomplete": {"columnValue": "ndx", "columnTitle": "fullName"},
+	"options": ["configSource"],
+	"ndx": 0
+}

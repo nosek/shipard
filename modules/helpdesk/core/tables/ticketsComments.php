@@ -4,6 +4,7 @@ namespace helpdesk\core;
 use \Shipard\Viewer\TableView, \Shipard\Viewer\TableViewDetail, \Shipard\Form\TableForm, \Shipard\Table\DbTable;
 use \Shipard\Utils\Utils;
 use \Shipard\Utils\Json;
+use \translation\dicts\e10\base\system\DictSystem;
 
 
 /**
@@ -117,6 +118,7 @@ class ViewTicketsComments extends TableView
   var \lib\core\texts\Renderer $textRenderer;
 
 	var $notifyPks = [];
+	var $othersNotifications = [];
 
 	public function init ()
 	{
@@ -171,6 +173,37 @@ class ViewTicketsComments extends TableView
 				'data-srcobjecttype' => 'viewer', 'data-srcobjectid' => $this->vid,
 				'class' => 'pull-right'
 			];
+		}
+
+		if (isset($this->othersNotifications[$ndx]))
+		{
+			$title[] = ['text' => 'Přečetli:', 'class' => ''];
+			foreach ($this->othersNotifications[$ndx] as $urn)
+			{
+				if ($urn['state'])
+					$title[] = ['text' => $urn['personName'], 'class' => 'label label-default lh16', 'icon' => 'system/iconCheck'];
+				else
+					$title[] = ['text' => $urn['personName'], 'class' => 'label label-info lh16', 'icon' => 'user/ban'];
+			}
+		}
+
+		if (in_array($item['ndx'], $this->notifyPks))
+		{
+			$readButton = [
+				'text' => DictSystem::text(DictSystem::diBtn_Seen),
+
+				'action' => 'viewer-inline-action',
+				'class' => 'pull-right',
+
+				'icon' => 'user/eye',
+				'btnClass' => 'btn-xs',
+				'actionClass' => 'df2-action-trigger',
+				'data-object-class-id' => 'helpdesk.core.libs.TicketsBulkAction',
+				'data-action-type' => 'markCommentAsRead',
+				'data-action-param-comment-ndx' => $item['ndx'],
+				'data-action-param-ticket-ndx' => $item['ticket'],
+			];
+			$title[] = $readButton;
 		}
 
 		$item ['pane']['title'][] = [
@@ -346,6 +379,7 @@ class ViewTicketsComments extends TableView
 			return;
 
 		$this->loadNotifications();
+		$this->loadOthersNotifications();
 		//$this->atts = \E10\Base\loadAttachments ($this->app(), $this->pks, 'wkf.core.comments');
 	}
 
@@ -371,6 +405,7 @@ class ViewTicketsComments extends TableView
       'text' => 'Nový komentář', 'type' => 'button', 'actionClass' => 'btn btn-xs',
       'class' => 'pull-right', 'btnClass' => 'btn-success',
       'data-addParams' => $addParams,
+			'data-srcobjecttype' => 'viewer', 'data-srcobjectid' => $this->vid,
     ];
 
     $c .= "<div class='e10-pane-core e10-pane-info padd5 e10-bg-t6 pt1 pb1 mb1'>";
@@ -391,6 +426,29 @@ class ViewTicketsComments extends TableView
 
 		foreach ($rows as $r)
 			$this->notifyPks[] = $r['recId'];
+	}
+
+	protected function loadOthersNotifications ()
+	{
+		$q = [];
+
+		array_push ($q, 'SELECT ntfs.*, [persons].[fullName] AS [personName]');
+		array_push ($q, ' FROM [e10_base_notifications] AS [ntfs]');
+		array_push ($q, ' LEFT JOIN [e10_persons_persons] AS [persons] ON [ntfs].[personDest] = [persons].[ndx]');
+		array_push ($q, ' WHERE 1');
+		array_push ($q, 'AND tableId = %s', 'helpdesk.core.tickets');
+		array_push ($q, 'AND recIdMain = %i', $this->ticketNdx);
+		array_push ($q, 'AND recId IN %in', $this->pks);
+		$rows = $this->db()->query ($q);
+
+		foreach ($rows as $r)
+		{
+			$this->othersNotifications[$r['recId']][] = [
+				'personNdx' => $r['personDest'],
+				'personName' => $r['personName'],
+				'state' => $r['state'],
+			];
+		}
 	}
 }
 

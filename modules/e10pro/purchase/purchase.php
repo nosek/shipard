@@ -3,7 +3,7 @@
 namespace E10Pro\Purchase;
 require_once __SHPD_MODULES_DIR__ . 'e10/base/base.php';
 
-use \Shipard\Viewer\TableViewDetail, \Shipard\Viewer\TableViewPanel, \E10\TableForm, \E10\DbTable, \E10\utils, \E10\Widget, \E10\Application;
+use \Shipard\Viewer\TableViewPanel;
 
 require_once __SHPD_MODULES_DIR__ . 'e10/persons/tables/persons.php';
 require_once __SHPD_MODULES_DIR__ . 'e10doc/balance/balance.php';
@@ -120,14 +120,17 @@ class ViewSuppliers extends \e10\persons\ViewPersons
 	public function createToolbar ()
 	{
 		$toolbar = parent::createToolbar ();
+		if ($this->objectSubType !== self::vsMain)
+			return $toolbar;
 
 		$addParams = '__docType=purchase&__person={pk}';
-		$toolbar [] = array ('type' => 'document', 'action' => 'new', 'table' => 'e10doc.core.heads', 'doubleClick' => 1,
-												 'data-addparams' => $addParams, 'text' => 'Nový výkup');
+		$toolbar [] = [
+			'type' => 'document', 'action' => 'new', 'table' => 'e10doc.core.heads', 'doubleClick' => 1,
+			'data-addparams' => $addParams, 'text' => 'Nový výkup2'
+		];
 		return $toolbar;
-	} // createToolbar
-
-} // class ViewSuppliers
+	}
+}
 
 
 /**
@@ -147,11 +150,15 @@ class ViewDetailSupplier extends \E10\Persons\ViewDetailPersons
 			'data-addparams' => $addParams, 'text' => 'Nový výkup'
 		];
 
-		$addParams = '__docType=cashreg&__person='.$this->item['ndx'];
-		$toolbar [] = [
-			'type' => 'document', 'action' => 'new', 'data-table' => 'e10doc.core.heads',
-			'data-addparams' => $addParams, 'text' => 'Nová prodejka'
-		];
+		if (isset ($this->app()->workplace['cashBox']))
+		{
+			$cbNdx = $this->app()->workplace['cashBox'];
+			$addParams = '__docType=cashreg&__person='.$this->item['ndx'].'&__cashBox='.$cbNdx;
+			$toolbar [] = [
+				'type' => 'document', 'action' => 'new', 'data-table' => 'e10doc.core.heads',
+				'data-addparams' => $addParams, 'text' => 'Nová prodejka'
+			];
+		}
 
 		return $toolbar;
 	} // createToolbar
@@ -302,19 +309,3 @@ class reportBalancePurchasesInvoice extends \E10Doc\Balance\reportBalance
 		parent::init();
 	}
 }
-
-/**
- * AddWizardFromID
- *
- */
-
-class AddWizardFromID extends \E10\Persons\AddWizardFromID
-{
-	public function savePerson ()
-	{
-		parent::savePerson ();
-		$this->stepResult ['addDocument'] = 1;
-		$this->stepResult ['params'] = array('table' => 'e10doc.core.heads', 'addparams' => "__docType=purchase&__person={$this->newPersonNdx}");
-	}
-}
-

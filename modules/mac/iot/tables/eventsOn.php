@@ -10,6 +10,12 @@ use \Shipard\Form\TableForm, \Shipard\Table\DbTable, \Shipard\Viewer\TableView, 
  */
 class TableEventsOn extends DbTable
 {
+	CONST
+		svtValue = 0,
+		svtParam = 1,
+		svtTemplate = 2
+	;
+
 	public function __construct ($dbmodel)
 	{
 		parent::__construct ($dbmodel);
@@ -93,11 +99,33 @@ class TableEventsOn extends DbTable
 		return parent::columnInfoEnum ($columnId, $valueType, $form);
 	}
 
-	public function getEventLabels($eventRow, &$dest)
+	public function getEventLabels($eventRow, &$dest, $showTitle = FALSE)
 	{
+		if ($showTitle)
+		{
+			$dest[] = [
+				'text' => $eventRow['fullName'], 'class' => 'e10-bold',
+				'docAction' => 'edit', 'pk' => $eventRow['ndx'], 'table' => 'mac.iot.eventsOn'
+			];
+
+			if ($eventRow['disabled'])
+				$dest[] = ['text' => 'Zakázáno', 'class' => 'label label-danger'];
+
+			$eventType = $this->app()->cfgItem('mac.iot.events.onEventTypes.'.$eventRow['eventType'], NULL);
+			if ($eventType)
+				$dest[] = ['text' => $eventType['fn'].':', 'class' => 'break e10-small'];
+		}
+
 		if ($eventRow['eventType'] === 'deviceAction')
 		{
-			$dest[] = ['text' => $eventRow['deviceFriendlyId'], 'class' => 'label label-default'];
+			if ($showTitle)
+				$dest[] = [
+					'text' => $eventRow['deviceFriendlyId'], 'class' => 'label label-default',
+					'docAction' => 'edit', 'pk' => $eventRow['iotDevice'], 'table' => 'mac.iot.devices'
+				];
+			else
+				$dest[] = ['text' => $eventRow['deviceFriendlyId'], 'class' => 'label label-default'];
+
 			$dest[] = ['text' => $eventRow['iotDeviceEvent'], 'class' => 'label label-default'];
 			$dest[] = ['text' => ' = ', 'class' => 'label label-default'];
 			$dest[] = ['text' => $eventRow['iotDeviceEventValueEnum'], 'class' => 'label label-info'];
@@ -114,9 +142,14 @@ class TableEventsOn extends DbTable
 		}
 		elseif ($eventRow['eventType'] === 'mqttMsg')
 		{
-			//$this->addColumnInput ('mqttTopic');
-			//$this->addColumnInput ('mqttTopicPayloadItemId');
-			//$this->addColumnInput ('mqttTopicPayloadValue');
+			$dest[] = ['text' => $eventRow['mqttTopic'].':', 'class' => 'label label-default'];
+			$dest[] = ['text' => '[\''.$eventRow['mqttTopicPayloadItemId'].'\']', 'class' => 'label label-default'];
+			$dest[] = ['text' => ' = ', 'class' => 'label label-default'];
+			$dest[] = ['text' => '`'.$eventRow['mqttTopicPayloadValue'].'`', 'class' => 'label label-info'];
+		}
+		elseif ($eventRow['eventType'] === 'mqttTopic')
+		{
+			$dest[] = ['text' => $eventRow['mqttTopic'], 'class' => 'label label-default'];
 		}
 		elseif ($eventRow['eventType'] === 'sensorValue')
 		{
@@ -129,8 +162,58 @@ class TableEventsOn extends DbTable
 				$sensorRecData = $this->app()->loadItem($eventRow['iotSensor'], 'mac.iot.sensors');
 				if ($sensorRecData)
 				{
-					$dest[] = ['text' => $sensorRecData['fullName'].':', 'class' => 'label label-default'];
-					$dest[] = ['text' => $eventRow['iotSensorValueFrom'].' až '.$eventRow['iotSensorValueTo'], 'class' => 'label label-default'];
+					$si = $this->app()->cfgItem('mac.data.quantityTypes.' . $sensorRecData['quantityType'] . '.icon', 'x-cog');
+					$dest[] = ['text' => $sensorRecData['idName'].':', 'class' => 'label label-default', 'icon' => $si, 'title' => 'Hodnota senzoru '.$sensorRecData['fullName']];
+
+
+					if ($eventRow['iotSensorValueFromType'] == TableEventsOn::svtValue)
+						$dest[] = ['text' => $eventRow['iotSensorValueFrom'], 'class' => 'label label-default'];
+					elseif ($eventRow['iotSensorValueFromType'] == TableEventsOn::svtTemplate)
+						$dest[] = ['text' => '`'.$eventRow['iotSensorValueFromTemplate'].'`', 'class' => 'label label-default'];
+					elseif ($eventRow['iotSensorValueFromType'] == TableEventsOn::svtParam)
+					{
+						$paramRecData = $this->app()->loadItem($eventRow['iotSensorValueFromParam'], 'mac.iot.params');
+						if ($paramRecData)
+							$dest[] = ['text' => '#'.$paramRecData['idName'], 'class' => 'label label-default', 'title' => $paramRecData['fullName']];
+						else
+							$dest[] = ['text' => '#'.'CHYBNÝ PARAMETR', 'class' => 'label label-danger'];
+					}
+
+					$dest[] = ['text' => ' až ', 'class' => ''];
+
+					if ($eventRow['iotSensorValueToType'] == TableEventsOn::svtValue)
+						$dest[] = ['text' => $eventRow['iotSensorValueTo'], 'class' => 'label label-default'];
+					elseif ($eventRow['iotSensorValueToType'] == TableEventsOn::svtTemplate)
+						$dest[] = ['text' => '`'.$eventRow['iotSensorValueToTemplate'].'`', 'class' => 'label label-default'];
+					elseif ($eventRow['iotSensorValueToType'] == TableEventsOn::svtParam)
+					{
+						$paramRecData = $this->app()->loadItem($eventRow['iotSensorValueToParam'], 'mac.iot.params');
+						if ($paramRecData)
+							$dest[] = ['text' => '#'.$paramRecData['idName'], 'class' => 'label label-default', 'title' => $paramRecData['fullName']];
+						else
+							$dest[] = ['text' => '#'.'CHYBNÝ PARAMETR', 'class' => 'label label-danger'];
+					}
+
+					//$dest[] = ['text' => $eventRow['iotSensorValueTo'], 'class' => 'label label-default'];
+				}
+				else
+				{
+					$dest[] = ['text' => 'unknown sensor #'.$eventRow['iotSensor'], 'class' => 'label label-warning'];				}
+			}
+		}
+		elseif ($eventRow['eventType'] === 'sensorValueChange')
+		{
+			if (!$eventRow['iotSensor'])
+			{
+				$dest[] = ['text' => 'senzor není vybrán', 'class' => 'label label-warning'];
+			}
+			else
+			{
+				$sensorRecData = $this->app()->loadItem($eventRow['iotSensor'], 'mac.iot.sensors');
+				if ($sensorRecData)
+				{
+					$si = $this->app()->cfgItem('mac.data.quantityTypes.' . $sensorRecData['quantityType'] . '.icon', 'x-cog');
+					$dest[] = ['text' => $sensorRecData['fullName'], 'class' => 'label label-default', 'icon' => $si, 'title' => 'Změna hodnoty senzoru'];
 				}
 				else
 				{
@@ -280,6 +363,7 @@ class FormEventOn extends TableForm
 		//$this->setFlag ('maximize', 1);
 
 		$tabs ['tabs'][] = ['text' => 'Základní', 'icon' => 'system/formHeader'];
+		$tabs ['tabs'][] = ['text' => 'Nastavení', 'icon' => 'system/formSettings'];
 
 		$this->openForm ();
 			$this->openTabs ($tabs, TRUE);
@@ -311,11 +395,40 @@ class FormEventOn extends TableForm
 					elseif ($this->recData['eventType'] === 'sensorValue')
 					{
 						$this->addColumnInput ('iotSensor');
-						$this->addColumnInput ('iotSensorValueFrom');
-						$this->addColumnInput ('iotSensorValueTo');
+
+						$this->addSeparator(self::coH4);
+						$this->openRow();
+							$this->addColumnInput ('iotSensorValueFromType');
+							if ($this->recData['iotSensorValueFromType'] == TableEventsOn::svtValue)
+								$this->addColumnInput ('iotSensorValueFrom');
+							elseif ($this->recData['iotSensorValueFromType'] == TableEventsOn::svtTemplate)
+								$this->addColumnInput ('iotSensorValueFromTemplate');
+						$this->closeRow();
+						if ($this->recData['iotSensorValueFromType'] == TableEventsOn::svtParam)
+							$this->addColumnInput ('iotSensorValueFromParam');
+
+						$this->addSeparator(self::coH4);
+						$this->openRow();
+							$this->addColumnInput ('iotSensorValueToType');
+							if ($this->recData['iotSensorValueToType'] == TableEventsOn::svtValue)
+								$this->addColumnInput ('iotSensorValueTo');
+							elseif ($this->recData['iotSensorValueToType'] == TableEventsOn::svtTemplate)
+								$this->addColumnInput ('iotSensorValueToTemplate');
+						$this->closeRow();
+						if ($this->recData['iotSensorValueToType'] == TableEventsOn::svtParam)
+							$this->addColumnInput ('iotSensorValueToParam');
+					}
+					elseif ($this->recData['eventType'] === 'sensorValueChange')
+					{
+						$this->addColumnInput ('iotSensor');
 					}
 
 					$this->addViewerWidget ('mac.iot.eventsDo', 'form', ['dstTableId' => 'mac.iot.eventsOn', 'dstRecId' => $this->recData['ndx']], TRUE);
+				$this->closeTab ();
+
+				$this->openTab ();
+					$this->addColumnInput ('rowOrder');
+					$this->addColumnInput ('disabled');
 				$this->closeTab ();
 			$this->closeTabs ();
 		$this->closeForm ();

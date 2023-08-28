@@ -1,13 +1,15 @@
 {
   "Výdejka": {
+    "de": "Aktienfreigabemitteilung",
     "en": "Stock release note",
+    "it": "Nota di rilascio",
     "sk": "Výdajka"
   },
-  "Ev. číslo": {
-    "de": "Nr.",
-    "en": "No.",
-    "it": "Num.",
-    "sk": "Číslo"
+  "číslo": {
+    "de": "nr.",
+    "en": "no.",
+    "it": "num.",
+    "sk": "číslo"
   },
   "Dodavatel": {
     "de": "Lieferant",
@@ -334,15 +336,69 @@
     "sk": "z"
   },
   "Dobrý den": {
+    "de": "Hallo",
     "en": "Greetings",
+    "it": "Buongiorno",
     "sk": "Dobrý deň"
   },
   "v příloze Vám zasíláme výdejku": {
+    "de": "Anbei senden wir Ihnen eine Quittung",
     "en": "in attachments below you will find your stock release note",
+    "it": "in allegato vi inviamo una ricevuta",
     "sk": "v prílohe Vám zasielame výdajku"
   },
   "S pozdravem": {
+    "de": "Mit freundlichen Grüßen",
     "en": "Best wishes",
+    "it": "Cordiali saluti",
     "sk": "S pozdravom"
+  },
+  "Provozovna odběratele": {
+    "de": "Niederlassung des Kunden",
+    "en": "Customer's establishment",
+    "it": "Ramo del cliente",
+    "sk": "Prevádzkareň zákazníka"
+  },
+  "vydejka": {
+    "de": "aktienfreigabemitteilung",
+    "en": "stock-release-note",
+    "it": "nota-di-rilascio",
+    "sk": "vydajka"
+  },
+  "Provozovna dodavatele": {
+    "de": "Niederlassung des Lieferanten",
+    "en": "Supplier's establishment",
+    "it": "Ramo del fornitore",
+    "sk": "Prevádzkareň dodávateľa"
+  },
+  "Doprava": {
+    "de": "Transportieren",
+    "en": "Transport",
+    "it": "Trasporto",
+    "sk": "Doprava"
+  },
+  "Jméno řidiče": {
+    "de": "Name des Fahrers",
+    "en": "Name of driver",
+    "it": "Nome del conducente",
+    "sk": "Meno vodiča"
+  },
+  "RZ vozidla": {
+    "de": "Kraftfahrzeugkennzeichen",
+    "en": "Vehicle registration plate",
+    "it": "Targa d'immatricolazione",
+    "sk": "Evidenčné číslo vozidla"
+  },
+  "Celková hmotnost včetně vozidla": {
+    "de": "Gesamtgewicht einschließlich Fahrzeug",
+    "en": "Total weight including vehicle",
+    "it": "Peso totale incluso il veicolo",
+    "sk": "Celková hmotnosť vrátane vozidla"
+  },
+  "Celková hmotnost nákladu": {
+    "de": "Gesamtfrachtgewicht",
+    "en": "Total cargo weight",
+    "it": "Peso totale del carico",
+    "sk": "Celková hmotnosť nákladu"
   }
 }

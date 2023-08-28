@@ -4,6 +4,7 @@
 namespace e10\base\libs;
 use \e10\base\TableAttachments;
 
+
 class UtilsBase
 {
 	static function classificationParams (\Shipard\Table\DbTable $table)
@@ -61,7 +62,9 @@ class UtilsBase
 		$query = $app->db->query ("SELECT * from [e10_base_clsf] where [tableid] = %s AND [recid] IN ($recIds)", $tableId);
 		forEach ($query as $r)
 		{
-			$clsfItem = $clsfItems [$r['group']][$r['clsfItem']];
+			$clsfItem = $clsfItems [$r['group']][$r['clsfItem']] ?? NULL;
+			if (!$clsfItem)
+				continue;
 			$i = ['text' => $clsfItem['name'], 'class' => $class, 'clsfItem' => $r['clsfItem']];
 			if ($withIcons)
 				$i ['icon'] = $clsfGroups [$r['group']]['icon'];
@@ -81,7 +84,7 @@ class UtilsBase
 
 	static function loadAttachments ($app, $ids, $tableId = FALSE)
 	{
-		static $imgFileTypes = array ('pdf', 'jpg', 'jpeg', 'png', 'gif', 'svg');
+		static $imgFileTypes = array ('pdf', 'jpg', 'jpeg', 'webp', 'png', 'gif', 'svg');
 
 		$files = array ();
 		if (count($ids) == 0)
@@ -369,6 +372,47 @@ class UtilsBase
 		return $lp;
 	}
 
+	static function linkedSendReports ($app, $table, $toRecId, $elementClass = '')
+	{
+		$list = [];
+		if (is_array($toRecId) && !count($toRecId))
+			return $list;
+
+		if (is_string($table))
+			$tableId = $table;
+		else
+			$tableId = $table->tableId ();
+
+		$q = [];
+		array_push($q, 'SELECT links.ndx, links.linkId as linkId, links.dstTableId, links.srcRecId, links.dstRecId,');
+		array_push($q, ' [reports].fullName AS fullName');
+		array_push($q, ' FROM [e10_base_doclinks] AS [links] ');
+		array_push($q, ' LEFT JOIN [e10_reports_reports] AS [reports] ON [links].[dstRecId] = [reports].[ndx]');
+		array_push($q, ' WHERE [links].[srcTableId] = %s', $tableId);
+		array_push($q, ' AND [dstTableId] = %s', 'e10.reports.reports');
+
+		if (is_array($toRecId))
+			array_push($q, ' AND links.srcRecId IN %in', $toRecId);
+		else
+			array_push($q, ' AND links.srcRecId = %i', $toRecId);
+
+		$rows = $app->db->query ($q);
+		foreach ($rows as $r)
+		{
+			$label = ['text' => $r['fullName'], 'class' => 'label label-default', 'srNdx' => $r['dstRecId']];
+			if (is_array($toRecId))
+			{
+				$list[$r['srcRecId']][] = $label;
+			}
+			else
+			{
+				$list[$r['dstRecId']] = $label;
+			}
+		}
+
+		return $list;
+	}
+
 	static function sendEmail ($app, $subject, $message, $fromAdress, $toAdress, $fromName = '', $toName = '', $html = FALSE)
 	{
 		if ($app->cfgItem ('develMode', 0) !== 0)
@@ -385,7 +429,81 @@ class UtilsBase
 		else
 			$header .= "Content-Type: text/plain; charset=utf-8\n";
 		$header .= "From: =?UTF-8?B?".base64_encode($fromName)."?=<".$fromAdress.">\n";
-		$header .= "To: =?UTF-8?B?".base64_encode($toName)."?=<".$toAdress.">\n";
-		return mail ("", $subjectEncoded, $message, $header);
+		//$header .= "To: =?UTF-8?B?".base64_encode($toName)."?=<".$toAdress.">\n";
+		return mail ($toAdress, $subjectEncoded, $message, $header);
+	}
+
+	static function getPropertiesTable ($app, $toTableId, $toRecId)
+	{
+		$multiple = FALSE;
+		$texy = new \lib\core\texts\Texy ($app);
+
+		if (is_array($toRecId))
+		{
+			if (!count($toRecId))
+				return [];
+			$multiple = TRUE;
+			$recs = implode (', ', $toRecId);
+			$sql = "SELECT * FROM [e10_base_properties] where [tableid] = %s AND [recid] IN ($recs) ORDER BY ndx";
+		}
+		else
+		{
+			$recId = intval($toRecId);
+			$sql = "SELECT * FROM [e10_base_properties] where [tableid] = %s AND [recid] = $recId ORDER BY ndx";
+		}
+
+		$allProperties = $app->cfgItem ('e10.base.properties', array());
+		$properties = array ();
+
+		// --load from table
+		$query = $app->db->query ($sql, $toTableId);
+		foreach ($query as $row)
+		{
+			$loaded = false;
+			$p = $allProperties [$row['property']];
+			if (isset ($p ['type']))
+			{
+				if ($p ['type'] == 'memo')
+				{
+					if ($row ['valueMemo'] === NULL)
+						continue;
+					$texy->setOwner ($row);
+					$txt = $texy->process ($row ['valueMemo']);
+					$oneProp = array ('ndx' => $row ['ndx'], 'property' => $row ['property'], 'group' => $row ['group'], 'value' => $txt, 'type' => 'memo', 'name' => $p ['name']);
+					$loaded = true;
+				}
+				else
+				if ($p ['type'] == 'date')
+				{
+					$oneProp = array ('ndx' => $row ['ndx'], 'property' => $row ['property'], 'group' => $row ['group'], 'value' => $row ['valueDate'], 'type' => 'memo', 'name' => $p ['name']);
+					$loaded = true;
+				}
+				else
+				if ($p ['type'] == 'text')
+				{
+					$oneProp = array ('ndx' => $row ['ndx'], 'property' => $row ['property'], 'group' => $row ['group'], 'value' => $row ['valueString'], 'type' => 'text', 'name' => $p ['name']);
+					$loaded = true;
+				}
+				else
+				if ($p ['type'] == 'enum')
+				{
+					$oneProp = array ('ndx' => $row ['ndx'], 'property' => $row ['property'], 'group' => $row ['group'], 'value' => $p ['enum'][$row ['valueString']]['fullName'],
+							'type' => 'enum', 'name' => $p ['name']);
+					$loaded = true;
+				}
+
+				if ($loaded && $row ['note'] !== '')
+					$oneProp ['note'] = $row ['note'];
+			}
+			if (!$loaded)
+				$oneProp = array ('ndx' => $row ['ndx'], 'property' => $row ['property'], 'group' => $row ['group'], 'value' => $p [$row ['valueString']], 'type' => 'string', 'name' => $p ['name']);
+
+			if ($multiple)
+				$properties [$row ['recid']][$row['group']][$row['property']][] = $oneProp;
+			else
+				$properties [$row['group']][$row['property']][] = $oneProp;
+		}
+
+		return $properties;
 	}
 }

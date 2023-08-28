@@ -53,17 +53,17 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		/** @var \e10\persons\TablePersons $tablePersons */
 		$tablePersons = $this->app()->table('e10.persons.persons');
 		$newPerson = [];
-	
+
 		$personHead = $personData ['person'];
 		Utils::addToArray ($newPerson, $personHead, 'firstName');
 		Utils::addToArray ($newPerson, $personHead, 'lastName');
 		Utils::addToArray ($newPerson, $personHead, 'fullName', '');
 		Utils::addToArray ($newPerson, $personHead, 'company', 0);
 		Utils::addToArray ($newPerson, $personHead, 'accountType', 2);
-	
+
 		if ($newPerson ['company'] == 0)
 			$newPerson ['fullName'] = $newPerson ['firstName'].' '.$newPerson ['lastName'];
-	
+
 		if (isset ($personHead ['roles']))
 			$newPerson ['roles'] = $personHead ['roles'];
 		if (isset ($personHead ['login']))
@@ -72,26 +72,26 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			$newPerson ['loginHash'] = md5(strtolower(trim($personHead ['login'])));
 			$newPerson ['accountState'] = 1;
 		}
-	
+
 		$newPerson ['docState'] = 4000;
 		$newPerson ['docStateMain'] = 2;
-	
+
 		$newPersonNdx = $tablePersons->dbInsertRec($newPerson);
-	
+
 		// -- contactInfo
 		if (isset($personData ['contacts']))
 		{
 			forEach ($personData ['contacts'] as $contact)
 			{
 				$newContact = [
-					'property' => $contact ['type'], 'group' => 'contacts', 
+					'property' => $contact ['type'], 'group' => 'contacts',
 					'tableid' => 'e10.persons.persons', 'recid' => $newPersonNdx,
 					'valueString' => $contact ['value'], 'created' => new \DateTime (),
 				];
 				$this->db()->query ("INSERT INTO [e10_base_properties]", $newContact);
 			}
 		}
-	
+
 		// -- address
 		if (isset ($personData ['address']))
 		{
@@ -103,15 +103,15 @@ class ModuleServices extends \E10\CLI\ModuleServices
 				Utils::addToArray ($newAddress, $address, 'city', '');
 				Utils::addToArray ($newAddress, $address, 'zipcode', '');
 				Utils::addToArray ($newAddress, $address, 'country', $this->app()->cfgItem ('options.core.ownerDomicile', 'cz'));
-	
+
 				Utils::addToArray ($newAddress, $address, 'worldCountry', 0);
 				if ($newAddress['worldCountry'] === 0) // TODO: for compatibility with old hosting
 					$newAddress['worldCountry'] = World::countryNdx($this->app(), $newAddress['country']);
-	
+
 				$this->db()->query ("INSERT INTO [e10_persons_address]", $newAddress);
 			}
 		}
-	
+
 		// -- identification
 		if (isset ($personData ['ids']))
 		{
@@ -120,7 +120,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 				if ($id ['type'] === 'birthdate')
 					continue;
 				$newId = [
-					'property' => $id ['type'], 'group' => 'ids', 
+					'property' => $id ['type'], 'group' => 'ids',
 					'tableid' => 'e10.persons.persons', 'recid' => $newPersonNdx,
 					'valueString' => $id ['value'], 'created' => new \DateTime (),
 				];
@@ -138,6 +138,8 @@ class ModuleServices extends \E10\CLI\ModuleServices
 	{
 		$s = [];
 		$s [] = ['end' => '2022-12-31', 'sql' => "update e10_persons_address set docState = 4000, docStateMain = 2 where docState = 0"];
+		$s [] = ['end' => '2022-12-31', 'sql' => "update e10_persons_address set docState = 4000, docStateMain = 2 where docState = 2"];
+		$s [] = ['end' => '2023-06-01', 'sql' => "update e10_persons_personsContacts set onTop = 99 where onTop = 0"];
 		$this->doSqlScripts ($s);
 
 		// check owner persons properties
@@ -259,6 +261,10 @@ class ModuleServices extends \E10\CLI\ModuleServices
 
 	public function personValidator()
 	{
+		$testNewPersons = intval($this->app->cfgItem ('options.persons.testNewPersons', 0));
+		if ($testNewPersons)
+			return;
+
 		if ($this->app->model()->table ('e10doc.debs.journal') === FALSE)
 			return;
 
@@ -317,6 +323,30 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$this->lastPersonsUseCreate();
 	}
 
+	public function importNewPersons()
+	{
+		$e = new \e10\persons\libs\ImportNewPersons($this->app);
+		$e->run();
+	}
+
+	public function importNewPersonsBA()
+	{
+		$e = new \e10\persons\libs\ImportNewPersons($this->app);
+		$e->importBankAccounts();
+	}
+
+	public function importNewPersonsBAClean()
+	{
+		$e = new \e10\persons\libs\ImportNewPersons($this->app);
+		$e->cleanOldBankAccounts();
+	}
+
+	public function importNewPersonsValidityClean()
+	{
+		$e = new \e10\persons\libs\ImportNewPersons($this->app);
+		$e->cleanOldValidity();
+	}
+
 	public function onCliAction ($actionId)
 	{
 		switch ($actionId)
@@ -324,6 +354,10 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			case 'geo-code': return $this->geoCode();
 			case 'last-persons-use-create': return $this->lastPersonsUseCreate();
 			case 'person-validator': return $this->personValidator();
+			case 'import-new-persons': return $this->importNewPersons();
+			case 'import-new-persons-ba': return $this->importNewPersonsBA();
+			case 'import-new-persons-ba-clean': return $this->importNewPersonsBAClean();
+			case 'import-new-persons-validity-clean': return $this->importNewPersonsValidityClean();
 		}
 
 		parent::onCliAction($actionId);

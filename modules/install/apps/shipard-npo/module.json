@@ -1,0 +1,26 @@
+{
+	"id": "install.apps.shipard-npo",
+	"name": "Neziskové organizace",
+	"modules": [
+		"install/apps/shipard-core",
+
+		"e10pro/install/docs-sale",
+		"e10pro/install/docs-buy",
+		"e10pro/install/docs-finance",
+		"e10pro/install/docs-accounting",
+		"e10pro/property",
+
+		"install/country-modules/debs/cz"
+	],
+
+	"config": [
+	],
+
+	"dataPackages": [
+		"install/data/common/e10-robots",
+		"install/data/common/e10-min-docs-dataset",
+		"install/data/countries/cz/property/property",
+
+		"install/data/countries/cz/debs/debs-accounts-npo"
+	]
+}

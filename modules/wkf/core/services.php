@@ -208,12 +208,46 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$dsStats->saveToFile();
 	}
 
+	protected function uploadEmail()
+	{
+		$fileName = $this->app->arg('file');
+		if (!$fileName)
+		{
+			echo "Param `file` not found...\n";
+			return FALSE;
+		}
+
+		$im = new \wkf\core\services\IncomingEmail($this->app());
+		$im->setFileName($fileName);
+		$im->run();
+
+		return TRUE;
+	}
+
+	public function checkIncomingIssue()
+	{
+		$issueNdx = intval($this->app->arg('issueNdx'));
+		if (!$issueNdx)
+		{
+			echo "Param `issueNdx` not found...\n";
+			return FALSE;
+		}
+
+		$im = new \wkf\core\libs\CheckIncomingIssue($this->app());
+		$im->setIssue($issueNdx);
+		$im->run();
+
+		return TRUE;
+	}
+
 	public function onCliAction ($actionId)
 	{
 		switch ($actionId)
 		{
 			case 'issue-filtering': return $this->issueFiltering();
 			case 'remove-issues': return $this->removeIssues();
+			case 'upload-email': return $this->uploadEmail();
+			case 'check-incoming-issue': return $this->checkIncomingIssue();
 		}
 
 		parent::onCliAction($actionId);

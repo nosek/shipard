@@ -1,0 +1,49 @@
+{
+	"TS0503B": {
+		"fn": "Zigbee RGB light",
+		"modelID": "TS0503B",
+		"iotKind": "light", "iotSubKind": "lightbulb", "iotOptions": ["br", "ww", "rgb"]
+	},
+	"TS0505B": {
+		"fn": "Zigbee RGB+CCT light",
+		"modelID": "TS0505B",
+		"iotKind": "light", "iotSubKind": "ledPanel", "iotOptions": ["br", "ww", "rgb"]
+	},
+	"TS0505B_1": {
+		"fn": "Zigbee RGB+CCT light",
+		"modelID": "TS0505B_1",
+		"iotKind": "light", "iotSubKind": "lightbulb", "iotOptions": ["br", "ww", "rgb"]
+	},
+	"TS0505B_2": {
+		"fn": "Zigbee RGB+CCT light",
+		"modelID": "TS0505B_2",
+		"iotKind": "light", "iotSubKind": "lightbulb", "iotOptions": ["br", "ww", "rgb"]
+	},
+
+	"TS0011": {
+		"fn": "Smart light switch - 1 gang",
+		"modelID": "TS0011",
+		"iotKind": "socket", "iotSubKind": "socket"
+	},
+	"TS0012": {
+		"fn": "Smart light switch - 2 gang",
+		"modelID": "TS0012",
+		"iotKind": "socket", "iotSubKind": "socket"
+	},
+	"TS011F_plug_1": {
+		"fn": "Smart plug (with power monitoring)",
+		"modelID": "TS011F_plug_1",
+		"iotKind": "socket", "iotSubKind": "socket"
+	},
+
+	"TS0042": {
+		"fn": "Wireless switch with 2 buttons",
+		"modelID": "TS0042",
+		"iotKind": "remote", "iotSubKind": "remote"
+	},
+	"TS0044": {
+		"fn": "Wireless switch with 4 buttons",
+		"modelID": "TS0044",
+		"iotKind": "remote", "iotSubKind": "remote"
+	}
+}

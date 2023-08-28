@@ -24,9 +24,26 @@ class PdfToText extends Base
 		if ($text && $text != '')
 		{
 			$this->saveData(self::mdtTextContent, $text);
+
+			$testDocDataMining = intval($this->app()->cfgItem('options.experimental.testDocDataMining', 0));
+			if ($testDocDataMining)
+			{
+				$o = new \e10doc\ddf\ddm\libs\DocsDataMining($this->app());
+				$o->init();
+				if ($this->attRecData && $this->attRecData['tableid'] === 'wkf.core.issues')
+					$o->inboxNdx = $this->attRecData['recid'];
+				$o->setFileContent($text, $this->attRecData['ndx']);
+				$o->checkFileContent();
+
+				if ($o->ddfId)
+				{
+					$this->db()->query ('UPDATE [e10_attachments_files] SET ddfId = %i', $o->ddfId, ', ddfNdx = %i', $o->ddfNdx, ' WHERE [ndx] = %i', $this->attRecData['ndx']);
+				}
+			}
 		}
 		else
 		{ // scanned?
+			/* @TODO: remove
 			$textPdfFileName = $this->tmpFileName.'.pdf';
 			$cmd = "export LC_ALL=C.UTF-8 && export LANG=C.UTF-8 && ocrmypdf -l ces --clean --deskew --remove-background --sidecar {$txtFileName} {$this->attFileName} ".$textPdfFileName.' > '.$txtFileName.'.log 2>&1';
 			exec($cmd);
@@ -35,6 +52,7 @@ class PdfToText extends Base
 			{
 				$this->saveData(self::mdtTextContent, $text);
 			}
+			*/
 		}
 	}
 

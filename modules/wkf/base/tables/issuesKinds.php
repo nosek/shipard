@@ -81,16 +81,14 @@ class TableIssuesKinds extends DbTable
 				'icon' => $icon,
 
 				'askWorkOrder' => $r['askWorkOrder'],
-				'askPersons' => $r['askPersons'], 'askPersonsUsers' => $r['askPersonsUsers'],
-				'askKind' => $r['askKind'],
-				'askDeadline' => $r['askDeadline'], 'askDeadlineUsers' => $r['askDeadlineUsers'],
-				'askDateIncoming' => $r['askDateIncoming'],
+				'askDocColumns' => $r['askDocColumns'],
+				'askDocAnalytics' => $r['askDocAnalytics'],
+				'askDeadline' => $r['askDeadline'],
 				'enableConnectedIssues' => $r['enableConnectedIssues'],
 				'enableProjects' => $r['enableProjects'], 'enableTargets' => $r['enableTargets'],
 				'enableEmailForward' => $r['enableEmailForward'], 'emailForwardOnFirstConfirm' => $r['emailForwardOnFirstConfirm'],
 				'emailForwardSubjectPrefix' => $r['emailForwardSubjectPrefix'], 'emailForwardBody' => $r['emailForwardBody'],
 				'addOrder' => $msgTypes[$r ['issueType']]['addOrder'].sprintf('%07d', $r['order']),
-				'aa' => $r['analyzeAttachments'],
 				'vds' => $r['vds'],
 			];
 
@@ -232,8 +230,8 @@ class FormIssueKind extends TableForm
 		$this->setFlag ('maximize', 1);
 
 		$tabs ['tabs'][] = ['text' => 'Základní', 'icon' => 'system/formHeader'];
-		$tabs ['tabs'][] = ['text' => 'Údaje', 'icon' => 'formData'];
 		$tabs ['tabs'][] = ['text' => 'Nastavení', 'icon' => 'system/formSettings'];
+		$tabs ['tabs'][] = ['text' => 'Přeposílání', 'icon' => 'user/arrowCircleRight'];
 
 		$this->openForm ();
 			$this->openTabs ($tabs);
@@ -243,36 +241,26 @@ class FormIssueKind extends TableForm
 					$this->addColumnInput ('issueType');
 					$this->addColumnInput ('icon');
 					$this->addColumnInput ('order');
-				$this->closeTab();
-				$this->openTab ();
-					$this->openRow();
-						$this->addColumnInput ('askPersons');
-						$this->addColumnInput ('askPersonsUsers');
-					$this->closeRow();
+					$this->addSeparator(self::coH4);
+					$this->addColumnInput ('askDocColumns');
+					$this->addColumnInput ('askDocAnalytics');
 					$this->addColumnInput ('askWorkOrder');
-
-					$this->addColumnInput ('askKind');
-					$this->openRow();
-						$this->addColumnInput ('askDeadline');
-						$this->addColumnInput ('askDeadlineUsers');
-					$this->closeRow();
-					$this->addColumnInput ('askDateIncoming');
-					$this->addColumnInput ('enableConnectedIssues');
-					$this->addSeparator(self::coH4);
-					$this->addColumnInput ('enableEmailForward');
-					$this->addColumnInput ('emailForwardOnFirstConfirm');
-					$this->addColumnInput ('emailForwardSubjectPrefix');
-					$this->addColumnInput ('emailForwardBody');
-					$this->addSeparator(self::coH4);
-					$this->addColumnInput ('vds');
+					$this->addColumnInput ('askDeadline');
 				$this->closeTab();
 				$this->openTab ();
 					$this->addColumnInput ('enableProjects');
 					$this->addColumnInput ('enableTargets');
-					$this->addSeparator(self::coH2);
-					$this->addColumnInput ('analyzeAttachments');
-					$this->addSeparator(self::coH2);
+					$this->addColumnInput ('enableConnectedIssues');
+					$this->addSeparator(self::coH4);
+					$this->addColumnInput ('vds');
+					$this->addSeparator(self::coH4);
 					$this->addColumnInput ('systemKind');
+				$this->closeTab ();
+				$this->openTab ();
+					$this->addColumnInput ('enableEmailForward');
+					$this->addColumnInput ('emailForwardOnFirstConfirm');
+					$this->addColumnInput ('emailForwardSubjectPrefix');
+					$this->addColumnInput ('emailForwardBody');
 				$this->closeTab ();
 			$this->closeTabs();
 		$this->closeForm ();

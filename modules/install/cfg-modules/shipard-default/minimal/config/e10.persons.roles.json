@@ -11,6 +11,7 @@
 			"e10.persons.groups": {"default": 2},
 			"e10.persons.categories": {"default": 2},
 			"e10.persons.relations": {"default": 2},
+			"e10.persons.personsContacts": {"technicalAddress": 2},
 
 			"e10.base.templates": {"default": 2},
 			"e10.base.templatesLooks": {"default": 2, "web": 2, "webCombo": 1},
@@ -28,6 +29,7 @@
 			"e10.base.places": {"default": 2},
 
 			"e10.witems.itemtypes": {"default": 2},
+			"e10.witems.itemSubTypes": {"default": 2, "combo": 2},
 			"e10.witems.itemcategories": {"default": 2, "editor": 2},
 			"e10.witems.items": {"inCategory": 2},
 
@@ -38,8 +40,10 @@
 			"e10.persons.keys": {"default": 2},
 			"e10.persons.requests": {"default": 2},
 
+			"e10.reports.reportsTexts": {"default": 2},
+
 			"e10.base.nomencTypes": {"default": 2},
-			"e10.base.nomencItems": {"default": 2, "combo": 2},
+			"e10.base.nomencItems": {"default": 2, "combo": 2, "addressNomencCity": 2},
 
 			"e10.witems.units": {"default": 2},
 
@@ -76,6 +80,8 @@
 		"viewers": {
 			"e10.persons.persons": {"default": 2},
 			"e10.persons.address": {"default": 2, "form": 2, "persons": 2, "personsCombo": 2},
+			"e10.persons.personsContacts": {"default": 2, "form": 2, "combo": 2},
+			"e10.persons.personsBA": {"default": 2, "form": 2},
 			"e10.persons.contacts": {"default": 2, "form": 2},
 			"e10.persons.relations": {"default": 2},
 			"e10.witems.items": {"default": 2, "combo": 2, "byCategories": 2},

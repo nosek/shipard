@@ -2,8 +2,6 @@
 
 namespace lib\Wkf;
 
-require_once __APP_DIR__ . '/e10-modules/e10/persons/tables/persons.php';
-
 use \e10\utils, \e10\uiutils, \e10\Utility, e10pro\wkf\TableMessages;
 
 
@@ -20,111 +18,88 @@ class Calendar extends Utility
 	var $weekDate;
 	var $events = [];
 	var $tooltips = [];
-	var $tableMessages;
+	var $calendars;
+
+	/** @var \wkf\events\TableEvents */
+	var $tableEvents;
 
 	var $firstEventDate = NULL;
 	var $lastEventDate = NULL;
 
+	var $widgetId = '';
+
+	var $enabledCalendars = NULL;
+
 	public function init()
 	{
-		$this->tableMessages = $this->app->table ('e10pro.wkf.messages');
+		$this->tableEvents = $this->app->table ('wkf.events.events');
 		$this->today = utils::today();
+		$this->calendars = $this->app()->cfgItem('wkf.events.cals', NULL);
+
 	}
 
 	public function loadEvents ()
 	{
-		$thisUserId = intval($this->app->user()->data ('id'));
+		$thisUserId = intval($this->app->userNdx());
+		$ug = $this->app->userGroups ();
 
-		$q [] = 'SELECT messages.*, persons.fullName as authorFullName, projects.fullName as projectFullName, parts.id as projectPartId, parts.deadline as partDeadline FROM [e10pro_wkf_messages] as messages';
-		array_push ($q, ' LEFT JOIN e10_persons_persons as persons ON messages.author = persons.ndx');
-		array_push ($q, ' LEFT JOIN e10pro_wkf_projects as projects ON messages.project = projects.ndx');
-		array_push ($q, ' LEFT JOIN e10pro_wkf_projectsParts as parts ON messages.projectPart = parts.ndx');
+		$q [] = 'SELECT events.*, persons.fullName as authorFullName ';
+		array_push ($q, ' FROM [wkf_events_events] AS [events]');
+		array_push ($q, ' LEFT JOIN e10_persons_persons as persons ON events.author = persons.ndx');
 		array_push ($q, ' WHERE 1');
 
+		if ($this->enabledCalendars)
+			array_push ($q, ' AND (events.[calendar] IN %in)', $this->enabledCalendars);
+
 		// -- type
-		array_push ($q, " AND (messages.[msgType] IN %in)", [TableMessages::mtIssue, TableMessages::mtEvent, TableMessages::mtActivity]);
-		array_push ($q, " AND (messages.[docState] != 9800)");
-
-		// -- only my events
-		array_push ($q, ' AND (');
-		array_push ($q, " EXISTS (
-												SELECT docLinks.dstRecId FROM [e10_base_doclinks] as docLinks
-												where messages.ndx = srcRecId AND srcTableId = %s AND dstTableId = %s AND docLinks.dstRecId = %i)",
-			'e10pro.wkf.messages', 'e10.persons.persons', $thisUserId);
-
-		$ug = $this->app->userGroups ();
-		if (count ($ug) !== 0)
-			array_push ($q, ' OR '.
-				' EXISTS (
-													SELECT docLinks.dstRecId FROM [e10_base_doclinks] as docLinks
-													where messages.ndx = srcRecId AND srcTableId = %s AND dstTableId = %s AND docLinks.dstRecId IN (%sql))',
-				'e10pro.wkf.messages', 'e10.persons.groups', implode (', ', $ug));
-
-		array_push ($q, ' OR ');
-		array_push ($q, " (messages.author = %i)", $thisUserId);
-		array_push ($q, ' OR ');
-
-		array_push ($q, '(');
-		array_push ($q, " EXISTS (
-											SELECT docLinks.dstRecId FROM [e10_base_doclinks] as docLinks
-											where messages.project = srcRecId AND srcTableId = %s AND dstTableId = %s AND docLinks.dstRecId = %i)",
-			'e10pro.wkf.projects', 'e10.persons.persons', $thisUserId);
-		if (count ($ug) !== 0)
-			array_push ($q, ' OR '.
-				' EXISTS (
-						SELECT docLinks.dstRecId FROM [e10_base_doclinks] as docLinks
-						where messages.project = srcRecId AND srcTableId = %s AND dstTableId = %s AND docLinks.dstRecId IN (%sql))',
-				'e10pro.wkf.projects', 'e10.persons.groups', implode (', ', $ug));
-		array_push ($q, ')');
-
-		array_push ($q, ')');
+		array_push ($q, ' AND (events.[docState] != %i)', 9800);
 
 		array_push ($q, ' AND (');
-		array_push ($q, ' messages.[dateBegin] <= %s', $this->lastEventDate);
-		array_push ($q, ' OR (messages.[dateEnd] >= %s OR messages.[dateEnd] IS NULL)', $this->firstEventDate);
+		array_push ($q, ' events.[dateBegin] <= %s', $this->lastEventDate);
+		array_push ($q, ' OR (events.[dateEnd] >= %s OR events.[dateEnd] IS NULL)', $this->firstEventDate);
 		array_push ($q, ')');
 
-		array_push ($q, ' ORDER BY [date], [dateBegin]');
+		array_push ($q, ' ORDER BY [dateTimeBegin]');
 
 		$rows = $this->app->db()->query ($q);
 		foreach ($rows as $r)
 		{
-			$docState = $this->tableMessages->getDocumentState ($r);
-			$docStateClass = $this->tableMessages->getDocumentStateInfo ($docState ['states'], $r, 'styleClass');
+			$docState = $this->tableEvents->getDocumentState ($r);
+			$docStateClass = $this->tableEvents->getDocumentStateInfo ($docState ['states'], $r, 'styleClass');
 
 			$newEvent = [
-				'ndx' => $r['ndx'], 'msgType' => $r['msgType'], 'msgKind' => $r['msgKind'], 'icon' => $this->tableMessages->tableIcon ($r, 1),
-				'subject' => $r['subject'], 'dateBegin' => $r['dateBegin'], 'dateEnd' => $r['dateEnd'],
-				'docState' => $r['docState'], 'docStateClass' => $docStateClass];
+				'ndx' => $r['ndx'], 'icon' => $this->tableEvents->tableIcon ($r, 1),
+				'subject' => $r['title'], 'calendar' => $r['calendar'], 'placeDesc' => $r['placeDesc'],
+				'dateBegin' => $r['dateBegin'], 'timeBegin' => $r['timeBegin'], 'dateTimeBegin' => $r['dateTimeBegin'],
+				'dateEnd' => $r['dateEnd'], 'timeEnd' => $r['timeEnd'], 'dateTimeEnd' => $r['dateTimeEnd'],
+				'docState' => $r['docState'], 'docStateClass' => $docStateClass
+			];
 
-			if ($r['type'] === 'event' && !utils::dateIsBlank($r['dateBegin']))
+			if ($r['multiDays'])
 			{
 				$firstDate = utils::createDateTime($r['dateBegin']->format ('Y-m-d'));
+				$endDate = utils::createDateTime($r['dateEnd']->format ('Y-m-d'));
 				$allDay = 0;
 				while (1)
 				{
+					if ($firstDate > $endDate)
+						break;
 					$dayId = $firstDate->format('Y-m-d');
 					$newEvent['allDay'] = $allDay;
 					$this->events[$dayId][] = $newEvent;
 
 					$firstDate->modify('+1 day');
-					if ($firstDate > $r['dateEnd'])
-						break;
 					$allDay = 1;
 				}
 			}
 			else
 			{
 				$deadline = NULL;
-				if ($r['partDeadline'])
-					$deadline = $r['partDeadline'];
-				if ($r['date'])
-					$deadline = $r['date'];
+				if ($r['dateBegin'])
+					$deadline = $r['dateBegin'];
 				if (!$deadline)
 					continue;
-
 				$dayId = $deadline->format('Y-m-d');
-
 				$this->events[$dayId][] = $newEvent;
 			}
 		}
@@ -197,7 +172,8 @@ class Calendar extends Utility
 				$thisMonth = intval($activeDate->format('m'));
 				$title = strval($thisDay);
 				if ($thisMonth != $month)
-					$title = strval($thisDay) . '.' . strval($thisMonth) . '.';
+					//$title = strval($thisDay) . '.' . strval($thisMonth) . '.';
+					$title = strval($thisDay);
 
 				if ($params && isset($params['enabledDays']) &&
 						(!isset($params['enabledDays'][$thisMonth]) || !in_array($thisDay, $params['enabledDays'][$thisMonth])))
@@ -206,17 +182,23 @@ class Calendar extends Utility
 				}
 				else
 				{
+					$css = '';
 					$class = '';
 					if ($thisMonth != $month)
-						$class .= ' inactive';
+					{
+						$class .= ' inactive e10-off e10-small';
+						$css .= ' opacity: .6;';
+					}
 					if ($style === 'small' && isset ($this->events[$dayId]))
 						$class .= ' tooltips';
+					if ($dayId == $this->today->format('Y-m-d'))
+						$css .= ' background-color: #00A01030;';
 
 					$dayTitle = utils::es($thisDay . '. ' . utils::$monthNamesForDate[$thisMonth - 1]);
-					$c .= "<td class='day e10-param-btn{$class}' data-value='$dayId' data-date='$dayId' data-title='$dayTitle' tabindex='1'>";
+					$c .= "<td class='day e10-param-btn{$class}' data-value='$dayId' data-date='$dayId' data-title='$dayTitle' tabindex='1' style='padding: 2px; line-height: 1;$css'>";
 
 					if ($style === 'small')
-						$c .= $title;
+						$c .= "<span style='float:right; padding-left: 2px;'>".$title."</span>";
 					else
 					{
 						$c .= "<span class='title'>" . utils::es($title) . '</span>';
@@ -327,13 +309,26 @@ class Calendar extends Utility
 		{
 			foreach ($this->events[$dayId] as $e)
 			{
-				$event = [
-						'text' => $e['subject'], 'class' => 'tag tag-event ' . $e['docStateClass'], 'icon' => $e['icon'],
-						'docAction' => 'edit', 'pk' => $e['ndx'], 'table' => 'e10pro.wkf.messages'];
+				$cal = $this->calendars[$e['calendar']] ?? NULL;
+				$pfx = '';
 
-				$pfx = utils::dateFromTo($e['dateBegin'], $e['dateEnd'], $date);
-				if ($pfx !== '')
-					$event['prefix'] = $pfx;
+				if ($e['timeBegin'] !== '')
+					$pfx = $e['timeBegin'];
+
+				if ($e['timeEnd'] !== '')
+					$pfx .= ' - '.$e['timeEnd'];
+
+				$event = [
+					'text' => $pfx.' '.$e['subject'], 'class' => 'e10-suffix-block tag tag-event ' . $e['docStateClass'], 'icon' => $e['icon'],
+					'docAction' => 'edit', 'pk' => $e['ndx'], 'table' => 'wkf.events.events',
+					'data-srcobjecttype' => 'widget', 'data-srcobjectid' => $this->widgetId,
+				];
+
+				if ($e['placeDesc'] !== '')
+					$event['suffix'] = '  '.$e['placeDesc'];
+
+				if ($cal)
+					$event['css'] = 'border-left: 10px solid '.$cal['colorbg'].';';
 
 				$c .= $this->app()->ui()->composeTextLine($event);
 			}
@@ -346,27 +341,53 @@ class Calendar extends Utility
 	public function renderEventsSmall ($dayId)
 	{
 		$events = [];
-		$counts = [];
+		$badges = [];
 		if (isset($this->events[$dayId]))
 		{
 			foreach ($this->events[$dayId] as $e)
 			{
+				$calNdx = intval($e['calendar']);
+				$cal = $this->calendars[$e['calendar']] ?? NULL;
+
+				$pfx = '';
+
+				if ($e['timeBegin'] !== '')
+					$pfx = $e['timeBegin'];
+
+				if ($e['timeEnd'] !== '')
+					$pfx .= ' - '.$e['timeEnd'];
+
 				$event = [
-						'text' => $e['subject'], 'class' => 'tag tag-event ' . $e['docStateClass'], 'icon' => $e['icon'],
-						'docAction' => 'edit', 'pk' => $e['ndx'], 'table' => 'e10pro.wkf.messages'];
-				if (isset($e['dateBegin']))
-					$event['prefix'] = utils::datef($e['dateBegin'], '%T');
+						'text' => $pfx.' '.$e['subject'], 'class' => 'tag tag-event ' . $e['docStateClass'], 'icon' => $e['icon'],
+						'docAction' => 'edit', 'pk' => $e['ndx'], 'table' => 'wkf.events.events',
+						'data-srcobjecttype' => 'widget', 'data-srcobjectid' => $this->widgetId,
+				];
+
+				$css = '';
+				if ($cal)
+				{
+					$css = " style='color: ".$cal['colorbg']."; height: 10px; margin: 0; line-height: 1;'";
+					$event['css'] = 'border-left: 10px solid '.$cal['colorbg'].';';
+				}
+
 				$events [] = $event;
 
-				if (!isset($counts[$e['docStateClass']]))
-					$counts[$e['docStateClass']] = 0;
-				$counts[$e['docStateClass']]++;
+				if (!isset($badges[$calNdx]))
+				{
+					$badges[$calNdx] = ['count' => 1, 'css' => $css, 'dsc' => $e['docStateClass']];
+				}
+				else
+					$badges[$calNdx]['count']++;
 			}
 		}
-		$c = "<div class='events'><span class='list'>";
-		foreach ($counts as $dsc => $cnt)
-			$c .= "<span class='tag $dsc'>$cnt</span>";
-		$c .= '</span></div>';
+		$c = '';
+		$c = "<div style='display: inline-block;'>";
+
+		foreach ($badges as $calNdx => $badge)
+		{
+			$c .= "<span {$badge['css']}>"."●"."</span>";
+		}
+		$c .= '</div>';
 
 		$this->tooltips[$dayId] = '';
 		foreach ($events as $e)
@@ -419,7 +440,7 @@ class Calendar extends Utility
 			$c .= "<script>\n";
 			$c .= "var calTooltips = ".json_encode($this->tooltips).";\n";
 			$c .= "function calTooltip (dayId) {return 'nazdar!!!'};\n";
-			$c .= "$('#e10dashboardWidget table.e10-cal-small>tbody>tr>td.day.tooltips').popover({content:function(){return calTooltips[$(this).attr('data-date')];}, html: true, trigger: 'focus', delay: {'show': 0, 'hide': 100}, container: 'body', placement: 'auto', viewport:'#e10dashboardWidget'});";
+			$c .= "$('#e10dashboardWidget table.e10-cal-small>tbody>tr>td.day.tooltips').popover({content:function(){return calTooltips[$(this).attr('data-date')];}, html: true, trigger: 'focus', delay: {'show': 0, 'hide': 500}, container: 'body', placement: 'auto', viewport:'#e10dashboardWidget'});";
 			$c .= "</script>\n";
 		}
 		return $c;

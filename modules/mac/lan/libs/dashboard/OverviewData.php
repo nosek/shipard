@@ -95,6 +95,7 @@ class OverviewData extends Utility
 			$dk = $this->deviceKinds[$deviceKind];
 
 			$deviceRack = $r['rack'];
+
 			/*
 			if ($deviceRack && isset($this->racks[$deviceRack]) && isset($dk['showDashboardRacks']) && !$r['hideFromDR'])
 			{
@@ -138,6 +139,23 @@ class OverviewData extends Utility
 				$macDeviceCfg = json_decode($r['macDeviceCfg'], TRUE);
 				if ($macDeviceCfg)
 					$this->devices[$deviceNdx]['macDeviceCfg'] = $macDeviceCfg;
+			}
+
+			if ($deviceKind === 14 && isset($this->devices[$deviceNdx]['macDeviceCfg']['capsmanClient']) && intval($this->devices[$deviceNdx]['macDeviceCfg']['capsmanClient']))
+			{
+				$dgId = self::dgiWiFi;
+
+				$badgeQuantityId = 'statsd_capsman.ap.'.strtolower($deviceId).'_gauge';
+
+				$this->devices[$deviceNdx]['infoBadges'][] = [
+					'label' => 'WiFi',
+					'badgeQuantityId' => $badgeQuantityId,
+					'badgeParams' => [
+						'units' => ' 웃', 'precision' => 0,
+						'_title' => 'Počet připojených klientů',
+						'value_color' => 'COLOR:null|red>40|orange>20|00A000>=0',
+					],
+				];
 			}
 
 			// -- dashboard groups
@@ -199,6 +217,16 @@ class OverviewData extends Utility
 					'badgeQuantityId' => $badgeQuantityId,
 					'badgeParams' => ['dimensions' => 'uptime', 'units' => 'hours', 'divide' => 3600, 'value_color' => 'COLOR:null|red>2400|orange>1200|00A000>=0'],
 				];
+
+				if (isset($this->devices[$deviceNdx]['macDeviceCfg']) && intval($this->devices[$deviceNdx]['macDeviceCfg']['capsmanServer'] ?? 0))
+				{
+					$badgeQuantityId = 'snmp_'.$this->devices[$deviceNdx]['deviceId'].'.wifi-clients';
+					$this->devices[$deviceNdx]['deviceBadges'][] = [
+						'label' => 'WiFi',
+						'badgeQuantityId' => $badgeQuantityId,
+						'badgeParams' => ['units' => ' 웃', 'value_color' => 'COLOR:null|red>100|orange>50|00A000>=0'],
+					];
+				}
 			}
 			elseif ($deviceKind === 11)
 			{ // NAS

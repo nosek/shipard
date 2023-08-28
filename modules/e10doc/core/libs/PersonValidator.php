@@ -4,56 +4,71 @@ namespace e10doc\core\libs;
 use \Shipard\Base\Utility;
 
 /**
- * @class PersonValidator
+ * class PersonValidator
  */
 class PersonValidator extends Utility
 {
-  var $baseServicesURL = 'https://data.shipard.org/';
+  var $maxCount = 5;
+  var $debug = 0;
 
   public function batchCheck()
   {
-    $maxOldDate = new \DateTime('1 year ago');
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+    if (!$testNewPersons)
+      return;
 
     $q[] = 'SELECT * FROM [e10_persons_persons] as persons ';
 		array_push($q, ' WHERE 1');
 		array_push($q, ' AND [docState] = %i', 4000);
     array_push($q, ' AND [company] = %i', 1);
+    array_push($q, ' AND [disableRegsChecks] = %i', 0);
 
-    array_push($q, ' AND EXISTS (SELECT person FROM e10doc_core_heads WHERE persons.ndx = person AND dateAccounting > %d', $maxOldDate,
-        ' AND docType IN %in', ['invno', 'invni', 'cash', 'cashreg'], ')');
-    
-    array_push($q, ' AND EXISTS (SELECT recid FROM e10_persons_address WHERE persons.ndx = recid',
-        ' AND tableid = %s', 'e10.persons.persons', 
-        ' AND country = %s', 'cz', 
-        ')');
+    array_push($q, ' AND (');
+    array_push($q, ' EXISTS (SELECT ndx FROM e10_persons_personsValidity WHERE persons.ndx = person AND [valid] = %i)', 0);
+    array_push($q, ' OR NOT EXISTS (SELECT ndx FROM e10_persons_personsValidity WHERE persons.ndx = person)');
+    array_push($q, ')');
 
-		array_push($q, ' LIMIT 0, 500');
+		array_push($q, ' LIMIT 0, %i', $this->maxCount);
 
 		$rows = $this->db()->query($q);
 		foreach ($rows as $r)
 		{
-      $oidRecData = $this->db()->query('SELECT [valueString] FROM [e10_base_properties] WHERE [tableid] = %s', 'e10.persons.persons', 
-                            ' AND [recid] = %i', $r['ndx'], 
-                            ' AND  [property] = %s', 'oid', ' AND [group] = %s', 'ids')->fetch();
+      if ($this->debug)
+        echo "* ".$r['fullName']."\n";
+      $pv = new \e10\persons\libs\register\Validator($this->app());
+      $pv->setPersonNdx($r['ndx']);
+      $pv->checkPerson();
 
-      if (!$oidRecData)
-        continue;
-      
-      $oid = $oidRecData['valueString'];
+      sleep(1);
+		}
+  }
 
-      $url = $this->baseServicesURL.'persons/cz/'.$oid.'/json';
+  public function batchRepair()
+  {
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+    if (!$testNewPersons)
+      return;
 
-      $resultDataStr = file_get_contents($url);
-      $resultData = json_decode($resultDataStr, TRUE);
-      if (!$resultData || !isset($resultData['status']) || !$resultData['status'])
-      {
-        echo "\n#{$r['ndx']}: `{$oid}` {$r['fullName']} "."\n";
-        echo "  --> ".$url."\n";
-        echo "    ### ERROR ### \n".$resultDataStr."    ### ^^^^^ ### \n\n";
-      }
+    $q[] = 'SELECT * FROM [e10_persons_persons] as persons ';
+		array_push($q, ' WHERE 1');
+		array_push($q, ' AND [docState] = %i', 4000);
+    array_push($q, ' AND [company] = %i', 1);
+    array_push($q, ' AND [disableRegsChecks] = %i', 0);
 
-      echo ".";
-      sleep(5);
+    array_push($q, ' AND (');
+    array_push($q, ' EXISTS (SELECT ndx FROM e10_persons_personsValidity WHERE persons.ndx = person AND [valid] = %i)', 2);
+    array_push($q, ')');
+
+		array_push($q, ' LIMIT 0, %i', $this->maxCount);
+
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+      if ($this->debug)
+        echo "* ".$r['fullName']."\n";
+      $pv = new \e10\persons\libs\register\Validator($this->app());
+      $pv->setPersonNdx($r['ndx']);
+      $pv->checkPerson(1);
 		}
   }
 }

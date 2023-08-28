@@ -17,13 +17,23 @@ class ViewerHelpdeskAdmins extends TableViewGrid
 	var $usersSections = NULL;
 	var $allSections = NULL;
 
+	/** @var \hosting\core\TableDataSources */
+	var $tableDataSources;
+	var $helpdeskDataSources;
+
 	var $classification = [];
 	var $linkedPersons = [];
 	var $notifications = [];
 
+	CONST cmMulti = 0, cmSingle = 1;
+	var $colsMode = self::cmSingle;
+
 	public function init ()
 	{
 		parent::init();
+
+		$this->tableDataSources = $this->app()->table('hosting.core.dataSources');
+		$this->helpdeskDataSources = $this->tableDataSources->getUsersHelpdeskDataSources();
 
 		$this->loadNotifications ();
 
@@ -59,7 +69,9 @@ class ViewerHelpdeskAdmins extends TableViewGrid
 		$g['priority'] = '*P';
     $g['ds'] = 'Databáze';
 		$g['subject'] = 'Předmět';
-		$g['stateInfo'] = 'Stav';
+
+		if ($this->colsMode === self::cmMulti)
+			$g['stateInfo'] = 'Stav';
 
 		$this->setGrid ($g);
 		$this->setMainQueries ();
@@ -76,12 +88,21 @@ class ViewerHelpdeskAdmins extends TableViewGrid
 		{
 			$listItem['rowNtfBadge'] = "<span style='display: relative'><span class='e10-ntf-badge' style='display: inline;'>".count($this->notifications[$item ['ndx']])."</span></span>";
 		}
+
 		$listItem ['subject'] = [['text' => $item['subject'], 'class' => 'block']];
 		//$listItem ['author'] = $item['authorName'];
 		//$listItem ['date'] = Utils::datef($item['dateCreate'], '%S%t');
 
-		$listItem ['stateInfo'] = [];
-		$this->table->ticketStateInfo($item, $listItem ['stateInfo']);
+		if ($this->colsMode === self::cmMulti)
+		{
+			$listItem ['stateInfo'] = [];
+			$this->table->ticketStateInfo($item, $listItem ['stateInfo']);
+		}
+		else
+		{
+			//$listItem ['subject'][0]['class'] .= ' e10-bold lh16';
+			$this->table->ticketStateInfo($item, $listItem ['subject']);
+		}
 
 		$listItem ['ticketId'] = $item['ticketId'];
 
@@ -109,10 +130,10 @@ class ViewerHelpdeskAdmins extends TableViewGrid
 	{
 		if (isset ($this->classification [$item ['pk']]))
 		{
-			if (!isset($item ['subject']))
-				$item ['subject'] = [];
-			else
-				$item ['subject'][0]['class'] .= ' e10-bold';
+			//if (!isset($item ['subject']))
+			//	$item ['subject'] = [];
+			//else
+			//	$item ['subject'][0]['class'] .= ' e10-bold';
 
 			forEach ($this->classification [$item ['pk']] as $clsfGroup)
 				$item ['subject'] = array_merge ($item ['subject'], $clsfGroup);
@@ -126,12 +147,24 @@ class ViewerHelpdeskAdmins extends TableViewGrid
 
 		$q = [];
 		array_push ($q, ' SELECT [tickets].*,');
+
+		array_push ($q, ' (SELECT COUNT(*) FROM e10_base_notifications WHERE state = 0',
+		' AND tickets.ndx = recIdMain',
+		' AND personDest = %i', $this->app()->userNdx(),
+		' AND tableId = %s', $this->table->tableId());
+		array_push ($q, ' LIMIT 1) AS [ntf], ');
+
 		array_push ($q, ' authors.fullName AS authorName,');
     array_push ($q, ' ds.shortName AS dsName');
 		array_push ($q, ' FROM [helpdesk_core_tickets] AS [tickets]');
 		array_push ($q, ' LEFT JOIN [e10_persons_persons] AS [authors] ON [tickets].[author] = [authors].ndx');
     array_push ($q, ' LEFT JOIN [hosting_core_dataSources] AS [ds] ON [tickets].[dataSource] = [ds].ndx');
 		array_push ($q, ' WHERE 1');
+
+		$enabledDS = array_keys($this->helpdeskDataSources);
+		if ($this->app()->hasRole('admin'))
+			$enabledDS[] = 0;
+		array_push ($q, ' AND [tickets].[dataSource] IN %in', $enabledDS);
 
 		// -- special queries
 		$qv = $this->queryValues ();
@@ -152,6 +185,7 @@ class ViewerHelpdeskAdmins extends TableViewGrid
 			array_push ($q, ' AND [tickets].[dataSource] IN %in', array_keys($qv['ds']));
 
 		// -- fulltext
+		$forceArchive = FALSE;
 		if ($fts != '')
 		{
 			array_push ($q, ' AND (');
@@ -159,9 +193,48 @@ class ViewerHelpdeskAdmins extends TableViewGrid
 			array_push ($q, ' OR [tickets].[text] LIKE %s', '%'.$fts.'%');
 			array_push ($q, ' OR [tickets].[ticketId] LIKE %s', $fts.'%');
 			array_push ($q, ')');
+			$forceArchive = TRUE;
 		}
 
-		$this->queryMain ($q, 'tickets.', ['-[proposedDeadline] DESC', '[priority]', '[dateTouch]']);
+		$tablePrefix = 'tickets.';
+		$mainQuery = $this->mainQueryId ();
+
+		// -- active
+		if ($mainQuery === 'active' || $mainQuery === '')
+		{
+			if ($forceArchive)
+			{
+				array_push($q, " AND ({$tablePrefix}[docStateMain] != 4");
+			}
+			else
+			{
+				array_push($q, " AND ({$tablePrefix}[docStateMain] < 4");
+			}
+
+			array_push ($q, ' OR ');
+			array_push ($q, ' EXISTS (SELECT ndx FROM e10_base_notifications WHERE state = 0',
+											' AND tickets.ndx = recIdMain',
+											' AND personDest = %i', $this->app()->userNdx(),
+											' AND tableId = %s', $this->table->tableId());
+			array_push ($q, ')');
+
+			array_push ($q, ')');
+		}
+
+		// -- archive
+		if ($mainQuery === 'archive')
+			array_push ($q, " AND {$tablePrefix}[docStateMain] = %i", 5);
+
+		// trash
+		if ($mainQuery === 'trash')
+			array_push ($q, " AND {$tablePrefix}[docStateMain] = %i", 4);
+
+		if ($mainQuery === 'all')
+			array_push ($q, " ORDER BY [ntf] DESC, {$tablePrefix}[docStateMain], [priority], -[proposedDeadline] DESC, [dateTouch]");
+		else
+			array_push ($q, " ORDER BY [ntf] DESC, {$tablePrefix}[docStateMain], [priority], -[proposedDeadline] DESC, [dateTouch]");
+
+		array_push ($q, $this->sqlLimit ());
 
 		$this->runQuery ($q);
 	}
@@ -188,9 +261,14 @@ class ViewerHelpdeskAdmins extends TableViewGrid
 
 		// -- data sources
 		$qds[] = 'SELECT * FROM hosting_core_dataSources AS ds';
-		array_push ($qds, ' WHERE [helpdeskMode] != %i', 0);
+		array_push ($qds, ' WHERE 1');
+		array_push ($qds, ' AND [helpdeskMode] != %i', 0);
+		array_push ($qds, ' AND [ndx] IN %in', array_keys($this->helpdeskDataSources));
+		array_push ($qds, ' AND [docState] = %i', 4000);
 		array_push ($qds, ' ORDER BY ds.shortName');
 		$dss = $this->db()->query ($qds)->fetchPairs ('ndx', 'shortName');
+		if ($this->app()->hasRole('admin'))
+			$dss['0'] = 'Bez databáze';
 		$this->qryPanelAddCheckBoxes($panel, $qry, $dss, 'ds', 'Databáze');
 
 		$panel->addContent(['type' => 'query', 'query' => $qry]);

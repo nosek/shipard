@@ -2,6 +2,7 @@
 
 namespace Shipard\UI\Core;
 use \Shipard\Utils\Utils;
+use \Shipard\Utils\Json;
 use \Shipard\Viewer\TableView;
 
 
@@ -327,11 +328,18 @@ class ContentRenderer extends \Shipard\Base\BaseObject
 		$o->renderAll = 1;
 		if (isset($cp['sumTable']['queryParams']))
 			$o->setQueryParams($cp['sumTable']['queryParams']);
+		if (isset($cp['sumTable']['options']))
+			$o->setOptions($cp['sumTable']['options']);
 		$o->init();
 		$o->loadData();
 		$o->renderCode();
 
-		return $o->code;
+		$c = '';
+		if (isset($cp['title']) && $cp['title'])
+		$c .= '<div class="subtitle">'.$this->app()->ui()->composeTextLine($cp['title']).'</div>';
+		$c .= $o->code;
+
+		return $c;
 	}
 
 	public function createCodeAttachments ($cp, $app)
@@ -345,7 +353,11 @@ class ContentRenderer extends \Shipard\Base\BaseObject
 		// -- files
 		if (isset ($attachments['hasDownload']))
 		{
-			$c .= "<div class='e10-pane e10-pane-table mt1'>";
+			if (isset($cp['downloadClass']))
+				$c .= "<div class='{$cp['downloadClass']}'>";
+			else
+				$c .= "<div class='e10-pane e10-pane-table mt1'>";
+
 			if (isset($cp['downloadTitle']) && $cp['downloadTitle'])
 			{
 				$c .= '<div class="subtitle">' . $this->app()->ui()->composeTextLine($cp['downloadTitle']) . '</div>';
@@ -366,8 +378,11 @@ class ContentRenderer extends \Shipard\Base\BaseObject
 			$c .= '</div>';
 		}
 
+		if (isset ($cp['downloadOnly']))
+			return $c;
+
 		// -- images
-		$fullSizeTreshhold = 4;
+		$fullSizeTreshhold = 10;
 		if (isset ($cp['fullSizeTreshold']))
 			$fullSizeTreshhold = $cp['fullSizeTreshold'];
 		if (isset ($attachments['images']) && count ($attachments['images']))
@@ -399,16 +414,30 @@ class ContentRenderer extends \Shipard\Base\BaseObject
 				}
 				else
 				{
-					/*
-					$c .= "<span class='$itemClass'>".
-							"<a href='$fileUrl' target='_new'><img src='$thumbUrl' title=\"$thumbTitle\"></a>".
-							'</span>';
-					*/
 					$c.= "<span class='$itemClass'>";
-					$c .= "<span class='df2-action-trigger' data-url-download='$fileUrl' data-action='open-link' data-popup-id='vdatt' data-with-shift='tab'>".
-						"<img src='$thumbUrl' title=\"$thumbTitle\">".
-						'</span>';
-					$c .= '</span>';
+
+					if ($a['fileKind'] === 2 && $itemClass === 'e10-attbox-one' && $a['i3'] > 1)
+					{ // PDF
+						$pgCount = min(10, $a['i3']);
+						for ($pgn = 1; $pgn <= $pgCount; $pgn++)
+						{
+							$thumbUrl = \E10\Base\getAttachmentUrl ($app, $a, $thumbSize, 2 * $thumbSize, FALSE, ['-p'.$pgn]);
+							$c .= "<span class='df2-action-trigger' data-url-download='$fileUrl' data-action='open-link' data-popup-id='vdatt' data-with-shift='tab'>".
+							"<img src='$thumbUrl' title=\"$thumbTitle\">".
+							'</span>';
+							$c .= "<span class='label label-info'>".Utils::es('Strana '.$pgn.' / '.$a['i3']).'</span>';
+							if ($pgn !== $pgCount)
+								$c .= "<hr>";
+						}
+						$c .= '</span>';
+					}
+					else
+					{
+						$c .= "<span class='df2-action-trigger' data-url-download='$fileUrl' data-action='open-link' data-popup-id='vdatt' data-with-shift='tab'>".
+							"<img src='$thumbUrl' title=\"$thumbTitle\">".
+							'</span>';
+						$c .= '</span>';
+					}
 				}
 			}
 			$c .= '</div>';
@@ -867,6 +896,47 @@ class ContentRenderer extends \Shipard\Base\BaseObject
 			$c .= '</div>';
 		}
 
+		$c .= '</div>';
+
+		return $c;
+	}
+
+	function createCodeCard ($card)
+	{
+		$c = '';
+
+		foreach ($card as $cardPartId => $cardPart)
+		{
+			$c .= $this->createCodeCardPart ($card, $cardPartId, $cardPart);
+		}
+
+		return $c;
+	}
+
+	function createCodeCardPart ($card, $partId, $cardPart)
+	{
+		$c = '';
+
+		$class = isset($cardPart['class']) ? $cardPart['class'] : 'card-'.Utils::es($partId);
+		$c .= "<div class='$class'>";
+
+		if (isset($cardPart['value']))
+			$c .= $this->app()->ui()->composeTextLine ($cardPart['value']);
+		elseif (isset($cardPart['values']))
+		{
+			foreach ($cardPart['values'] as $v)
+			{
+				$c .= $this->app()->ui()->composeTextLine ($v);
+			}
+		}
+		elseif (isset($cardPart['content']))
+		{
+			$cr = new ContentRenderer ($this->app);
+			$cr->content = $cardPart['content'];
+			$c  .= $cr->createCode();
+
+			//$c .= $this->render();
+		}
 		$c .= '</div>';
 
 		return $c;

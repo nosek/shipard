@@ -1,0 +1,226 @@
+/*:root {
+  --accentColor: #93C572;
+ --navBackground: #E8E8E8;
+ --primaryColumn: whitesmoke;
+ --secondaryColumn: white;
+ --columnSeparator: gainsboro;
+ --numpadBackground: whitesmoke;
+ --numpadColor: #383838;
+ --numpadBorder: silver;
+ --numpadClose: gainsboro;
+ --numpadOk: var(--accentColor);
+ --itemBorder: gainsboro;
+ --cardBackground: white;
+}*/
+
+
+
+
+
+
+body > div.fullScreenModal {
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
+  background-color: #101010D0;
+  top: 0;
+  left: 0;
+
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  align-content: stretch;
+}
+
+div.shp-numpad-container {
+width: 25vw;
+background-color: var(--numpadBackground);
+border: 4px solid #10101010;
+border-radius: 4px;
+}
+
+table.shp-numpad-keyboard {
+ width: 100%;
+}
+
+table.shp-numpad-keyboard td {
+padding: .6rem;
+width: 25%;
+text-align: center;
+border: 2px solid var(--numpadBorder);
+background-color: var(--numpadBackground);
+color: var(--numpadColor);
+}
+
+table.shp-numpad-keyboard td.ok.shp-widget-action {
+background-color: var(--numpadOk);
+}
+
+
+table.shp-numpad-keyboard td.c.shp-widget-action {
+background-color: var(--numpadClose);
+}
+
+
+table.shp-numpad-keyboard td.d.shp-widget-action {
+font-size: 200%;
+line-height: 200%;
+}
+
+table.shp-numpad-keyboard td.b.shp-widget-action {
+font-size: 200%;
+line-height: 200%;
+}
+
+table.shp-numpad-keyboard td.n.shp-widget-action {
+padding: 2rem;
+}
+
+
+div.shp-workplace-login-users {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3rem;
+  padding: .6rem;
+
+}
+div.shp-workplace-login-users > *
+{
+  flex: 1 1 auto;
+  min-width: 10rem;
+  text-align: center;
+}
+
+
+
+body {
+  height: 100vh;
+ }
+
+ div.e10-widget-terminal {height: 100%;}
+
+ .app-container {
+   height: 100vh;
+   display: grid;
+   grid-template-columns: 1fr;
+   grid-template-rows: min-content 1fr min-content;
+   gap: 0px 0px;
+   grid-auto-flow: row;
+   grid-template-areas:
+     "app-nav"
+     "app-content"
+     "app-footer";
+ }
+
+ .app-content { grid-area: app-content; min-height: 0; overflow-y: auto;}
+
+.app-footer { grid-area: app-footer;}
+
+
+
+
+
+$shipard-primary: #93C572;
+$shipard-secondary: #A9A9A9;
+$nav-bg-light: #E8E8E8;
+$nav-bg-dark: #303030;
+$card-bg-light: white;
+$card-bg-dark: #505050;
+/*$card-bg-dark: #585858;*/
+$card-border-light: gainsboro;
+$card-border-dark: dimgray;
+$nav-pills-color-light: black;
+$nav-pills-color-dark: whitesmoke;
+$numpad-bg-light: whitesmoke;
+/*$numpad-bg-dark: #404040;*/
+$numpad-bg-dark: #585858;
+/*--numpadColor: #383838;*/
+$numpad-border-light: silver;
+$numpad-border-dark: dimgray;
+$numpad-close-light: gainsboro;
+$numpad-close-dark: gray;
+$numpad-ok: $shipard-primary;
+$dashboard-button-color: black;
+$accordion-bg-light: white;
+$accordion-bg-dark: #505050;
+/*$accordion-bg-dark: #585858;*/
+$accordion-border-light: gainsboro;
+$accordion-border-dark: dimgray;
+$nav-border-light: gainsboro;
+$nav-border-dark: #202020;
+$universal-border-light: gainsboro;
+$universal-border-dark: #696969;
+$list-border-light: gainsboro;
+$list-border-dark: #606060;
+
+$success: #198754;
+$info: #0dcaf0;
+$warning: #ffc107;
+$danger: #dc3545;
+$light: #f8f9fa;
+$dark: #212529;
+
+$theme-colors: (
+  "primary":  $shipard-primary,
+  "secondary": $shipard-secondary,
+  "success": $success,
+  "info": $info,
+  "warning": $warning,
+  "danger": $danger,
+  "light": $light,
+  "dark": $dark,
+);
+
+$body-bg-dark: #383838;
+/*$body-bg-dark: #404040;*/
+$body-bg: whitesmoke;
+/*$body-color-dark: #adb5bd;*/
+/*$body-color-dark: #D8D8D8;*/
+$body-color-dark: #F0F0F0;
+$body-color: #212529;
+
+$navbar-light-color: #282828;
+$navbar-dark-color: #D8D8D8;
+$navbar-light-active-color: $shipard-primary;
+$navbar-dark-active-color: $shipard-primary;
+$navbar-light-brand-color: dimgray;
+$navbar-dark-brand-color: gainsboro;
+$navbar-light-hover-color: $shipard-primary;
+$navbar-dark-hover-color: $shipard-primary;
+
+$nav-pills-link-active-color: black;
+$nav-pills-link-active-bg: $shipard-primary;
+
+$accordion-button-active-bg: transparent;
+$accordion-button-focus-border-color: transparent;
+$accordion-button-focus-box-shadow: none;
+
+$form-check-input-checked-color: $shipard-primary;;
+$form-check-input-checked-border-color: var(--universalBorder);
+$form-check-input-checked-border-color: orange;
+
+$form-check-input-focus-border: transparent;
+$form-check-input-focus-box-shadow: none;
+
+$input-focus-border-color: var(--universalBorder);
+$input-focus-box-shadow: none;
+
+$input-focus-bg: var(--formBackground);
+
+
+@import "../../../../../www-root/sc/bs/5.3/scss/bootstrap.scss";
+
+@import "_colors.scss";
+@import "_cashbox.scss";
+@import "_numpad.scss";
+@import "_navbar.scss";
+@import "_other.scss";
+@import "_buttons.scss";
+@import "_forms.scss";
+@import "_lists.scss";
+@import "_app.scss";
+@import "_viewers.scss";
+

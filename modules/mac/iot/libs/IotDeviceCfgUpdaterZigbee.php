@@ -2,7 +2,7 @@
 
 namespace mac\iot\libs;
 
-use e10\Utility, \e10\utils, \e10\json, e10\uiutils;
+use e10\Utility, \Shipard\Utils\Utils, \e10\json, e10\uiutils;
 use \mac\iot\libs\IotDeviceCfgUpdater;
 
 /**
@@ -14,7 +14,20 @@ class IotDeviceCfgUpdaterZigbee extends IotDeviceCfgUpdater
 
 	protected function createDataModel()
 	{
-		$topic = 'zigbee2mqtt'.'/'.$this->iotDeviceRecData['friendlyId'];
+		$topicBegin = 'zigbee2mqtt';
+
+		if ($this->iotDeviceRecData['nodeServer'])
+		{
+			$nodeServerRecData = $this->app()->loadItem($this->iotDeviceRecData['nodeServer'], 'mac.lan.devices');
+			if ($nodeServerRecData)
+			{
+				$macDeviceCfg = json_decode($nodeServerRecData['macDeviceCfg'], TRUE);
+				if (isset($macDeviceCfg['zigbee2MQTTBaseTopic']) && $macDeviceCfg['zigbee2MQTTBaseTopic'] !== '')
+					$topicBegin = $macDeviceCfg['zigbee2MQTTBaseTopic'];
+			}
+		}
+
+		$topic = $topicBegin.'/'.$this->iotDeviceRecData['friendlyId'];
 		$this->dataModel['deviceTopic'] = $topic;
 
 		$this->dataModel['properties'] = [];
@@ -39,6 +52,20 @@ class IotDeviceCfgUpdaterZigbee extends IotDeviceCfgUpdater
 			$this->createDataModel_DoItem($e, 'properties');
 		}
 
+		if (isset($this->deviceInfo['definition']['options']))
+		{
+			$simulatedBrightnessOption = Utils::searchArray($this->deviceInfo['definition']['options'], 'name', 'simulated_brightness');
+			if ($simulatedBrightnessOption)
+			{
+				$this->dataModel['properties']['action_brightness_delta'] = [
+					'itemType' => 'action',
+					'data-type' => "enum",
+					'enum' => ['__changed__value__' => 'Změna hodnoty'],
+					'order' => 2,
+				];
+			}
+		}
+
 		$this->dataModel['properties'] = \E10\sortByOneKey($this->dataModel['properties'], 'order', TRUE);
 	}
 
@@ -58,17 +85,17 @@ class IotDeviceCfgUpdaterZigbee extends IotDeviceCfgUpdater
 		{
 			$finalItemType = 'settings';
 			$order = 500;
-		}	
+		}
 		elseif ($access === 1 && $itemType === 'properties' && $item['name'] === 'action')
 		{
 			$finalItemType = 'action';
 			$order = 1;
-		}	
+		}
 		elseif ($access === 1 && $itemType === 'properties')
 		{
 			$finalItemType = 'info';
 			$order = 1000;
-		}	
+		}
 
 		$order = $order + count($this->dataModel['properties']);
 
@@ -89,7 +116,7 @@ class IotDeviceCfgUpdaterZigbee extends IotDeviceCfgUpdater
 				$p['value-on'] = $item['value_on'];
 				$p['enumGet'][$item['value_on']] = ['title' => $item['value_on']];
 				$p['enumSet'][$item['value_on']] = ['title' => $item['value_on']];
-			}	
+			}
 			if (isset($item['value_on']))
 			{
 				$p['value-off'] = $item['value_off'];
@@ -112,7 +139,7 @@ class IotDeviceCfgUpdaterZigbee extends IotDeviceCfgUpdater
 		{
 			$p['data-type'] = 'enum';
 			$p['enum'] = [];
-			foreach ($item['values'] as $v)	
+			foreach ($item['values'] as $v)
 			{
 				$p['enum'][$v] = $this->actionEnumItem ($v);//['title' => $v];
 			}
@@ -130,7 +157,7 @@ class IotDeviceCfgUpdaterZigbee extends IotDeviceCfgUpdater
 	{
 		$item = ['title' => $actionId];
 
-
+		/*
 		$hints = [
 			'brightness_move_up' => ['loopAction' => 1, 'stopAction' => 'brightness_stop'],
 			'brightness_move_down' => ['loopAction' => 1, 'stopAction' => 'brightness_stop'],
@@ -140,28 +167,26 @@ class IotDeviceCfgUpdaterZigbee extends IotDeviceCfgUpdater
 
 		if (isset($hints[$actionId]))
 			$item = array_merge($item, $hints[$actionId]);
-
-
-		//$item['pokus'] = 'test12';
-		//$this->iotDeviceModel
+		*/
 
 		return $item;
 	}
 
 	protected function applyDevicePropertyHints($propertyId, &$property)
 	{
-		if ($propertyId === 'temperature' || $propertyId === 'humidity' || $propertyId === 'occupancy')
+		if ($propertyId === 'temperature' || $propertyId === 'humidity' || $propertyId === 'occupancy' || $propertyId === 'illuminance_lux')
 			$this->dataModel['sensors'][] = $propertyId;
 	}
 
-	public function update($iotDeviceRecData)
+	public function update($iotDeviceRecData, &$update)
 	{
-		parent::update($iotDeviceRecData);
+		parent::update($iotDeviceRecData, $update);
 
 		$this->deviceInfo = json_decode($this->cfgRecData['deviceInfoData'], TRUE);
 
-
 		$this->createDataModel();
+		if ($iotDeviceRecData['deviceTopic'] !== $this->dataModel['deviceTopic'])
+			$update['deviceTopic'] = $this->dataModel['deviceTopic'];
 
 		$finalCfg = [
 			'dataModel' => $this->dataModel,

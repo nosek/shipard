@@ -62,8 +62,6 @@ class WkfDocsFromInbox extends TableView
 
 	var $issuesMarks;
 
-	var $testISDoc = 0;
-
 	public function init ()
 	{
 		$this->objectSubType = TableView::vsDetail;
@@ -71,7 +69,6 @@ class WkfDocsFromInbox extends TableView
 
 		$this->initMainQueries();
 
-		$this->testISDoc = intval($this->app()->cfgItem ('options.experimental.testISDoc', 0));
 		$this->tableIssues = $this->app->table ('wkf.core.issues');
 		$this->tableSections = $this->app->table ('wkf.base.sections');
 		$this->usersSections = $this->tableSections->usersSections();
@@ -429,14 +426,8 @@ class WkfDocsFromInbox extends TableView
 		}
 
 		$docButtons = [];
-		$docButtons[] = [
-			'type' => 'action', 'text' => 'Pořídit doklad', 'icon' => 'system/actionAdd', 'action' => 'newform', 'data-table' => 'e10doc.core.heads',
-			'actionClass' => 'btn btn-primary', 'class' => 'pt1', '__type' => 'button', 'data-viewer' => $this->queryParam ('mainViewerId'),
-			'data-addparams' => '__fromIssueNdx='.$ndx.'&__fromIssueSubject='.urlencode($item['subject']),
-		];
 
-
-		if ($this->testISDoc && isset($this->atts[$item ['ndx']]['files'][0]))
+		if (isset($this->atts[$item ['ndx']]['files'][0]))
 		{
 			foreach ($this->atts[$item ['ndx']]['files'] as $attFile)
 			{
@@ -444,12 +435,38 @@ class WkfDocsFromInbox extends TableView
 					continue;
 
 				$docButtons[] = [
-						'type' => 'action', 'text' => 'Importovat', 'icon' => 'system/actionAdd', 'action' => 'newform', 'data-table' => 'e10doc.core.heads', 'data-pk' => '0',
+						'type' => 'action', 'text' => 'Pořídit doklad', 'icon' => 'system/actionAdd', 'action' => 'newform', 'data-table' => 'e10doc.core.heads', 'data-pk' => '0',
 						'actionClass' => 'btn btn-primary', 'class' => 'pt1', '__type' => 'button', 'data-viewer' => $this->queryParam ('mainViewerId'),
 						'data-create-params' => '__inboxNdx='.$ndx.'&__ddfId='.$attFile['ddfId'].'&__ddfNdx='.$attFile['ddfNdx'],
 						'data-create-doc' => 1
 				];
+				break;
 			}
+		}
+		if (!count($docButtons) && isset($this->atts[$item ['ndx']]['images'][0]))
+		{
+			foreach ($this->atts[$item ['ndx']]['images'] as $attFile)
+			{
+				if (!$attFile['ddfId'])
+					continue;
+
+				$docButtons[] = [
+						'type' => 'action', 'text' => 'Pořídit doklad', 'icon' => 'system/actionAdd', 'action' => 'newform', 'data-table' => 'e10doc.core.heads', 'data-pk' => '0',
+						'actionClass' => 'btn btn-primary', 'class' => 'pt1', '__type' => 'button', 'data-viewer' => $this->queryParam ('mainViewerId'),
+						'data-create-params' => '__inboxNdx='.$ndx.'&__ddfId='.$attFile['ddfId'].'&__ddfNdx='.$attFile['ddfNdx'],
+						'data-create-doc' => 1
+				];
+				break;
+			}
+		}
+
+		if (!count($docButtons))
+		{
+			$docButtons[] = [
+				'type' => 'action', 'text' => 'Pořídit doklad', 'icon' => 'system/actionAdd', 'action' => 'newform', 'data-table' => 'e10doc.core.heads',
+				'actionClass' => 'btn btn-primary', 'class' => 'pt1', '__type' => 'button', 'data-viewer' => $this->queryParam ('mainViewerId'),
+				'data-addparams' => '__fromIssueNdx='.$ndx.'&__fromIssueSubject='.urlencode($item['subject']),
+			];
 		}
 
 		$item ['pane']['body'][] = ['value' => $docButtons, 'class' => 'padd5 e10-bg-t6'];

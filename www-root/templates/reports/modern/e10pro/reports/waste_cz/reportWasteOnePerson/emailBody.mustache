@@ -1,0 +1,15 @@
+{{textMode}}{{#data.reportTexts.emailBody}}{{{data.reportTexts.emailBody}}}{{/data.reportTexts.emailBody}}
+{{^data.reportTexts.emailBody}}
+Dobrý den,
+
+zasíláme vám {{data.reportTitle}} za {{data.periodNameL}} {{data.periodValue}}.
+Pokud se nám do 5-ti dnů neozvete, považujeme tyto údaje za schválené.
+
+S pozdravem
+
+--
+{{data.owner.fullName}}
+{{#data.owner_contacts}}
+{{name}}: {{value}}
+{{/data.owner_contacts}}
+{{/data.reportTexts.emailBody}}

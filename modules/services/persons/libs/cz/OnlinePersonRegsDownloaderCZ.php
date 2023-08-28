@@ -19,11 +19,11 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
    * https://wwwinfo.mfcr.cz/ares/ares_xml_basic.html.cz
    */
   function loadARESCore()
-  { 
+  {
     $logRecord = $this->log->newLogRecord();
     $logRecord->init(LogRecord::liDownloadRegisterData, 'services.persons.persons', $this->personNdx);
 
-		$downloadUrl = 'https://wwwinfo.mfcr.cz/cgi-bin/ares/darv_bas.cgi?ico='.$this->personData->personId;
+		$downloadUrl = 'https://wwwinfo.mfcr.cz/cgi-bin/ares/darv_bas.cgi?ico='.$this->personData->personId.'&aktivni=false';
     $logRecord->addItem('ares-download-init', '', ['url' => $downloadUrl]);
 
     $file = @file_get_contents ($downloadUrl);
@@ -71,7 +71,7 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
         $logRecord->addItem('ares-download-parse-error', '', ['xml-text' => $file]);
         $logRecord->setStatus(LogRecord::lstError);
       }
-    }  
+    }
     $logRecord->save();
   }
 
@@ -94,7 +94,7 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
       $logRecord->setStatus(LogRecord::lstError, TRUE);
       return;
     }
-		
+
     $xml = @simplexml_load_string ($file);
 		if (!$xml)
 		{
@@ -109,7 +109,7 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
   }
 
 
-  /** 
+  /**
    * https://adisspr.mfcr.cz/pmd/dokumentace/webove-sluzby-spolehlivost-platcu
    */
   function loadVAT()
@@ -123,7 +123,7 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
       $vatId = $this->personData->data['person']['vatID'];
       if ($vatId === '')
         return;
-    }  
+    }
 
     $logRecord = $this->log->newLogRecord();
     $logRecord->init(LogRecord::liDownloadRegisterData, 'services.persons.persons', $this->personNdx);
@@ -175,7 +175,7 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
     $qryString .= "</Kriteria>\n";
     $qryString .= "</VerejnyWebDotaz>\n";
 
-    
+
     $queryfileName = Utils::tmpFileName('xml');
     file_put_contents($queryfileName, $qryString);
 
@@ -247,8 +247,8 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
   {
     $street = $src['NU'] ?? '';
     if ($street === '')
-      $street = $src['NU'] ?? '';
-     if (isset($src['CD'])) 
+      $street = $src['NCO'] ?? '';
+     if (isset($src['CD']))
       $dest['street'] = $street . ' ' . $src['CD'];
      else
       $dest['street'] = $street;
@@ -274,16 +274,16 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
 
   protected function saveRegisterData ($personNdx, $regType, string $regData, string $checkSum, string $subId)
   {
-    $exist = $this->db()->query('SELECT * FROM [services_persons_regsData] WHERE [person] = %i', $personNdx, 
+    $exist = $this->db()->query('SELECT * FROM [services_persons_regsData] WHERE [person] = %i', $personNdx,
     ' AND [subId] = %s', $subId, ' AND [regType] = %i', $regType)->fetch();
 
     if (!$exist)
     {
       $insert = [
-        'person' => $personNdx, 
-        'regType' => $regType, 
-        'subId' => $subId, 
-        'srcData' => $regData, 
+        'person' => $personNdx,
+        'regType' => $regType,
+        'subId' => $subId,
+        'srcData' => $regData,
         'timeUpdated' => new \DateTime(),
         'srcDataCheckSum' => $checkSum,
         'imported' => 0,
@@ -294,7 +294,7 @@ class OnlinePersonRegsDownloaderCZ extends \services\persons\libs\OnlinePersonRe
     else
     {
       $update = [
-        'srcData' => $regData, 
+        'srcData' => $regData,
         'timeUpdated' => new \DateTime(),
         'srcDataCheckSum' => $checkSum,
         'imported' => 0,

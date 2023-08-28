@@ -22,12 +22,14 @@
 	"dataPackages": [
 		"install/data/common/e10-robots",
 		"install/data/common/e10-min-docs-dataset",
-		"install/data/countries/cz/property/property"
+		"install/data/countries/cz/property/property",
+
+		"install/data/countries/cz/debs/debs-accounts-default"
 	],
 
 	"demoData": {
 		"default": {
-			"name": "Demonstrační data 1", 
+			"name": "Demonstrační data 1",
 			"demoModule": "install/demo/modules/company-default",
 			"data": [
 				"install/demo/pkgs/cz/shipard-economy-default"

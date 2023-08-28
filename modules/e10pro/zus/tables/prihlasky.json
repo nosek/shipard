@@ -2,6 +2,7 @@
 	"id": "e10pro.zus.prihlasky", "sql": "e10pro_zus_prihlasky", "name": "Přihlášky ke studiu", "icon": "icon-child",
 	"columns": [
 		{"id": "ndx", "name": "id", "type": "int_ai"},
+		{"id": "docNumber", "name": "Číslo přihlášky", "type": "string", "len": 12, "options": ["ascii"]},
 		{"id": "skolniRok", "name": "Školní rok", "type": "enumString", "len": 10,
 			"enumCfg": {"cfgItem": "e10pro.zus.roky", "cfgValue": "", "cfgText": "nazev", "cfgPrint": "tisk"}},
 		{"id": "svp", "name": "ŠVP", "label": "Studium podle", "type": "enumInt", "options": ["saveOnChange"],
@@ -10,7 +11,7 @@
 			"enumCfg": {"cfgItem": "e10pro.zus.obory", "cfgValue": "id", "cfgText": "nazev"}},
 		{"id": "svpOddeleni", "name": "Oddělení", "type": "enumInt", "options": ["saveOnChange"],
 			"enumCfg": {"cfgItem": "e10pro.zus.oddeleni", "cfgValue": "id", "cfgText": "nazev"}},
-		{"id": "misto", "name": "Pobočka", "type": "int", "reference": "e10.base.places"},
+		{"id": "misto", "name": "Pobočka", "type": "int", "reference": "e10.base.places", "comboViewer": "e10.base.ViewPlacesComboLocalOffices"},
 		{"id": "stupen", "name": "Stupeň", "type": "enumInt",
 			"enumCfg": {"cfgItem": "e10pro.zus.stupne", "cfgValue": "", "cfgText": "nazev", "cfgPrint": "tisk"}},
 		{"id": "rocnik", "name": "Ročník", "type": "enumInt",
@@ -58,23 +59,39 @@
 
 		{"id": "note", "name": "Poznámka", "type": "memo"},
 
+		{"id": "talentovaZkouska", "name": "Talentová zkouška", "type": "enumInt",
+			"enumValues": {"0": "Neabsolvována", "1": "Absolvována"}},
+		{"id": "keStudiu", "name": "Doporučení k přijetí", "type": "enumInt",
+			"enumValues": {"0": "---", "1": "Doporučeno", "2": "Nedoporučeno"}},
+		{"id": "mistoStudia", "name": "Přijetí ke studiu v", "type": "enumInt",
+			"enumCfg": {"cfgItem": "e10pro.zus.mistaStudia", "cfgValue": "", "cfgText": "shortName"}},
+
 		{"id": "webSentDate", "name": "Datum a čas odeslání přihlášky z webu", "type": "timestamp"},
 		{"id": "confirmEmailDone", "name": "Potvrzovací email odeslán", "type": "logical"},
+
+    {"id": "dstStudent", "name": "Student", "type": "int", "reference": "e10.persons.persons"},
+    {"id": "dstStudium", "name": "Studium", "type": "int", "reference": "e10pro.zus.studium"},
 
 		{"id": "docState", "name": "Stav", "type": "int"},
 		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}
 	],
 	"views": [
-		{"id": "default", "class": "e10pro.zus.ViewPrihlasky", "detail": "e10pro.zus.ViewDetailPrihlaska"}
+		{
+			"id": "default", "class": "e10pro.zus.ViewPrihlasky",
+			"addWizard": [
+				{"class": "e10pro.zus.libs.WizardCreateStudentsFromEntries", "icon": "iconGenerateCertificates", "text": "Vytvořit studenty"}
+			],
+			"detail": "e10pro.zus.ViewDetailPrihlaska"
+		}
 	],
 	"forms": [
 		{"id": "default", "class": "e10pro.zus.FormPrihlaska"}
 	],
 	"reports": [
-		{"id": "prihlaska", "name": "Přihláška", "class": "e10pro.zus.libs.ReportPrihlaska"}
+		{"id": "prihlaska", "name": "Přihláška", "class": "e10pro.zus.libs.ReportPrihlaska", "email": 1}
 	],
 	"options": ["timelineSource"],
-	"states": {"stateColumn": "docState", "mainStateColumn": "docStateMain", "statesCfg": "e10pro.zus.docStatesEntries"},
+	"states": {"stateColumn": "docState", "mainStateColumn": "docStateMain", "statesCfg": "e10.base.defaultDocStatesArchive"},
 	"autocomplete": {"columnValue": "ndx", "columnTitle": "fullNameS"},
 	"ndx": 1216
 }
