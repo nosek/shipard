@@ -89,6 +89,12 @@
     "bsi":"bi-file-earmark-text",
     "mdi":"description"
   },
+  "tables/e10pro.zus.omluvenky":{
+    "fa5":"fa-user-md",
+    "fa6pro":"fa-user-md",
+    "bsi":"bi-virus2",
+    "mdi":""
+  },
 
   "iconStudents":{
     "fa5":"fa-user-graduate",

@@ -522,10 +522,10 @@
         "_title:en":"Light bulb",
         "_tags:cs":"žárovka; světlo",
         "_tags:en":"light bulb; bulb; light",
-        "fa5": "fa-info",
-		"fa6pro": "fa-info",
-		"bsi": "bi-info-lg",
-		"mdi": "info"
+        "fa5": "fa-lightbulb",
+		"fa6pro": "fa-lightbulb",
+		"bsi": "bi-lightbulb-fill",
+		"mdi": ""
     },
     "user/lock":
     {
@@ -1790,6 +1790,17 @@
         "fa5":"fa-grin-beam",
         "fa6pro":"fa-grin-beam",
         "bsi":"bi-emoji-laughing-fill",
+        "mdi":""
+    },
+    "user/doctor":
+    {
+        "_title:cs":"Doktor",
+        "_title:en":"Doctor",
+        "_tags:cs":"doktor; nemocnice; nemoc",
+        "_tags:en":"doctor; medic; hospital; sick; ill",
+        "fa5":"fa-user-md",
+        "fa6pro":"fa-user-md",
+        "bsi":"bi-virus2",
         "mdi":""
     }
 }
