@@ -88,6 +88,11 @@ class Router extends Utility
 			return new Response ($this->app, "invalid url 1/".$this->uiId, 404);
 		}
 
+		if ($first === 'a')
+		{
+			$this->checkCodeActivation($this->urlPath[1] ?? '');
+			die();
+		}
 		if ($first === 'manifest.webmanifest')
 		{
 			$object = $this->app->createObject('Shipard.UI.ng.WebManifest');
@@ -103,6 +108,12 @@ class Router extends Utility
 				header ('X-Accel-Redirect: ' . $this->app->urlRoot.'/e10-modules/.cfg/mobile/e10swm.js');
 			else
 				header ('X-Accel-Redirect: ' . $this->app->urlRoot.'/www-root/.ui/ng/js/e10-service-worker.js');
+			die();
+		}
+		elseif ($first === 'imgs')
+		{
+			$resizer = new \Shipard\Base\ImageResizer ($this->app());
+			$resizer->run ();
 			die();
 		}
 
@@ -151,6 +162,11 @@ class Router extends Utility
 
 	function routeApiV2()
 	{
+		if (!isset($this->urlPath[1]) || $this->urlPath[1] !== 'v2')
+		{
+			return $this->app()->routeApiRun();
+		}
+
 		$requestParamsStr = $this->app()->postData();
 		if ($requestParamsStr === '')
 		{
@@ -178,5 +194,21 @@ class Router extends Utility
 	public function urlPart($idx)
 	{
 		return $this->urlPath[$idx] ?? '';
+	}
+
+	public function pwaIcon()
+	{
+		if (isset($this->uiCfg['icons']['pwa']))
+			return $this->uiCfg['icons']['pwa'];
+
+		$dsIcon = $this->app->dsIcon();
+		return $dsIcon['iconUrl'];
+	}
+
+	protected function checkCodeActivation($shortId)
+	{
+		$redirTo = $this->uiRoot.'/user/activate/'.$shortId;
+		$redirTo = str_replace('//', '/', $redirTo);
+		header ('Location: ' . $redirTo);
 	}
 }

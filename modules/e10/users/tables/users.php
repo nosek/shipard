@@ -64,6 +64,14 @@ class TableUsers extends DbTable
 
 		return $newUserNdx;
 	}
+
+	public function formId ($recData, $ownerRecData = NULL, $operation = 'edit')
+	{
+		if (isset($recData['userType']) && $recData['userType'] == 1)
+			return 'robot';
+
+		return 'default';
+	}
 }
 
 
@@ -95,14 +103,12 @@ class ViewUsers extends TableView
 		$listItem ['t2'] = [
 			['text' => $item['login'], 'class' => 'label label-default', 'icon' => 'user/signIn']
 		];
-		if ($item['login'] !== $item['email'])
+		if ($item['login'] !== $item['email'] && $item['email'] !== '')
 			$listItem ['t2'][] = ['text' => $item['email'], 'class' => 'label label-default', 'icon' => 'system/iconEmail'];
 
 		$listItem ['i2'] = [
 			['text' => $this->accountStates[$item['accState']]['fn'], 'class' => 'label label-default'],
 		];
-
-
 		$listItem ['icon'] = $this->table->tableIcon($item);
 
 		return $listItem;
@@ -116,6 +122,7 @@ class ViewUsers extends TableView
     array_push ($q, 'SELECT [users].*');
 		array_push ($q, ' FROM [e10_users_users] AS [users]');
 		array_push ($q, ' WHERE 1');
+		array_push ($q, ' AND [userType] = %i', 0);
 
 		// -- fulltext
 		if ($fts != '')
@@ -130,6 +137,25 @@ class ViewUsers extends TableView
 		if (isset ($qv['accStates']))
 			array_push ($q, ' AND [users].[accState] IN %in', array_keys($qv['accStates']));
 
+		if (isset ($qv['usersRoles']))
+		{
+			array_push ($q, ' AND EXISTS (',
+			'SELECT docLinks.dstRecId FROM [e10_base_doclinks] as docLinks',
+			' WHERE [users].ndx = srcRecId AND srcTableId = %s', 'e10.users.users',
+			' AND dstTableId = %s', 'e10.users.roles',
+			' AND docLinks.dstRecId IN %in)', array_keys($qv['usersRoles']));
+		}
+
+		$withoutContact = isset ($qv['errors']['withoutContact']);
+		if ($withoutContact)
+		{
+			array_push ($q, ' AND users.email != %s', '',
+											' AND NOT EXISTS (SELECT ndx FROM e10_persons_personsContacts WHERE ',
+											' [users].[email] = e10_persons_personsContacts.contactEmail ',
+											' AND [e10_persons_personsContacts].[docState] = %i ', 4000,
+											')');
+		}
+
 
 		$this->queryMain ($q, '[users].', ['[fullName]', '[ndx]']);
 		$this->runQuery ($q);
@@ -139,12 +165,26 @@ class ViewUsers extends TableView
 	{
 		$qry = [];
 
-
 		$enum = [];
 		foreach ($this->app()->cfgItem('e10.users.accountStates') as $ndx => $k)
 			$enum[$ndx] = $k['fn'];
 		$this->qryPanelAddCheckBoxes($panel, $qry, $enum, 'accStates', 'Stav účtu');
 
+		$enum = [];
+		$rolesRows = $this->db()->query('SELECT * FROM [e10_users_roles] WHERE [docState] = %i', 4000);
+		foreach ($rolesRows as $role)
+		{
+			$enum[$role['ndx']] = $role['fullName'];
+		}
+		$this->qryPanelAddCheckBoxes($panel, $qry, $enum, 'usersRoles', 'Role uživatelů');
+
+		// -- errors
+		$chbxErrors = [
+			'withoutContact' => ['title' => 'Bez kontaktu', 'id' => 'withoutContact'],
+		];
+		$paramsErrors = new \E10\Params ($this->app());
+		$paramsErrors->addParam('checkboxes', 'query.errors', ['items' => $chbxErrors]);
+		$qry[] = ['id' => 'errors', 'style' => 'params', 'title' => 'Problémy', 'params' => $paramsErrors];
 
 		$panel->addContent(['type' => 'query', 'query' => $qry]);
 	}
@@ -210,6 +250,27 @@ class FormUser extends TableForm
 
 
 /**
+ * Class FormUserRobot
+ */
+class FormUserRobot extends TableForm
+{
+	public function renderForm ()
+	{
+		$this->setFlag ('formStyle', 'e10-formStyleSimple');
+		$this->setFlag('sidebarPos', TableForm::SIDEBAR_POS_RIGHT);
+
+		$this->openForm ();
+			$this->addColumnInput('fullName');
+      $this->addColumnInput('login');
+			$this->addColumnInput('email');
+			$this->addList ('doclinks', '', TableForm::loAddToFormLayout);
+			$this->addColumnInput('accState');
+		$this->closeForm ();
+	}
+}
+
+
+/**
  * class ViewDetailUser
  */
 class ViewDetailUser extends TableViewDetail
@@ -220,3 +281,14 @@ class ViewDetailUser extends TableViewDetail
 	}
 }
 
+
+/**
+ * class ViewDetailUserRobot
+ */
+class ViewDetailUserRobot extends TableViewDetail
+{
+	public function createDetailContent ()
+	{
+    $this->addDocumentCard('e10.users.libs.dc.DCRobot');
+	}
+}

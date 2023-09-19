@@ -40,14 +40,24 @@ class SendRequestEngine extends Utility
     }
 
 		$url = 'https://'.$host;
-    $url .= '/user/'.$this->requestTypeCfg['urlPart'].'/'.$this->requestRecData['requestId'];
+		if ($this->requestRecData['shortId'] !== '')
+    	$url .= '/a/'.$this->requestRecData['shortId'];
+		else
+			$url .= '/user/'.$this->requestTypeCfg['urlPart'].'/'.$this->requestRecData['requestId'];
 		return $url;
 	}
 
 	public function sendRequest ()
 	{
 		$emailsTo = $this->userRecData['email'];
-		$report = new \e10\users\libs\reports\ReportRequestActivate($this->tableRequests, $this->requestRecData);
+		$report = NULL;
+		if ($this->requestRecData['requestType'] == 0)
+			$report = new \e10\users\libs\reports\ReportRequestActivate($this->tableRequests, $this->requestRecData);
+		elseif ($this->requestRecData['requestType'] == 1)
+			$report = new \e10\users\libs\reports\ReportRequestLostPassword($this->tableRequests, $this->requestRecData);
+
+		if (!$report)
+			return;
 
 		$report->init();
 		$report->renderReport ();
@@ -57,7 +67,13 @@ class SendRequestEngine extends Utility
 
 		$msg = new \Shipard\Report\MailMessage($this->app());
 
-		$msg->setFrom ($this->app->cfgItem ('options.core.ownerFullName'), $this->app->cfgItem ('options.core.ownerEmail'));
+		$fromEmail = $this->app->cfgItem ('options.core.ownerEmail');
+		$fromName = $this->app->cfgItem ('options.core.ownerFullName');
+
+		if ($this->uiRecData['sendRequestsFromEmail'] !== '')
+			$fromEmail = $this->uiRecData['sendRequestsFromEmail'];
+
+		$msg->setFrom ($fromName, $fromEmail);
 		$msg->setTo($emailsTo);
 		$msg->setSubject($msgSubject);
 		$msg->setBody($msgBody);
@@ -67,7 +83,10 @@ class SendRequestEngine extends Utility
 		if ($attachmentFileName === '')
 			$attachmentFileName = 'priloha';
 
-		$msg->addAttachment($report->fullFileName, $attachmentFileName.'.pdf', 'application/pdf');
+		if (!$report->pdfAttSendDisabled)
+			$msg->addAttachment($report->fullFileName, $attachmentFileName.'.pdf', 'application/pdf');
+
+		$report->addMessageAttachments($msg);
 
 		$msg->sendMail();
 		$msg->saveToOutbox();

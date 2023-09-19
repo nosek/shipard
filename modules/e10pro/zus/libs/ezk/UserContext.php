@@ -1,7 +1,8 @@
 <?php
 
 namespace e10pro\zus\libs\ezk;
-
+require_once __SHPD_MODULES_DIR__ . 'e10pro/zus/zus.php';
+use \e10pro\zus\zusutils;
 
 /**
  * class UserContext
@@ -39,8 +40,9 @@ class UserContext extends \e10\users\libs\UserContext
 
   protected function loadAll()
   {
-    $this->schoolYear = 2022; //zusutils::aktualniSkolniRok($this->app());
-    $this->loadStudents();
+    $this->schoolYear = zusutils::aktualniSkolniRok($this->app());
+    if (!$this->contextCreator->userRecData['person'])
+      $this->loadStudents();
 
     foreach($this->students as $studentNdx => $studentInfo)
     {
@@ -119,6 +121,18 @@ class UserContext extends \e10\users\libs\UserContext
 
   public function run()
   {
+    if ($this->contextCreator->userRecData['person'])
+    { // student
+      $this->getStudentInfo($this->contextCreator->userRecData['person']);
+
+      $studentRecData = $this->app()->loadItem($this->contextCreator->userRecData['person'], 'e10.persons.persons');
+      $this->students[$studentRecData['ndx']] = [
+        'fullName' => $studentRecData['fullName'],
+        'firstName' => $studentRecData['firstName'],
+        'lastName' => $studentRecData['lastName'],
+      ];
+    }
+
     $this->loadAll();
   }
 }

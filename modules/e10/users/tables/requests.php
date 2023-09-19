@@ -26,7 +26,7 @@ class TableRequests extends DbTable
 		$hdr ['info'][] = [
 			'class' => 'title', 'value' => [
 				['text' => $sendRequestEngine->userRecData['fullName'], 'icon' => 'system/iconUser', 'class' => ''],
-				['text' => $sendRequestEngine->userRecData['email'], 'icon' => 'system/iconEmail', 'class' => 'e10-small'],
+				['text' => $sendRequestEngine->userRecData['login'], 'icon' => 'user/signIn', 'class' => 'e10-small'],
 			]
 		];
 
@@ -48,7 +48,10 @@ class TableRequests extends DbTable
 			'errorInvalidRequest' => 1,
 		];
 
-		$requestRecData = $this->db()->query('SELECT * FROM e10_users_requests WHERE requestId = %s', $requestId)->fetch();
+		if (strlen($requestId) === 6)
+			$requestRecData = $this->db()->query('SELECT * FROM e10_users_requests WHERE shortId = %s', $requestId)->fetch();
+		else
+			$requestRecData = $this->db()->query('SELECT * FROM e10_users_requests WHERE requestId = %s', $requestId)->fetch();
 		if (!$requestRecData)
 		{
 			$info['errorMsg'] = 'Neplatná žádost';
@@ -97,6 +100,10 @@ class TableRequests extends DbTable
 			$info ['emails']['to'] = $userRecData['email'];
 		}
 
+		$uiRecData = $this->app()->loadItem($recData['ui'], 'e10.ui.uis');
+		if ($uiRecData && $uiRecData['sendRequestsFromEmail'] !== '')
+			$info['emailFromAddress'] = $uiRecData['sendRequestsFromEmail'];
+
 		return $info;
 	}
 }
@@ -134,7 +141,7 @@ class ViewRequests extends TableView
 			['text' => $rt['fn'], 'class' => 'label label-info'],
 			['text' => $item['userLogin'], 'class' => 'label label-default', 'icon' => 'user/signIn']
 		];
-		if ($item['userLogin'] !== $item['userEmail'])
+		if ($item['userLogin'] !== $item['userEmail'] && $item['userEmail'] !== '')
 			$listItem ['t2'][] = ['text' => $item['userEmail'], 'class' => 'label label-default', 'icon' => 'system/iconEmail'];
 
     $flags = [];
@@ -146,6 +153,9 @@ class ViewRequests extends TableView
 		elseif ($item['requestState'] === 3)
 			$labelState['suffix'] = Utils::datef($item['tsFinished'], '%D, %T');
     $flags[] = $labelState;
+
+		if ($item['shortId'] !== '')
+			$flags[] = ['text' => $item['shortId'], 'class' => 'label label-default'];
 
     $listItem['t3'] = $flags;
 
@@ -183,6 +193,16 @@ class ViewRequests extends TableView
 		if (isset ($qv['requestStates']))
 			array_push ($q, ' AND [requests].[requestState] IN %in', array_keys($qv['requestStates']));
 
+		if (isset ($qv['usersRoles']))
+		{
+			array_push ($q, ' AND EXISTS (',
+			'SELECT docLinks.dstRecId FROM [e10_base_doclinks] as docLinks',
+			' WHERE [users].ndx = srcRecId AND srcTableId = %s', 'e10.users.users',
+			' AND dstTableId = %s', 'e10.users.roles',
+			' AND docLinks.dstRecId IN %in)', array_keys($qv['usersRoles']));
+		}
+
+
     array_push ($q, ' ORDER BY ndx');
     array_push ($q, $this->sqlLimit ());
 		$this->runQuery ($q);
@@ -206,6 +226,14 @@ class ViewRequests extends TableView
 		foreach ($this->app()->cfgItem('e10.users.requestStates') as $ndx => $k)
 			$enum[$ndx] = $k['fn'];
 		$this->qryPanelAddCheckBoxes($panel, $qry, $enum, 'requestStates', 'Stav požadavku');
+
+		$enum = [];
+		$rolesRows = $this->db()->query('SELECT * FROM [e10_users_roles] WHERE [docState] = %i', 4000);
+		foreach ($rolesRows as $role)
+		{
+			$enum[$role['ndx']] = $role['fullName'];
+		}
+		$this->qryPanelAddCheckBoxes($panel, $qry, $enum, 'usersRoles', 'Role uživatelů');
 
 		$panel->addContent(['type' => 'query', 'query' => $qry]);
 	}

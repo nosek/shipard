@@ -6,7 +6,7 @@
 		"eventsOn", "eventsDo",
 		"setups", "setupsStates",
 		"params",
-		"cams",
+		"cams", "camsStreams",
 
 	  "topics", "sensors", "sensorsValues", "sensorsValuesHistory",
 	  "controls", "scPlacements",
@@ -20,6 +20,7 @@
 	  {"id": "+mac.iot.ioPortValueStyle", "file": "mac.iot.ioPortValueStyle.json"},
 	  {"id": "+mac.iot.values.types", "file": "mac.iot.values.types.json"},
 		{"id": "+mac.iot.devices.types", "file": "mac.iot.devices.types.json"},
+		{"id": "+mac.io.connectionTypes", "file": "mac.io.connectionTypes.json"},
 
 		{"id": "+mac.iot.ioPorts.types", "file": "ioPorts/ioPorts.json"},
 		{"id": "+mac.iot.ioPorts.i2cIOExpanders", "file": "ioPorts/i2cIOExpanders.json"},
@@ -32,6 +33,7 @@
 	  {"id": "+mac.iot.setups.types", "file": "mac.iot.setups.types.json"},
 
 		{"id": "+mac.iot.cams.types", "file": "mac.iot.cams.types.json"},
+		{"id": "+mac.iot.cams.streamsTypes", "file": "mac.iot.cams.streamsTypes.json"},
 		{"id": "+mac.iot.cams.vdt", "file": "mac.iot.cams.vdt.json"},
 
 		{"id": "+mac.iot.events.onEventTypes", "file": "mac.iot.events.onEventTypes.json"},

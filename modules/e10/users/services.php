@@ -12,10 +12,10 @@ class ModuleServices extends \e10\cli\ModuleServices
 	protected function addUsersFromContacts()
 	{
 		$tableUsers = new \e10\users\TableUsers($this->app());
-		$this->db()->query('DELETE FROM e10_users_users');
+		//$this->db()->query('DELETE FROM e10_users_users');
 
 		$tableRequests = new \e10\users\TableRequests($this->app());
-		$this->db()->query('DELETE FROM e10_users_requests');
+		//$this->db()->query('DELETE FROM e10_users_requests');
 
     $q = [];
     array_push($q, 'SELECT contacts.*,');
@@ -55,21 +55,33 @@ class ModuleServices extends \e10\cli\ModuleServices
 
 	protected function sendRequests()
 	{
-		$q = [];
-		array_push($q, 'SELECT * FROM [e10_users_requests]');
-		array_push($q, ' WHERE 1');
-		array_push($q, ' AND requestState = %i', 1);
+		$maxCount = 50;
 
+		$q = [];
+		array_push($q, 'SELECT [requests].* ');
+		array_push($q, ' FROM [e10_users_requests] AS [requests]');
+		array_push($q, ' LEFT JOIN e10_users_users AS [users] ON [requests].[user] = [users].ndx');
+		array_push($q, ' WHERE 1');
+		array_push($q, ' AND [users].[docState] = %i', 4000);
+		array_push($q, ' AND [users].[email] != %s', '');
+		array_push($q, ' AND requestState <= %i', 1);
+		array_push($q, ' ORDER BY [requests].ndx');
+
+		$cnt = 0;
 		$rows = $this->db()->query($q);
 		foreach ($rows as $r)
 		{
-
 			$sendRequestEngine = new \e10\users\libs\SendRequestEngine($this->app());
 			$sendRequestEngine->setRequestNdx($r['ndx']);
 
 			echo '* '.$sendRequestEngine->userRecData['fullName'].'; '.$sendRequestEngine->userRecData['email']."\n";
 
 			$sendRequestEngine->sendRequest();
+			sleep(5);
+
+			$cnt++;
+			if ($cnt > $maxCount)
+				break;
 		}
 	}
 
