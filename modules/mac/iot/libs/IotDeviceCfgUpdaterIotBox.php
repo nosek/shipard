@@ -102,7 +102,11 @@ class IotDeviceCfgUpdaterIotBox extends \mac\iot\libs\IotDeviceCfgUpdater
 					{
 						$ioPortCfg[$ioPortColumnId] = $this->deviceSettings[$cfgColumnId];
 //				$portTypeCfgColumn = utils::searchArray($ioPortTypeCfg['fields']['columns'], 'id', $key);
-
+					}
+					elseif ($cfgColumnId[0] === '_')
+					{
+						$icd = substr($cfgColumnId, 1);
+						$ioPortCfg[$icd] = $ioPortColumnId;
 					}
 				}
 				continue;
@@ -281,25 +285,28 @@ class IotDeviceCfgUpdaterIotBox extends \mac\iot\libs\IotDeviceCfgUpdater
 			if (isset($ioPortTypeCfg['dataModel']))
 				$ioPortProperties = array_merge($ioPortProperties, $ioPortTypeCfg['dataModel']);
 
-			/*
-			if ($portTypeId === 'input/binary')
-			{
-				$this->dataModel['properties'][$uioPort['portId']] = [
-					'itemType' => 'action', 'data-type' => 'enum', 'enum' => ['click' => 'click'],
-				];
-			}
-			elseif ($portTypeId === 'control/binary')
-			{
-				$this->dataModel['properties'][$uioPort['portId']] = [
-					'itemType' => 'control', 'data-type' => 'binary'
-				];
-			}*/
-
-
 			if (isset($ioPortProperties['eventType']) && $ioPortProperties['eventType'] === 'readerValue')
 			{
 				$ioPortProperties['valueTopic'] = $uioPort['mqttTopic'];
+			}
 
+			if ($portTypeId === 'signal/gsm' && isset($portCfg['dualSIM']) && intval($portCfg['dualSIM']))
+			{
+				if ($portCfg['sim1Id'] !== '')
+				{
+					$sim1Prop = $ioPortProperties;
+					$sim1Prop['valueTopic'] .= '-'.$portCfg['sim1Id'];
+					$this->dataModel['properties'][$uioPort['portId'].'-'.$portCfg['sim1Id']] = $sim1Prop;
+				}
+
+				if ($portCfg['sim2Id'] !== '')
+				{
+					$sim2Prop = $ioPortProperties;
+					$sim2Prop['valueTopic'] .= '-'.$portCfg['sim2Id'];
+					$this->dataModel['properties'][$uioPort['portId'].'-'.$portCfg['sim2Id']] = $sim2Prop;
+				}
+
+				continue;
 			}
 
 			$this->dataModel['properties'][$uioPort['portId']] = $ioPortProperties;
