@@ -1,0 +1,29 @@
+{
+  "condo-portal": {
+    "fn": "Portál Výkupna",
+    "appMenu": {
+      "appTitle": "Výkupna",
+      "items": [
+        {
+          "title": "Ceník", "icon": "user/medal", "id": "priceList",
+          "objectType": "widget", "classId": "e10pro.purchase.libs.apps.WidgetPriceList"
+        },
+        {
+          "title": "Výkupy", "icon": "user/book", "id": "purchases",
+          "objectType": "viewer", "table": "e10doc.core.heads", "viewer": "portal-purchases"
+        },
+        {
+          "title": "Nastavení", "icon": "system/actionSettings", "id": "settings",
+          "objectType": "widget", "classId": "Shipard.UI.ng.WidgetAppSettings"
+        }
+      ]
+    },
+    "mainRoles":
+    {
+      "purch-portal-spl": {
+        "fn": "Dodavatel"
+      }
+    },
+    "appSettings": ["e10pro.purchase.libs.apps.AppSettings"]
+  }
+}

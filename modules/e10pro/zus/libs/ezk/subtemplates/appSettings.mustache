@@ -1,0 +1,50 @@
+<ol class="shpd-list mb-2">
+    <h3 class="shpd-list-item mb-0">{{userInfo.name}}</h3>
+
+    {{#data.personsContacts}}
+        <span class="shpd-list-item">{{{@icon;dataItem:icon}}} {{text}}</span>
+    {{/data.personsContacts}}
+
+    {{#data.personsAddress}}
+        <span class="shpd-list-item">
+            {{{@icon;dataItem:icon}}} {{addressText}}
+            {{#type}}
+                <small class="text-muted ps-1">{{text}}</small>
+            {{/type}}
+        </span>
+    {{/data.personsAddress}}
+
+    <span class="shpd-list-item text-muted"><small>V případě nesprávných informací nám zašlete e-mail na: <a href="mailto:{{data.uiCfg.supportEmail}}">{{data.uiCfg.supportEmail}}</a></small></span>
+</ol>
+
+{{#data.students.0}}
+<ol class="shpd-list mb-2">
+    <h3 class="shpd-list-item mb-0">Studenti</h3>
+
+    {{#data.students}}
+        <span class="shpd-list-item">
+            <h6 class="mb-0">{{fullName}}</h6>
+
+            {{#personsContacts}}
+                <small class="ps-1">{{{@icon;dataItem:icon}}} {{text}}</small>
+            {{/personsContacts}}
+
+            {{#personsIds}}
+                <small class="ps-1">{{{@icon;dataItem:icon}}} {{text}}</small>
+            {{/personsIds}}
+        </span>
+    {{/data.students}}
+</ol>
+{{/data.students.0}}
+
+{{#data.flags.showBalance}}
+<ol class="shpd-list mb-2">
+    <h3 class="shpd-list-item mb-0">Školné</h3>
+    <div class="shpd-list-item d-flex justify-content-between align-items-center">
+        <span class='{{data.balance.status.class}}'>{{{@icon;dataItem:data.balance.status.icon}}} {{data.balance.status.text}}</span>
+
+        <button class='btn btn-sm btn-outline-secondary shp-widget-action' data-action='open-modal' data-action-param-modal-type='dataViewer' data-action-param-view-id='zus-ezk-invoicesOut' data-action-param-table='e10doc.core.heads'>{{{@icon;icon:user/archive}}} Přehled faktur</button>
+    </div>
+</ol>
+{{/data.flags.showBalance}}
+

@@ -289,8 +289,17 @@ class TableView extends \Shipard\Base\BaseObject
 
 	public function bottomTabId ()
 	{
-		if (isset ($_POST ['bottomTab']))
-			return $_POST ['bottomTab'];
+		if ($this->app()->ngg)
+		{
+			if (isset($this->requestParams['bottomTab']))
+				return $this->requestParams['bottomTab'];
+		}
+		else
+		{
+			if (isset ($_POST ['bottomTab']))
+				return $_POST ['bottomTab'];
+		}
+
 		if (isset($this->bottomTabs))
 			forEach ($this->bottomTabs as $q)
 				if ($q['active'])
@@ -699,6 +708,9 @@ class TableView extends \Shipard\Base\BaseObject
 
 	public function createToolbarCode ()
 	{
+		if ($this->ngRenderer)
+			return $this->ngRenderer->createToolbarCode();
+
 		$c = '';
 		$tlbr = $this->createToolbar ();
 
@@ -724,6 +736,9 @@ class TableView extends \Shipard\Base\BaseObject
 
 				if (isset ($btn['doubleClick']))
 					$class .= ' dblclk';
+
+				if (isset ($btn['class']))
+					$class .= ' '.$btn['class'];
 
 				$icon = '';
 				$dataTable = '';
@@ -998,7 +1013,7 @@ class TableView extends \Shipard\Base\BaseObject
 				if ($this->toolbarTitle)
 					$h .= "<td class='pr1'>".$this->app()->ui()->composeTextLine($this->toolbarTitle).'</td>';
 
-				$h .= "<td id='{$this->toolbarElementId}__Main' style='right: 2rem; max-width: 70%;'>";
+				$h .= "<td id='{$this->toolbarElementId}__Main' style='right: 2rem; max-width: 70%;' class='formViewToolbar'>";
 				$h .= $this->createToolbarCode ();
 				$h .= "<div id='{$this->toolbarElementId}' style='display: inline-block; padding-left: 1em; padding-right: 1em;'>";
 				$h .= '</div>';
@@ -1926,6 +1941,10 @@ class TableView extends \Shipard\Base\BaseObject
 
 	public function mainQueryId ()
 	{
+		if ($this->app()->ngg)
+		{
+			return $this->requestParams['mainQuery'] ?? '';
+		}
 		if (isset ($_POST ['mainQuery']))
 			return $_POST ['mainQuery'];
 		if (isset($this->mainQueries[0]['id']))

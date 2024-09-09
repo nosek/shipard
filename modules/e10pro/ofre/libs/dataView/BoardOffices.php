@@ -24,6 +24,9 @@ class BoardOffices extends DataView
   var $displayWidth = 2880;
   var $displayHeight = 2160;
 
+  var $orderBy = '';
+  var $displayTitle = '';
+
 	protected function init()
 	{
 		parent::init();
@@ -31,6 +34,8 @@ class BoardOffices extends DataView
 		$this->checkRequestParamsList('docKinds', TRUE);
 		$this->checkRequestParamsList('withLabels');
 		$this->checkRequestParamsList('withoutLabels');
+    $this->orderBy = $this->requestParam('orderBy', 'wo');
+    $this->displayTitle = $this->requestParam('title', 'office');
 
     $this->cntCols = $this->requestParam ('cntCols', 5);
     $this->cntRows = $this->requestParam ('cntRows', 10);
@@ -70,7 +75,11 @@ class BoardOffices extends DataView
 
     if (isset($this->requestParams['docKinds']))
       array_push ($q, ' AND wo.docKind IN %in', $this->requestParams['docKinds']);
-		array_push ($q, ' ORDER BY custs.[fullName], custs.[ndx]');
+
+    if ($this->orderBy === 'person')
+      array_push ($q, ' ORDER BY custs.[fullName], custs.[ndx]');
+    else
+      array_push ($q, ' ORDER BY wo.[title], wo.[ndx]');
 
     $sqlLimitStart = $this->pageNumber * $this->pageSize;
     array_push ($q, ' LIMIT %i', $sqlLimitStart, ', %i', $this->pageSize);
@@ -83,6 +92,7 @@ class BoardOffices extends DataView
 			$item = [
         'ndx' => $r['ndx'],
         'custName' => $r['custName'],
+        'officeTitle' => ($r['title'] !== '') ? $r['title'] : $r['custName'],
       ];
 
       $vdsData = Json::decode($r['vdsData']);
@@ -106,7 +116,7 @@ class BoardOffices extends DataView
         $t[$personNdx]['oid'] = $pp['ids']['oid'][0]['value'];
     }
 
-		$this->data['header'] = ['#' => '#', 'id' => 'id', 'custName' => 'Jméno', 'email' => 'E-mail', 'phone' => 'Telefon'];
+		$this->data['header'] = ['#' => '#', 'id' => 'id', 'custName' => 'Jméno', 'officeTitle' => 'Název', 'email' => 'E-mail', 'phone' => 'Telefon'];
 		$this->data['table'] = $t;
 	}
 
@@ -145,7 +155,10 @@ class BoardOffices extends DataView
 
       $tableCells .= "<div style=' border-left: 6px solid #AAA; padding: .4rem; margin: 1rem; height: 100%;'>";
 
-      $tableCells .= '<h5>'.utils::es($person['custName']).'</h5>';
+      if ($this->displayTitle === 'office')
+        $tableCells .= '<h5>'.utils::es($person['officeTitle']).'</h5>';
+      else
+        $tableCells .= '<h5>'.utils::es($person['custName']).'</h5>';
       if (isset($person['oid']))
       $tableCells .= "<span class='text-nowrap'>".Utils::es('IČ').' '.Utils::es($person['oid']).'</span> ';
       if (isset($person['email']))
@@ -163,6 +176,8 @@ class BoardOffices extends DataView
 
     $this->data['tableCells'] = $tableCells;
     $this->data['pageNumber'] = strval($this->pageNumber);
+    $this->data['pageNumber1'] = strval($this->pageNumber + 1);
+    $this->data['countPages'] = strval($this->countPages);
 
     $this->pageBtnSizeX = 255;
     $this->pageBtnSizeY = 100;
@@ -208,6 +223,11 @@ class BoardOffices extends DataView
     $c .= "\n<textarea id='shp-sc-page-info-result' style='display: none;'></textarea>";
 
     $jsScripts = '';
+
+    $jsScripts .= "
+
+    ";
+
     $jsScripts .= "<script type='text/javascript' src='".$this->app()->dsRoot."/www-root/templates/web/libs/scCreator.js?v=22'></script>";
     $this->data['jsScripts'] = $jsScripts;
     $c .= $jsScripts;

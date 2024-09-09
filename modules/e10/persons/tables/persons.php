@@ -341,7 +341,7 @@ class TablePersons extends DbTable
 		return $addresses;
 	}
 
-	public function loadProperties ($pkeys, $disabledProperties = FALSE)
+	public function loadProperties ($pkeys, $disabledProperties = FALSE, $withoutGroups = FALSE)
 	{
 		if (is_array($pkeys))
 			$personsIds = implode (', ', $pkeys);
@@ -354,14 +354,17 @@ class TablePersons extends DbTable
 			return $properties;
 
 		/* groups */
-		$allGroups = $this->app()->cfgItem ('e10.persons.groups', FALSE);
-		$q = "SELECT * FROM [e10_persons_personsgroups] WHERE person IN ($personsIds)";
-		$groups = $this->db()->fetchAll ($q);
-		forEach ($groups as $g)
+		if (!$withoutGroups)
 		{
-			$thisGroup = Utils::searchArray ($allGroups, 'id', $g ['group']);
-			if ($thisGroup)
-				$properties [$g ['person']]['groups'][] = array ('text' => $thisGroup ['name'], 'class' => 'label label-default');
+			$allGroups = $this->app()->cfgItem ('e10.persons.groups', FALSE);
+			$q = "SELECT * FROM [e10_persons_personsgroups] WHERE person IN ($personsIds)";
+			$groups = $this->db()->fetchAll ($q);
+			forEach ($groups as $g)
+			{
+				$thisGroup = Utils::searchArray ($allGroups, 'id', $g ['group']);
+				if ($thisGroup)
+					$properties [$g ['person']]['groups'][] = array ('text' => $thisGroup ['name'], 'class' => 'label label-default');
+			}
 		}
 
 		/* properties */
@@ -447,7 +450,9 @@ class TablePersons extends DbTable
 				$rows = $this->db()->query($q);
 				foreach ($rows as $r)
 				{
-					$emails[] = $r['contactEmail'];
+					$e = trim($r['contactEmail']);
+					if ($e !== '')
+						$emails[] = $e;
 				}
 
 				if (count($emails))
@@ -473,7 +478,9 @@ class TablePersons extends DbTable
 			$rows = $this->db()->query($q);
 			foreach ($rows as $r)
 			{
-				$emails[] = $r['contactEmail'];
+				$e = trim($r['contactEmail']);
+				if ($e !== '')
+					$emails[] = $e;
 			}
 			if (count($emails))
 				return implode (', ', $emails);
@@ -482,7 +489,11 @@ class TablePersons extends DbTable
 		$sql = 'SELECT valueString FROM [e10_base_properties] where [tableid] = %s AND [recid] IN %in AND [property] = %s AND [group] = %s ORDER BY ndx';
 		$emailsRows = $this->db()->query ($sql, 'e10.persons.persons', $persons, 'email', 'contacts')->fetchPairs ();
 		if (count($emailsRows))
+		{
+			foreach ($emailsRows as &$e)
+				$e = trim($e);
 			return implode (', ', $emailsRows);
+		}
 
 		return '';
 	}
@@ -819,6 +830,9 @@ class ViewPersonsBase extends TableView
 			array_push ($q, ')');
 		}
 
+		if (isset ($qv['fiscalPeriods']))
+			array_push ($q, ' AND EXISTS (SELECT ndx FROM e10doc_core_heads WHERE persons.ndx = e10doc_core_heads.person AND [fiscalYear] IN %in', array_keys($qv['fiscalPeriods']), ')');
+
 		// -- others - with error
 		$withError = isset ($qv['others']['withError']);
 		if ($withError)
@@ -886,8 +900,8 @@ class ViewPersonsBase extends TableView
 		if (isset ($this->properties [$item ['pk']]['contacts']))
 			$item ['t2'] = array_merge ($item ['t2'], array_slice ($this->properties [$item ['pk']]['contacts'], 0, 2, TRUE));
 
-		if (!count($item ['t2']))
-			$item ['t2'] = ' ';
+		//if (!count($item ['t2']))
+		//	$item ['t2'] = ' ';
 
 		if (isset ($this->classification [$item ['pk']]))
 		{
@@ -953,6 +967,8 @@ class ViewPersonsBase extends TableView
 			}
 		}
 
+		$this->createPanelContentQry1 ($panel, $qry);
+
 		// -- countries
 		$paramsPersonCountries = new \E10\Params ($panel->table->app());
 
@@ -974,6 +990,19 @@ class ViewPersonsBase extends TableView
 
 		// -- tags
 		UtilsBase::addClassificationParamsToPanel($this->table, $panel, $qry);
+
+		// -- active in fiscal period
+		$periods = $this->app->cfgItem ('e10doc.acc.periods', NULL);
+		if ($periods)
+		{
+			$periodsEnum = [];
+			forEach ($periods as $periodNdx => $periodCfg)
+				$periodsEnum[$periodNdx] = ['title' => $periodCfg['fullName'], 'id' => $periodNdx];
+
+			$paramsFiscalPeriods = new \E10\Params ($panel->table->app());
+			$paramsFiscalPeriods->addParam ('checkboxes', 'query.fiscalPeriods', ['items' => $periodsEnum]);
+			$qry[] = ['id' => 'fiscalPeriods', 'style' => 'params', 'title' => 'Použito ve fiskálním období', 'params' => $paramsFiscalPeriods];
+		}
 
 		// -- others
 		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
@@ -998,6 +1027,10 @@ class ViewPersonsBase extends TableView
 
 		$panel->addContent(['type' => 'query', 'query' => $qry]);
 	}
+
+	protected function createPanelContentQry1 (TableViewPanel $panel, &$qry)
+	{
+	}
 }
 
 
@@ -1018,7 +1051,8 @@ class ViewPersons extends ViewPersonsBase
 		$this->setMainQueries ($mq);
 
 		$this->setPanels (TableView::sptQuery);
-	}}
+	}
+}
 
 /**
  * class ViewDetailPersons

@@ -1,0 +1,77 @@
+{
+  "5": {
+    "fn": "Hrubá mzda",
+    "sn": "Hrubá mzda",
+    "disableAccItemBal": 1,
+    "payee": 0,
+    "mandatory": 1
+  },
+  "10": {
+    "fn": "Benefity - čistá mzda",
+    "sn": "Benefity čistá mzda",
+    "payee": 2
+  },
+  "15": {
+    "fn": "Zdravotní pojištění - zaměstnanec",
+    "sn": "Zdravotní zaměstnanec",
+    "payee": 2
+  },
+  "20": {
+    "fn": "Sociální pojištění - zaměstnanec",
+    "sn": "Sociální zaměstnanec",
+    "payee": 2
+  },
+  "25": {
+    "fn": "Daně",
+    "sn": "Daně",
+    "payee": 2
+  },
+  "30": {
+    "fn": "Srážky",
+    "sn": "Srážky",
+    "payee": 3
+  },
+  "35": {
+    "fn": "Exekuce",
+    "sn": "Exekuce",
+    "payee": 3
+  },
+  "40": {
+    "fn": "Čistá mzda",
+    "sn": "Čistá mzda",
+    "disableAccItemBal": 1,
+    "payee": 1,
+    "mandatory": 1
+  },
+  "45": {
+    "fn": "Zdravotní pojištění - zaměstnavatel",
+    "sn": "Zdravotní zaměstnavatel",
+    "payee": 2
+  },
+  "50": {
+    "fn": "Sociální pojištění - zaměstnavatel",
+    "sn": "Sociální zaměstnavatel",
+    "payee": 2
+  },
+  "55": {
+    "fn": "Benefity - ostatní",
+    "sn": "Benefity ostatní",
+    "payee": 2
+  },
+  "60": {
+    "fn": "Úrazové pojištění",
+    "sn": "Úrazové pojištění",
+    "payee": 2
+  },
+  "0": {
+    "fn": "Ostatní",
+    "sn": "Ostatní",
+    "payee": 0
+  },
+  "100": {
+    "fn": "Ignorovat",
+    "sn": "Ignorovat",
+    "ignore": 1,
+    "payee": 0
+  }
+}

@@ -2,7 +2,7 @@
 
 namespace lib\wkf;
 
-use \e10\DocumentAction;
+use \Shipard\Base\DocumentAction;
 
 
 /**
@@ -42,6 +42,10 @@ class SendBulkEmailAction extends DocumentAction
 		$msg->addDocAttachments('e10pro.bume.bulkEmails', $this->bulkEmailNdx);
 
 		$msg->sendMail();
+		//$msg->saveToOutbox();
+
+		if ($this->app()->debug)
+			echo "# ".json_encode($onePost)."\n";
 
 		$update = ['sentDate' => new \DateTime(), 'sent' => 1];
 		$this->db()->query ('UPDATE [e10pro_wkf_bulkPosts] SET ', $update, ' WHERE ndx = %i', $onePost['ndx']);
@@ -58,6 +62,8 @@ class SendBulkEmailAction extends DocumentAction
 		foreach ($rows as $r)
 		{
 			$this->sendOne($r->toArray());
+
+			sleep(1);
 		}
 
 		$update = ['sendingState' => 4, 'dateSent' => new \DateTime()];

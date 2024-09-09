@@ -62,6 +62,10 @@ class TableForm
 
 	var $dirtyColsReferences;
 
+	var $formContent = [];
+
+
+
 	const INPUT_STYLE_RADIO = 1, INPUT_STYLE_OPTION = 2, INPUT_STYLE_MONEY = 3, INPUT_STYLE_DATE = 4, INPUT_STYLE_STRING = 5,
 				INPUT_STYLE_DOUBLE = 6, INPUT_STYLE_INT = 7, INPUT_STYLE_DATETIME = 8, INPUT_STYLE_TIME = 9, INPUT_STYLE_TIMELEN = 10,
 				INPUT_STYLE_STRING_COLOR = 11;
@@ -70,6 +74,8 @@ class TableForm
 
 	const disOld = 0, disNative = 1, disShipard = 2;
 	var $dateInputStyle = self::disShipard;
+
+	CONST etColumnInput = 1;
 
 	// -- column options - lower bits are reserved for dataModel column options
 	const coHidden				= 0x00000100,
@@ -104,7 +110,8 @@ class TableForm
 				coRightCheckbox	= 0x800000000,
 				coDisabled			= 0x1000000000,
 				coInline				= 0x2000000000,
-				coBorder				= 0x4000000000;
+				coBorder				= 0x4000000000,
+				coDisableCombo	= 0x8000000000;
 
 
 	const loAddToFormLayout = 0x1000, loWidgetParts = 0x2000, loRowsDisableMove = 0x4000;
@@ -447,6 +454,16 @@ class TableForm
 
 	function addColumnInput ($columnId, $options = 0, $params = FALSE, $columnPath = '')
 	{
+		$this->formContent[] = [
+			'type' => self::etColumnInput,
+			'columnId' => $columnId,
+			'options' => $options,
+			'params' => $params,
+			'columnPath' => $columnPath,
+		];
+		if ($this->app()->ngg)
+			return;
+
 		$col = $this->inputColDef($columnId, $columnPath);
 		if (!$col)
 			return;
@@ -571,7 +588,7 @@ class TableForm
 		$colId = str_replace('.', '_', $this->fid . "_inp_$ip{$columnId}");
 		$finalColumnName = $ip.$columnId;
 
-		if (isset ($colDef ['comboTable']))
+		if (isset ($colDef ['comboTable']) && !($options & self::coDisableCombo))
 		{
 			$inputClass .= ' e10-inputRefId e10-inputRefIdDirty e10-viewer-search';
 			$comboTableId = $this->tableId();
@@ -903,6 +920,8 @@ class TableForm
 
 	function addInputMemo ($columnId, $label, $options = NULL, $columnType = DataModel::ctMemo, $colDef = NULL)
 	{
+		$testNewCodeEditor = intval($this->app()->cfgItem ('options.experimental.testNewCodeEditor', 0));
+
 		$ip = $this->option ('inputPrefix', '');
 		$colId = str_replace ('.', '_', $this->fid."_inp_$ip{$columnId}");
 
@@ -954,7 +973,14 @@ class TableForm
 
 		if ($label !== NULL && !($options & TableForm::coFullSizeY))
 			$inputCode .= "<label for='inp_$ip{$columnId}'$labelClass>" . self::e ($label) . "</label>";
-		$inputCode .= $inputCodePrefix."<textarea name='$ip{$columnId}' id='$colId' class='$inputClass'$inputParams></textarea>".$inputCodeCoreSuffix;
+		if ($columnType === DataModel::ctCode && $testNewCodeEditor)
+		{
+			if ($colDef && isset($colDef['clng']))
+				$inputParams .= " data-clng='{$colDef['clng']}'";
+			$inputCode .= $inputCodePrefix."<div name='$ip{$columnId}' id='$colId' class='e10-monaco-editor $inputClass'$inputParams></div>".$inputCodeCoreSuffix;
+		}
+		else
+			$inputCode .= $inputCodePrefix."<textarea name='$ip{$columnId}' id='$colId' class='$inputClass'$inputParams></textarea>".$inputCodeCoreSuffix;
 
 		$hints = $this->columnOptionsHints ($options, $columnId);
 		$this->appendElement ($inputCode, $labelCode, $hints);
@@ -1015,6 +1041,8 @@ class TableForm
 				$labelCode = "<label>" . self::e ($label) . "</label>";
 			$this->appendElement ($inputCode, $labelCode);
 		}
+
+		return $inputCode;
 	}
 
 	function addListViewer ($listId, $listViewerId, $label = '', $options = 0)
@@ -1407,6 +1435,8 @@ class TableForm
 		$c = '';
 		if ($options & DataModel::coSaveOnChange)
 			$c .= ' e10-ino-saveOnChange';
+		if ($options & DataModel::coCheckOnChange)
+			$c .= ' e10-ino-checkOnChange';
 		return $c;
 	}
 
@@ -1675,7 +1705,7 @@ class TableForm
 		$headerCode .= "<td class='content-header-btns'><button class='df2-action-trigger e10-close-detail' data-action='cancelform'>&times;</button>";
 		$headerCode .= "</td>";
 
-		$headerCode .= "</table>";
+		$headerCode .= "</tr></table>";
 		$headerCode .= "</div>";
 
 		return $headerCode;
@@ -1710,7 +1740,7 @@ class TableForm
 
 			if ($this->lockState === FALSE)
 			{
-				if (isset($docState['state']))
+				if (isset($docState['state']) && isset($docState ['state']['goto']))
 				{
 					forEach ($docState ['state']['goto'] as $gotoStateId)
 					{
@@ -1820,6 +1850,8 @@ class TableForm
 				$btnsCode [$side] .= "<span style='padding-left: 1em; vertical-align: middle;display: inline-block;'>$icon<h4 style='display: inline-block; position: relative; padding-left: 1ex;'>$t1<br/><small>$t2</small></h4></span>";
 				continue;
 			}
+			if (isset ($btn['noclose']))
+				$params .= " data-noclose='1'";
 
 			switch ($btn['style'])
 			{

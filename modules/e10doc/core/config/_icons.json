@@ -5,8 +5,6 @@
 		"bsi": "bi-file-earmark",
 		"mdi": "insert_drive_file"
     },
-    
-    
     "docTypeInvoicesIn":{
         "fa5":"fa-file-download",
         "fa6pro":"fa-file-download",
@@ -61,9 +59,15 @@
         "bsi":"bi-basket",
         "mdi":"shopping_basket"
     },
+    "docType/offersOut":{
+        "fa5":"fa-file-contract",
+        "fa6pro":"fa-file-contract",
+        "bsi":"bi-file-earmark-medical",
+        "mdi":"local-shipping"
+    },
     "docType/deliveryNote":{
-        "fa5":"fa-file-signature",
-        "fa6pro":"fa-file-signature",
+        "fa5":"fa-truck",
+        "fa6pro":"fa-truck",
         "bsi":"bi-truck",
         "mdi":"local-shipping"
     },
@@ -206,6 +210,12 @@
         "fa6pro":"fa-envelope-open-dollar",
         "bsi":"bi-cash-stack",
         "mdi":"payments"
+    },
+    "balance/transitionalAccounts":{
+        "fa5":"fa-clock",
+        "fa6pro":"fa-clock",
+        "bsi":"bi-clock",
+        "mdi":"timer"
     },
     "balance/requestsForPayment":{
         "fa5":"fa-exclamation-circle",

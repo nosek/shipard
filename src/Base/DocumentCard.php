@@ -17,6 +17,12 @@ class DocumentCard extends Content
 	var $header = NULL;
 	var $disableAttachments = FALSE;
 	var $dstObjectType = '';
+	var $widgetId = '';
+
+	/** @var  \wkf\core\TableIssues */
+	var $tableIssues;
+
+	var ?\Shipard\UI\ng\TemplateUI $uiTemplate = NULL;
 
 	CONST spTimeLine = 'tl', spDocuments = 'docs';
 
@@ -77,16 +83,20 @@ class DocumentCard extends Content
 	{
 		$this->table = $table;
 		$this->recData = $recData;
+
+		$this->widgetId = 'DC-'.mt_rand(1000000, 999999999);
+
+		$this->tableIssues = $this->app->table ('wkf.core.issues');
 	}
 
-	public function addContentAttachments ($toRecId, $tableId = FALSE, $title = FALSE, $downloadTitle = FALSE)
+	public function addContentAttachments ($toRecId, $tableId = FALSE, $title = FALSE, $downloadTitle = FALSE, $oneAttachmentNdx = 0)
 	{
 		if ($this->disableAttachments)
 			return;
 		if ($tableId === FALSE)
 			$tableId = $this->table->tableId();
 
-		$files = UtilsBase::loadAttachments ($this->table->app(), [$toRecId], $tableId);
+		$files = UtilsBase::loadAttachments ($this->table->app(), [$toRecId], $tableId, $oneAttachmentNdx);
 		if (isset($files[$toRecId]))
 			$this->content['body'][] = ['type' => 'attachments', 'attachments' => $files[$toRecId], 'title' => $title, 'downloadTitle' => $downloadTitle];
 	}
@@ -166,6 +176,45 @@ class DocumentCard extends Content
 				$this->addContent('body', $dc);
 			}
 		}
+	}
+
+	protected function addDiaryButtonsParams()
+	{
+		//$diaryInfo = $this->table->getDiaryInfo($this->recData);
+
+		$btnParams = [
+			'btnActionClass' => 'btn btn-xs btn-outline',
+			'btnWithTexts' => 1,
+			'diary' => 1,
+			'onTop' => 5,
+		];
+
+		//if (isset($diaryInfo['sectionNdx']))
+		//	$btnParams['section'] = $diaryInfo['sectionNdx'];
+
+		$btnParams['section'] = $this->tableIssues->defaultSection(21);
+
+		$btnParams['tableNdx'] = $this->table->ndx;
+		$btnParams['recNdx'] = $this->recData['ndx'];
+		$btnParams['diary'] = 1;
+
+		return $btnParams;
+	}
+
+	protected function diaryButtons()
+	{
+		$addButtonsEnabled = 1;
+		if ($addButtonsEnabled)
+		{
+			$addButtons = [];
+			$btnParams = $this->addDiaryButtonsParams();
+			$this->tableIssues->addWorkflowButtons($addButtons, $btnParams);
+
+			if (count($addButtons))
+				return $addButtons;
+		}
+
+		return NULL;
 	}
 
 	public function createContent()
@@ -283,6 +332,25 @@ class DocumentCard extends Content
 		$attCode = $this->app()->ui()->addAttachmentsInputCodeMobile($this->table->tableId(), $this->recData['ndx'], '');
 
 		$this->response->add ('codeFooter', $attCode."<div class='e10-page-end'><i class='fa fa-chevron-up'></i></div>");
+	}
+
+	public function createCodeNG ()
+	{
+		$cr = new ContentRenderer($this->app);
+		$cr->mobile = TRUE;
+		$cr->setDocumentCard($this);
+
+		$c = "<document-card id='{$this->widgetId}'>";
+		$c .= "<div class='toolbar'>";
+		$c .= "<span style='font-size: 1.6em;' class='shp-widget-action p-2' data-action='closeModal'>".$this->app()->ui()->icon('user/arrowLeft')."</span>";
+		//$c .= $this->createToolbarCode ();
+		$c .= '</div>';
+		$c .= "<div class='content'>";
+		$c .= $cr->createCode('body');
+		$c .= '</div>';
+		$c .= "</document-card>";
+
+		return $c;
 	}
 
 	public function response ()

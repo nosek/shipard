@@ -99,7 +99,7 @@ class TableRows extends DbTable
 		}
 
 		// -- subColumns
-		if ($recData['rowVds'])
+		if (isset($recData['rowVds']) && $recData['rowVds'])
 		{
 			$sci = $this->subColumnsInfo ($recData, 'rowData');
 			if ($sci && isset($sci['computeClass']))
@@ -157,7 +157,7 @@ class TableRows extends DbTable
 
 		if ($ownerData ['taxPayer'])
 		{
-			$taxDate = E10Utils::headsTaxDate ($ownerData);
+			$taxDate = E10Utils::headsTaxDate ($ownerData, $recData);
 			$cfgTaxCode = $docTaxCodes[$recData['taxCode']] ?? NULL;
 			//if (!$cfgTaxCode)
 			//	error_log("INVALID TAX CODE: ".json_encode($recData['taxCode'])." - ".json_encode($recData));
@@ -410,7 +410,7 @@ class TableRows extends DbTable
 		if ($ownerRecData ['taxType'] != $taxCode ['type'])
 			return FALSE;
 
-		$taxDate = E10Utils::headsTaxDate ($ownerRecData);
+		$taxDate = E10Utils::headsTaxDate ($ownerRecData, $recData);
 		$tp = $this->taxPercent ($taxCodeKey, $taxDate);
 		if ($tp === FALSE)
 			return FALSE;
@@ -468,7 +468,7 @@ class TableRows extends DbTable
 
 	public function columnInfoEnumTaxCodes ($recData, $ownerRecData, $form)
 	{
-		$taxDate = E10Utils::headsTaxDate ($ownerRecData);
+		$taxDate = E10Utils::headsTaxDate ($ownerRecData, $recData);
 		$taxCodes = E10Utils::docTaxCodes($this->app(), $ownerRecData);
 		$enum = [];
 		foreach ($taxCodes as $tcId => $tc)
@@ -523,6 +523,7 @@ class TableRows extends DbTable
 
 	public function docDir ($recData, $ownerRecData)
 	{
+		// TODO: refactor to E10Utils::docRowDir
 		$docType = $this->app()->cfgItem ('e10.docs.types.' . $ownerRecData['docType']);
 		if (isset ($docType ['docDir']) && $docType ['docDir'] != 0)
 			return $docType ['docDir'];

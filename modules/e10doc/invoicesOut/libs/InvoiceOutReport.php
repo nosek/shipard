@@ -33,6 +33,12 @@ class InvoiceOutReport extends \e10doc\core\libs\reports\DocReport
 		$spayd->createString();
 		$spayd->createQRCode();
 
+		$this->loadBalanceInfo($this->recData);
+
+		$invoicePaymentInfoSignatureCSS = $this->app()->cfgItem('flags.e10doc.docReports.invoicePaymentInfoSignatureCSS', NULL);
+		if ($invoicePaymentInfoSignatureCSS !== NULL)
+			$this->data['flags']['invoicePaymentInfoSignatureCSS'] = $invoicePaymentInfoSignatureCSS;
+
 		$this->data ['spayd'] = $spayd;
 	}
 
@@ -110,6 +116,36 @@ class InvoiceOutReport extends \e10doc\core\libs\reports\DocReport
 			$mimeType = mime_content_type($attFileName);
 			$msg->addAttachment($attFileName, $attName, $mimeType);
     }
+	}
+
+	protected function loadBalanceInfo ($item)
+	{
+		if ($this->recData['paymentMethod'] === 1)
+		{ // cash
+			$this->data['balanceInfo']['paymentDone'] = 1;
+			$this->data['balanceInfo']['payedCash'] = 1;
+			return;
+		}
+
+		$bi = new \e10doc\balance\BalanceDocumentInfo($this->app());
+		$bi->setDocRecData ($item);
+		$bi->run ();
+
+		if (!$bi->valid)
+			return;
+
+		$this->data['balanceInfo'] = [];
+
+		$line = [];
+		$line[] = ['text' => utils::datef($item['dateDue']), 'icon' => 'system/iconStar'];
+
+		if ($bi->restAmount < 1.0)
+		{
+			$this->data['balanceInfo']['payed'] = 1;
+			$this->data['balanceInfo']['paymentDone'] = 1;
+			$this->data['balanceInfo']['payments'] = $bi->payments;
+			$this->data['balanceInfo']['rowSpan'] = count($bi->payments) + 1;
+		}
 	}
 }
 

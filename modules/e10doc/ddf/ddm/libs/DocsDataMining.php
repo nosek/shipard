@@ -4,6 +4,7 @@ namespace e10doc\ddf\ddm\libs;
 use \e10\json, \Shipard\Utils\Str;
 use \e10doc\core\libs\E10Utils;
 
+
 /**
  * class DocsDataMining
  */
@@ -14,6 +15,43 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 		if (isset($this->ddfRecData['srcData']))
 			$this->fileContent = $this->ddfRecData['srcData'];
 
+		if ($this->checkOldWay())
+			return;
+
+		$this->checkLocalDDMs();
+	}
+
+	protected function checkLocalDDMs()
+	{
+		$q = [];
+		array_push ($q, 'SELECT * FROM [e10doc_ddm_ddm]');
+		array_push ($q, ' WHERE 1');
+		array_push ($q, ' AND [docState] IN %in', [4000, 8000, 1000]);
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			if (!Str::strstr($this->fileContent, $r['signatureString']))
+				continue;
+
+			$formatDef = Json::decode($r['configuration']);
+			$ddmEngine = new \e10doc\ddm\libs\DDMEngine($this->app());
+			$ddmEngine->importDataText($this->fileContent, $formatDef);
+
+			$this->srcImpData = ['head' => $ddmEngine->docHeadSrcItems];
+			$this->importHead();
+			$this->importRows();
+			$this->addRowsFromSettings();
+
+			$this->impData = ['head' => $this->docHead, 'rows' => $this->docRows];
+
+			//echo json_encode($ddmEngine->docHeadSrcItems)."\n";
+
+			return;
+		}
+	}
+
+	protected function checkOldWay()
+	{
 		$allFormats = $this->app()->cfgItem('e10.ddf.ddm.formats');
 
 		foreach ($allFormats as $oneFormatId => $oneFormat)
@@ -46,6 +84,7 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 				{
 					$fe->setSrcText($this->fileContent);
 					$fe->import($this->srcImpData);
+					$this->addRowsFromSettings();
 
 					$this->srcImpData['rows'] = $fe->docRows;
 					//echo "Format ENGINE2!\n";
@@ -56,9 +95,10 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 			$this->importRows();
 
 			$this->impData = ['head' => $this->docHead, 'rows' => $this->docRows];
-
-			return;
+			return TRUE;
 		}
+
+		return FALSE;
 	}
 
 	public function createContents()
@@ -67,10 +107,25 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 
 		$c = [];
 
+		// -- preview
+		$ci = [
+			'name' => 'Náhled',
+			'icon' => 'system/iconPreview',
+			'content' => ['type' => 'text', 'subtype' => 'rawhtml', 'text' => $this->previewCode()]
+		];
+		$c[] = $ci;
+
+		$ci = [
+			'name' => 'PDF',
+			'icon' => 'system/iconFilePdf',
+			'content' => $this->previewAtt(),
+		];
+		$c[] = $ci;
+
 		// -- src data
 		$ci = [
-			'name' => 'XML',
-			'icon' => 'icon-file-code-o',
+			'name' => 'Originál',
+			'icon' => 'user/fileText',
 			'content' => ['type' => 'text', 'subtype' => 'code', 'text' => $this->ddfRecData['srcData']]
 		];
 		$c[] = $ci;
@@ -78,15 +133,15 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 		// -- simplifiedData
 		$ci = [
 			'name' => 'Vytěženo',
-			'icon' => 'icon-file-code-o',
+			'icon' => 'user/fileText',
 			'content' => ['type' => 'text', 'subtype' => 'code', 'text' => json::lint($this->srcImpData)]
 		];
 		$c[] = $ci;
 
 		// -- impData
 		$ci = [
-			'name' => 'IMP',
-			'icon' => 'icon-file-code-o',
+			'name' => 'Shipard',
+			'icon' => 'user/fileText',
 			'content' => ['type' => 'text', 'subtype' => 'code', 'text' => json::lint($this->impData)]
 		];
 		$c[] = $ci;
@@ -137,6 +192,9 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 		//if (isset($this->srcImpData['Note']))
 		//	$this->docHead['title'] = $this->valueStr($this->srcImpData['Note'], 120);
 
+		if (isset($this->srcImpData['head']['taxType']))
+			$this->docHead['taxType'] = $this->srcImpData['head']['taxType'];
+
 		if (isset($this->srcImpData['head']['dateIssue']))
 			$this->docHead['dateIssue'] = $this->srcImpData['head']['dateIssue'];
 		if (isset($this->srcImpData['head']['dateTax']))
@@ -150,8 +208,6 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 			$this->docHead['bankAccount'] = $this->srcImpData['head']['bankAccount'];
 
 		//echo json_encode($this->docHead);
-
-		//$this->importPayment();
 	}
 
 	protected function importRows()
@@ -242,10 +298,13 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 		if (isset($r['itemShortName']) && $r['itemShortName'] !== '')
 			$itemInfo['itemShortName'] = $r['itemShortName'];
 
+		$row['!itemInfo'] = $itemInfo;
+
 		$this->searchItem($itemInfo, $r, $row);
 		$this->checkItem($r, $row);
 
 		$this->applyRowSettings($row);
+		$this->applyDocsImportSettings($row);
 
 		if (count($row))
 			$this->docRows[] = $row;
@@ -290,6 +349,7 @@ class DocsDataMining extends \e10doc\ddf\core\libs\Core
 		if (isset($this->srcImpData['head']['person']['vatId']))
 		{
 			$vatId = $this->srcImpData['head']['person']['vatId'];
+			$this->importProtocol['person']['src']['vatId'] = $vatId;
 			$personNdx = $this->searchPerson('ids', 'taxid', $vatId);
 			if ($personNdx)
 			{

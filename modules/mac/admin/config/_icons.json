@@ -1,5 +1,11 @@
 {
-    "tables/mac.admin.admins": {
+	"tables/mac.admin.admins": {
+		"fa5": "fa-user-secret",
+		"fa6pro": "fa-user-secret",
+		"bsi": "bi-person-square",
+		"mdi": "support_agent"
+	},
+	"tables/mac.admin.lanUsers": {
 		"fa5": "fa-user-secret",
 		"fa6pro": "fa-user-secret",
 		"bsi": "bi-person-square",
@@ -16,5 +22,11 @@
 		"fa6pro": "fa-crosshairs",
 		"bsi": "bi-geo-fill",
 		"mdi": "location_on"
+	},
+	"tables/mac.admin.tokens": {
+		"fa5":"fa-tag",
+		"fa6pro":"fa-tag",
+		"bsi":"bi-tag-fill",
+		"mdi":"local_offer"
 	}
 }

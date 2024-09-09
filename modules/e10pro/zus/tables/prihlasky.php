@@ -110,6 +110,26 @@ class TablePrihlasky extends DbTable
 		$r = zusutils::columnInfoEnumTest ($columnId, $cfgItem, $form);
 		return ($r !== NULL) ? $r : parent::columnInfoEnumTest ($columnId, $cfgKey, $cfgItem, $form);
 	}
+
+	public function archiveEntries($academicYearId)
+	{
+		$q = [];
+		array_push($q, 'SELECT *');
+		array_push($q, ' FROM [e10pro_zus_prihlasky]');
+		array_push($q, ' WHERE [docState] = %i', 4000);
+		array_push($q, ' AND [skolniRok] = %s', $academicYearId);
+		array_push($q, ' ORDER BY [ndx]');
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			if ($this->app()->debug)
+				echo "* ".$r['fullNameS']."\n";
+			$this->db()->query('UPDATE [e10pro_zus_prihlasky] SET [docState] = %i, ', 9000, '[docStateMain] = %i', 5,
+													' WHERE [ndx] = %i', $r['ndx']);
+
+			$this->docsLog ($r['ndx']);
+		}
+	}
 }
 
 
@@ -190,6 +210,9 @@ class ViewPrihlasky extends TableView
 			array_push ($q, " AND prihlasky.[svpOddeleni] = %i", $qv['oddeleni']['']);
 		if (isset ($qv['mistoStudia']))
 			array_push ($q, " AND [prihlasky].[mistoStudia] IN %in", array_keys($qv['mistoStudia']));
+
+		if (isset($qv['skolniRok']['']) && $qv['skolniRok'][''] != '0')
+			array_push ($q, " AND prihlasky.[skolniRok] = %i", $qv['skolniRok']['']);
 
 		$this->queryMain ($q, 'prihlasky.', ['[webSentDate]', '[fullNameS]']);
 		$this->runQuery ($q);
@@ -288,10 +311,12 @@ class ViewPrihlasky extends TableView
 		$qry[] = ['id' => 'mistoStudia', 'style' => 'params', 'title' => 'Přijetí ke studiu v', 'params' => $paramsMS];
 
 		$paramsRows = new \e10doc\core\libs\GlobalParams ($panel->table->app());
+		$paramsRows->addParam('switch', 'query.skolniRok', ['title' => 'Školní rok', 'switch' => zusutils::skolniRoky($this->app)]);
 		$paramsRows->addParam ('switch', 'query.obor', ['title' => 'Obor', 'place' => 'panel', 'cfg' => 'e10pro.zus.obory', 'titleKey' => 'nazev',
 			'enableAll' => ['0' => ['title' => 'Vše']]]);
 		$paramsRows->addParam ('switch', 'query.oddeleni', ['title' => 'Oddělení', 'place' => 'panel', 'cfg' => 'e10pro.zus.oddeleni', 'titleKey' => 'nazev',
 			'enableAll' => ['0' => ['title' => 'Vše']]]);
+
 		$paramsRows->detectValues();
 		$qry[] = array ('id' => 'paramRows', 'style' => 'params', 'title' => 'Hledat', 'params' => $paramsRows, 'class' => 'switches');
 

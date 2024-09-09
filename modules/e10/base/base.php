@@ -109,7 +109,12 @@ function getPropertiesTable ($app, $toTableId, $toRecId)
 			else
 			if ($p ['type'] == 'date')
 			{
-				$oneProp = array ('ndx' => $row ['ndx'], 'property' => $row ['property'], 'group' => $row ['group'], 'value' => $row ['valueDate'], 'type' => 'memo', 'name' => $p ['name']);
+				$oneProp = [
+					'ndx' => $row ['ndx'], 'property' => $row ['property'], 'group' => $row ['group'],
+					'value' => $row ['valueDate'], 'type' => 'memo', 'name' => $p ['name']
+				];
+				if ($row ['valueDate'])
+					$oneProp['value'] = utils::datef($row ['valueDate'], '%d');
 				$loaded = true;
 			}
 			else
@@ -419,7 +424,7 @@ class ListProperties implements \E10\IDocumentList
 			}
 			else
 			{
-				$r['valueString'] = $row ['value'];
+				$r['valueString'] = str::upToLen($row ['value'], 64);
 				if ($row ['value'] != '')
 					$hasValue = true;
 			}
@@ -584,7 +589,7 @@ class ListProperties implements \E10\IDocumentList
 		$inputNoteId = str_replace ('.', '-', $inputPrefix . '-note');
 
 		if ($property ['type']  == 'text')
-			$c .= "<input type='text' name='{$inputPrefix}.value' class='e10-ef-w50' id='$inputId' data-fid='{$this->formData->fid}'$readOnlyParam/>";
+			$c .= "<input type='text' name='{$inputPrefix}.value' class='e10-ef-w50' maxlength='64' id='$inputId' data-fid='{$this->formData->fid}'$readOnlyParam/>";
 		else
 		if ($property ['type']  == 'memo')
 		{
@@ -645,7 +650,7 @@ class ListProperties implements \E10\IDocumentList
 
 		if (isset($property ['note']) && $property ['note'])
 			$c .= "<label for='$inputNoteId' class='e10-prop-note'><i class='fa fa-pencil'></i></label>".
-						"<input type='text' placeholder='pozn.' name='{$inputPrefix}.note' class='e10-prop-note' id='$inputNoteId' data-fid='{$this->formData->fid}'$readOnlyParam/>";
+						"<input type='text' placeholder='pozn.' name='{$inputPrefix}.note' class='e10-prop-note' maxlength='50' id='$inputNoteId' data-fid='{$this->formData->fid}'$readOnlyParam/>";
 
 		if (isset($property ['multi']) && $property ['multi'] && !$this->formData->readOnly)
 			$c .= " <button type='button' class='btn btn-default btn-xs e10-row-append' tabindex='-1' data-list='{$this->listId}' data-propid='{$dataItem ['property']}' data-groupid='{$dataItem ['group']}'>".$this->formData->app()->ui()->icon('system/actionAdd')."</button>";
@@ -848,7 +853,8 @@ function addAttachments ($app, $toTableId, $toRecId, $fullFileName, $attType, $m
 			copy ($fullFileName, $destFullFileName);
 	}
 
-	$newAtt ['name'] = ($attName === '') ? $baseFileName : str::upToLen($attName, 80);
+	$newAtt ['fileSize'] = filesize($destFullFileName);
+	$newAtt ['name'] = ($attName === '') ? str::upToLen($baseFileName, 80) : str::upToLen($attName, 80);
 
 	$app->db->query ("INSERT INTO [e10_attachments_files]", $newAtt);
 	$newNdx = intval ($app->db->getInsertId ());
@@ -2165,13 +2171,22 @@ class ListDocLinks implements \E10\IDocumentList
 				$inputHint = $this->formData->columnOptionsHints ($options);
 			}
 
+			$inputClass = 'e10-inputDocLink';
+			if (isset($this->listDefinition['saveOnChange']))
+				$inputClass .= ' e10-ino-saveOnChange';
 			$inputCode = '';
-			$inputCode .= "<div id='$inputId' class='e10-inputDocLink' data-name='$inputName'
+			$inputCode .= "<div id='$inputId' class='$inputClass' data-name='$inputName'
 											data-srctable='{$this->table->tableId()}' data-listid='{$this->listId}'
 											data-listgroup='{$linkDef['linkid']}' data-fid='{$this->formData->fid}'$readOnlyParam>";
 			$inputCode .= "<span class='placeholder'>" . '...' . '</span>';
 			$inputCode .= '<ul>';
-			$inputCode .= "<li class='input'><input class='e10-inputListSearch e10-viewer-search' style='width: 10ex' data-sid='{$this->formData->fid}Sidebar'></li>";
+			$inputClass = '';
+			if ($options & TableForm::coFocus)
+			{
+				$inputClass = ' autofocus';
+				$this->formData->setFlag ('autofocus', 1);
+			}
+			$inputCode .= "<li class='input'><input class='e10-inputListSearch e10-viewer-search$inputClass' style='width: 10ex' data-sid='{$this->formData->fid}Sidebar'></li>";
 			$inputCode .= '</ul>';
 			$inputCode .= '</div>';
 			if ($this->formData->activeLayout === TableForm::ltGrid)

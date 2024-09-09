@@ -1,0 +1,25 @@
+<div class="container-fluid">
+  <h1 class="p-1 pt-3">{{{@icon;icon:user/cog}}} Nastavení</h1>
+
+  {{#data.appSettings}}
+    {{{code}}}
+  {{/data.appSettings}}
+
+  <ol class="shpd-list mb-2">
+    <div class="d-flex shpd-list-item align-items-center">
+      <label class="me-3">{{{@icon;icon:user/paintBrush}}}&nbsp;Vzhled</label>
+      <select name="shp-theme-variant" id="input-shp-theme-variant" onchange="shc.setColorMode(event)">
+        <option value="auto">Auto</option>
+        {{#data.uiStruct.themeVariants}}
+          <option value='{{id}}'>{{name}}</option>
+        {{/data.uiStruct.themeVariants}}
+      </select>
+    </div>
+  </ol>
+
+  <ol class="shpd-list mb-2">
+    <a class="shpd-list-item" href='{{data.uiRoot}}auth/logout'>{{{@icon;icon:user/signOut}}} Odhlásit</a>
+  </ol>
+
+
+</div>

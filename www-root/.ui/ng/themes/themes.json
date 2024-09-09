@@ -2,9 +2,51 @@
   "default":{
     "id":"default",
     "name":"default ng theme",
+    "variants":{
+      "systemDefaultLight":{
+        "name":"sv\u011btl\u00fd",
+        "file":"\/www-root\/.ui\/ng\/themes\/default\/systemDefaultLight.css",
+        "dm":0,
+        "integrity":{
+          "sha384":"48c12fd3e6986428cc409ae27e9221be68a4e2450b02d6959740efdf499a04e01dee319b653556a7a79b4a7ed8bf7124"
+        }
+      },
+      "systemDefaultDark":{
+        "name":"tmav\u00fd",
+        "file":"\/www-root\/.ui\/ng\/themes\/default\/systemDefaultDark.css",
+        "dm":1,
+        "integrity":{
+          "sha384":"72b749d6798c9af2b23f3b32485c73362fc112f18c4a6b6b18a9f7b77b7e7011dd87f50b179b0c15776ac112c7d86723"
+        }
+      },
+      "systemDefaultColored":{
+        "name":"modr\u00fd",
+        "file":"\/www-root\/.ui\/ng\/themes\/default\/systemDefaultColored.css",
+        "dm":1,
+        "integrity":{
+          "sha384":"e9fba06d67863c33f5a9fe41e70be9cbf6e549609b70ef7f192049387ce354a1c199ed8194bf8706189b192b79f4fe16"
+        }
+      },
+      "systemPastelLight":{
+        "name":"sv\u011btle pastelov\u00fd",
+        "file":"\/www-root\/.ui\/ng\/themes\/default\/systemPastelLight.css",
+        "dm":1,
+        "integrity":{
+          "sha384":"beda705e4e8bb8dfddd6913eb274744626fb98487d477e93d055aae56a505685f6070fa3062cda4107abb9aa92a4f154"
+        }
+      },
+      "systemBlack":{
+        "name":"\u010dern\u00fd",
+        "file":"\/www-root\/.ui\/ng\/themes\/default\/systemBlack.css",
+        "dm":1,
+        "integrity":{
+          "sha384":"e4a08449d93a42da1adba260ad0376ed380ce74fd7914695a1be8240a94a4b53a23debb3e42fd81165831d5d9a6d339c"
+        }
+      }
+    },
     "integrity":{
-      "sha384":"30af597690c69a3ba04bf518beb2ce36cbe257c14db94964b811f778a4ab3b7ccc008707ffa99e6b55576c236a7292bc",
-      "md5":"01b41d23034daaf8ef482e861e519cbf"
+      "sha384":"8f043d2f52ee8b995ab867658faf8e989d257f80e72b4be24f9331714f3a2b3676ba6c2db37aafba6d718774aa3624ca",
+      "md5":"ce8e0ef7e11fdfe36b44631f1d22a990"
     }
   }
 }

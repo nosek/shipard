@@ -13,7 +13,7 @@ class ViewBankOrders extends \E10Doc\Core\ViewHeads
 {
 	var $bankAccountsParam = NULL;
 	var $bankAccounts = NULL;
-	var $bankAccountGroups = NULL;
+	var $bankAccountsGroups = NULL;
 	var $bankAccountNdx = 0;
 
 
@@ -107,8 +107,8 @@ class ViewBankOrders extends \E10Doc\Core\ViewHeads
 	public function createMainQueries ()
 	{
 		$mq [] = ['id' => 'active', 'title' => 'Aktivní'];
+		$mq [] = ['id' => 'archive', 'title' => 'Uhrazeno'];
 		$mq [] = ['id' => 'all', 'title' => 'Vše'];
-		$mq [] = ['id' => 'archive', 'title' => 'Archív'];
 		$mq [] = ['id' => 'trash', 'title' => 'Koš'];
 		$this->setMainQueries ($mq);
 	}
@@ -148,7 +148,7 @@ class ViewBankOrders extends \E10Doc\Core\ViewHeads
       array_push ($q, ' AND heads.[docStateMain] = 4');
 
 		if ($mainQuery == 'all')
-			array_push ($q, ' ORDER BY [datePeriodBegin] DESC' . $this->sqlLimit());
+			array_push ($q, ' ORDER BY [datePeriodBegin] DESC, [docNumber] DESC' . $this->sqlLimit());
 		else
 			array_push ($q, ' ORDER BY heads.[docStateMain], [docNumber] DESC' . $this->sqlLimit());
 

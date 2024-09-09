@@ -1,13 +1,13 @@
-<div class="app-container">
+<div class="app-container app-container-simple{{#data.uiStruct.appMenu.class}} {{data.uiStruct.appMenu.class}}{{/data.uiStruct.appMenu.class}}" id='shp-app-window'>
   <div class="app-nav">
-    <nav class="navbar align-items-between">
-    <div class="container-fluid">
+    <!--<nav class="_navbar align-items-between">-->
+      <!--<div class="container-fluid">-->
 
       <button class="navbar-toggler" id="navbar-toggler-left" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar" aria-controls="offcanvasNavbar" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
+        <span class="shpd-nav-toggler-icon">{{{@icon;icon:user/other}}}</span>
       </button>
 
-      <h5 id="navbar-title-left">
+      <h5 class="mb-0" id="navbar-title-left">
         {{{@icon;icon:user/user}}} {{userInfo.name}}
       </h5>
 
@@ -19,33 +19,20 @@
 
       {{#data.rightMenuCode}}
       <button class="navbar-toggler" id="navbar-toggler-right" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar2" aria-controls="offcanvasNavbar2" aria-label="Toggle navigation">
-        <span class="fw-semibold align-items-center" style='font-size: 110%;'>{{activeUserContext.shortTitle}}<span class="ps-2"> {{{@icon;icon:user/user}}}</span></span>
+        <span class="fw-semibold align-items-center" style='font-size: 110%;'>{{activeUserContext.shortTitle}}<span class="ps-2"> {{{@icon;dataItem:data.uiStruct.appMenu.rightMenu.icon}}}</span></span>
       </button>
       {{/data.rightMenuCode}}
 
       <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasNavbar" aria-labelledby="offcanvasNavbarLabel">
         <div class="offcanvas-header">
           <h5 class="offcanvas-title" id="offcanvasNavbarLabel">{{userInfo.name}}</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+          <button type="button" class="shpd-close" data-bs-dismiss="offcanvas" aria-label="Close">{{{@icon;icon:user/times}}}</button>
         </div>
         <div class="offcanvas-body">
-          <div class="navbar-nav flex-grow-1">
-            <div class="list-group list-group-flush">
-              {{#data.uiStruct.appMenu.items}}
-                <a href="{{uiRoot}}{{id}}" class='list-group-item list-group-item-action {{#active}}active{{/active}}'><span class="navListIcon">{{{@icon;dataItem:icon}}}</span> {{title}}</a>
-              {{/data.uiStruct.appMenu.items}}
-
-              <a class="list-group-item" href='{{data.uiRoot}}auth/logout'>{{{@icon;icon:user/signOut}}} Odhlásit</a>
-
-              <div class="list-group-item d-flex align-items-center">
-                {{{@icon;icon:user/paintBrush}}}&nbsp;Motiv
-                <div class="btn-group ms-3 flex-grow-1">
-                  <a class="shp-app-action btn btn-secondary" data-action='setColorMode' href="#" data-app-color-mode='auto'>Auto</a>
-                  <a class="shp-app-action btn btn-secondary" data-action='setColorMode' href="#" data-app-color-mode='dark'>Tmavý</a>
-                  <a class="shp-app-action btn btn-secondary" data-action='setColorMode' href="#" data-app-color-mode='light'>Světlý</a>
-                </div>
-              </div>
-            </div>
+          <div class="shpd-nav">
+            {{#data.uiStruct.appMenu.items}}
+              <a href="{{uiRoot}}{{id}}" class='shpd-nav-item {{#active}}active{{/active}}'><span class="navListIcon">{{{@icon;dataItem:icon}}}</span> {{title}}</a>
+            {{/data.uiStruct.appMenu.items}}
           </div>
         </div>
       </div>
@@ -55,13 +42,13 @@
       <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasNavbar2" aria-labelledby="offcanvasNavbarLabel">
         <div class="offcanvas-header">
           <h5 class="offcanvas-title" id="offcanvasNavbarLabel"></h5>
-          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+          <button type="button" class="shpd-close" data-bs-dismiss="offcanvas" aria-label="Close">{{{@icon;icon:user/times}}}</button>
         </div>
         <div class="offcanvas-body">
-          <div class="list-group list-group-flush">
+          <div class="shpd-nav">
             {{#userContextsEnum}}
               <!-- <div class="d-grid gap-2">-->
-                <button type="button" class=' list-group-item list-group-item-action shp-app-action {{#active}}active{{/active}}' data-action='setUserContext' data-user-context='{{id}}'> {{{@icon;icon:user/user}}} {{title}}</button>
+                <button type="button" class='shpd-nav-item shp-app-action {{#active}}active{{/active}}' data-action='setUserContext' data-user-context='{{id}}'> {{{@icon;icon:user/user}}} {{title}}</button>
               <!--</div>-->
             {{/userContextsEnum}}
           </div>
@@ -73,7 +60,7 @@
       <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasNavbar2" aria-labelledby="offcanvasNavbarLabel">
         <div class="offcanvas-header">
           <h5 class="offcanvas-title" id="offcanvasNavbarLabel"></h5>
-          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+          <button type="button" class="shpd-close" data-bs-dismiss="offcanvas" aria-label="Close">{{{@icon;icon:user/times}}}</button>
         </div>
         <div class="offcanvas-body">
           {{{data.rightMenuCode}}}
@@ -81,8 +68,8 @@
       </div>
       {{/data.rightMenuCode}}
 
-    </div>
-    </nav>
+    <!--</div>-->
+    <!--</nav>-->
   </div>
 
   <div class="app-content" id='shp-main-app-content' {{{data.appBrowserParams}}}>
@@ -90,26 +77,12 @@
   </div>
 
   <div class='app-menu'>
-    <div class="list-group list-group-flush">
+    <div class="shpd-nav">
       {{#data.uiStruct.appMenu.items}}
-        <a href="{{uiRoot}}{{id}}" class='list-group-item list-group-item-action {{#active}}active{{/active}}'><span class="navListIcon">{{{@icon;dataItem:icon}}}</span> {{title}}</a>
+        <a href="{{uiRoot}}{{id}}" class='shpd-nav-item {{#active}}active{{/active}}'><span class="navListIcon">{{{@icon;dataItem:icon}}}</span> {{title}}</a>
       {{/data.uiStruct.appMenu.items}}
-
-      <a class="list-group-item" href='{{data.uiRoot}}auth/logout'>{{{@icon;icon:user/signOut}}} Odhlásit</a>
-
-      <div class="list-group-item d-flex align-items-center">
-        {{{@icon;icon:user/paintBrush}}}&nbsp;Motiv
-        <div class="btn-group ms-3 flex-grow-1">
-          <a class="shp-app-action btn btn-secondary" data-action='setColorMode' href="#" data-app-color-mode='auto'>Auto</a>
-          <a class="shp-app-action btn btn-secondary" data-action='setColorMode' href="#" data-app-color-mode='dark'>Tmavý</a>
-          <a class="shp-app-action btn btn-secondary" data-action='setColorMode' href="#" data-app-color-mode='light'>Světlý</a>
-        </div>
-      </div>
     </div>
   </div>
 
   <!--<div class='app-footer'>AHOJ...</div>-->
-
-  <div class="p-1">
-  </div>
 </div>

@@ -13,10 +13,16 @@ class ReportWasteOnePersonAction extends DocumentAction
 {
 	var $testRun = 0;
 	var $debug = 0;
+	var $maxCount = 0;
+
+	/** @var \e10\persons\TablePersons */
+	var $tablePersons = NULL;
+
 
 	public function init ()
 	{
 		parent::init();
+		$this->tablePersons = $this->app()->table('e10.persons.persons');
 	}
 
 	public function actionName ()
@@ -38,6 +44,7 @@ class ReportWasteOnePersonAction extends DocumentAction
 		$report->calendarYear = intval($this->params['data-param-calendar-year']);
 		$report->periodBegin = $report->calendarYear.'-01-01';
 		$report->periodEnd = $report->calendarYear.'-12-31';
+		$report->codeKindNdx = intval($this->params['data-param-code-kind']);
 
 		$report->init();
 		$report->renderReport ();
@@ -52,6 +59,7 @@ class ReportWasteOnePersonAction extends DocumentAction
 		$msg->setSubject($msgSubject);
 		$msg->setBody($msgBody);
 		$msg->setDocument ('e10.persons.persons', $personNdx, $report);
+		$msg->outboxLinkId = $report->outboxLinkId;
 
 		$attachmentFileName = Utils::safeChars($report->createReportPart ('fileName'));
 		if ($attachmentFileName === '')
@@ -86,28 +94,36 @@ class ReportWasteOnePersonAction extends DocumentAction
 		$report->calendarYear = intval($this->params['data-param-calendar-year']);
 		$report->periodBegin = $this->params['data-param-period-begin'];
 		$report->periodEnd = $this->params['data-param-period-end'];
+		$report->codeKindNdx = $this->params['data-param-code-kind'];
 		$report->createPdf();
 
+		$cnt = 0;
 		foreach ($report->persons as $personNdx)
 		{
 			$this->sendOne($personNdx);
+
+			$cnt++;
+			if ($this->maxCount && $cnt >= $this->maxCount)
+				break;
 		}
 	}
 
-	public function runFromCli($year)
+	public function runFromCli($year, $wasteCodeKind)
 	{
 		$this->setParams([
 			'data-param-calendar-year' => $year,
 			'data-param-period-begin' => $year.'-01-01',
 			'data-param-period-end' => $year.'-12-31',
+			'data-param-code-kind' => strval($wasteCodeKind),
 		]);
 		$this->run();
 	}
 
 	public function loadEmails ($personNdx)
 	{
-		$sql = 'SELECT valueString FROM [e10_base_properties] where [tableid] = %s AND [recid] = %i AND [property] = %s AND [group] = %s ORDER BY ndx';
-		$emailsRows = $this->db()->query ($sql, 'e10.persons.persons', $personNdx, 'email', 'contacts')->fetchPairs ();
-		return implode (', ', $emailsRows);
+		if (!$this->tablePersons)
+			$this->tablePersons = $this->app()->table('e10.persons.persons');
+
+		return $this->tablePersons->loadEmailsForReport([$personNdx], 'e10pro.reports.waste_cz.ReportWasteOnePerson');
 	}
 }

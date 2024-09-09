@@ -12,6 +12,7 @@ use \Shipard\UI\Core\ContentRenderer;
 class TableViewRenderer extends Renderer
 {
   var ?\Shipard\Viewer\TableView $viewer = NULL;
+	var $isModal = 0;
 
   public function setViewer (\Shipard\Viewer\TableView $viewer)
   {
@@ -27,8 +28,6 @@ class TableViewRenderer extends Renderer
   function createViewerCode ()
 	{
     $fullCode = 1;
-		//if ($this->mobile)
-		//	return $this->createViewerCodeMobile ($format, $fullCode, $jsinit);
 
     /*
 		$this->viewer->toolbarElementId = 'e10-tm-detailbuttonbox';
@@ -44,26 +43,17 @@ class TableViewRenderer extends Renderer
 
 
 		$detailCode = '';
+		if ($this->viewer->objectSubType !== TableView::vsDetail)
+			$detailCode = $this->createDetailsCode();
 
-		if (/*$this->viewer->paneMode && */ $this->viewer->objectSubType !== TableView::vsDetail)
-		{
-			$detailCode .= "<div style='' class='detail' id='{$this->viewer->vid}Details'>";
-			$detailCode .=
-			"<div class='e10-mv-ld-header'></div>" .
-			"<div class='e10-mv-ld-content' data-e10mxw='1'></div>" .
-			"</div>";
-		}
-
-		//if ($this->viewer->paneMode && $this->viewer->objectSubType !== TableView::vsDetail)
-		//	$detailCode .= $this->viewer->createDetailsCode ();
-
-
+		/*
 		$reportCode =
 		"<div style='display: none;' class='e10-mv-lr' id='{$this->viewer->vid}Report'>" .
 				//$this->createPanelsCode () .
 				"<div class='e10-mv-lr-content'>{$this->viewer->report ()}</div>" .
 				"</div>
 		</div>";
+		*/
 
 		$viewerClass = "df2-viewer shp-viewer-{$this->viewer->table->tableId()} shp-{$this->viewer->objectSubType}";
 		$viewerClass .= ' shp-viewer-type-'.$this->viewer->type;
@@ -83,18 +73,31 @@ class TableViewRenderer extends Renderer
 		if ($this->viewer->usePanelLeft)
 			$viewerClass .= ' e10-viewer-panel-left';
 
-		if ($this->viewer->fullWidthToolbar)
-			$viewerClass .= ' e10-viewer-fw-toolbar';
+		$viewerClass .= ' dmPanels';
+
+		//if ($this->viewer->fullWidthToolbar)
+		//	$viewerClass .= ' e10-viewer-fw-toolbar';
 
 		if (isset ($this->viewer->classes))
 			$viewerClass .= ' '.implode (' ', $this->viewer->classes);
+		else
+			$viewerClass .= ' appViewer';
 
 		$c = "<data-viewer style='display: none;' ";
 		$c .= "data-request-type='dataViewer' ";
     $c .= "data-object-type='data-viewer'";
     $c .= "class='$viewerClass' id='{$this->viewer->vid}' data-viewer='{$this->viewer->vid}' data-object='viewer'";
 		$c .=	"data-viewertype='{$this->viewer->objectSubType}' data-table='" . $this->viewer->table->tableId () . "' data-viewer-view-id='" . $this->viewer->viewId () . "' ";
-		$c .= "data-addparams='{$this->viewer->addParams ()}' data-queryparams='{$this->viewer->queryParams()}' data-lineswidth='{$this->viewer->linesWidth}' ";
+
+		foreach ($this->viewer->addParams as $apk => $apv)
+		{
+			if (str_starts_with($apk, ''))
+				$c .= "data-form-param-addparam-".substr($apk, 2)."='".Utils::es(strval($apv))."' ";
+			else
+				$c .= "data-form-param-addparam-{$apk}='".Utils::es(strval($apv))."' ";
+		}
+
+		$c .= "data-queryparams='{$this->viewer->queryParams()}' data-lineswidth='{$this->viewer->linesWidth}' ";
 		$c .= "data-toolbar='{$this->viewer->toolbarElementId}' data-mode='{$this->viewer->mode}' data-type='{$this->viewer->type}'";
 
     /*
@@ -127,10 +130,32 @@ class TableViewRenderer extends Renderer
 		$c .= ">";
 
 		// -- toolbar?
-		//if ($this->viewer->type === 'inline')
+		if ($this->viewer->enableToolbar)
 		{
-			$c .= "<div class='toolbar' id='{$this->viewer->toolbarElementId}__Main'>";
-			$c .= $this->viewer->createToolbarCode ();
+			$c .= "<div class='toolbar'>";
+				$c .= "<div class='buttons'>";
+					if ($this->viewer->enableFullTextSearch)
+					{
+						$c .= "<span class='fts'>";
+							$c .= $this->app()->ui()->icon('system/iconSearch', 'iconSearch');
+							$c .= "<input name='fullTextSearch' type='text' class='fulltext e10-viewer-search' autocomplete='off' placeholder='".utils::es($placeholder)."' value=''";
+							if ($this->viewer->disableIncrementalSearch)
+								$c .= " data-onenter='1'";
+							$c .= '/>';
+							$c .= $this->app()->ui()->icon('system/actionInputClear', 'iconClear');
+						$c .= '</span>';
+					}
+					$c .= $this->createToolbarCode ();
+				$c .= '</div>';
+
+				$fc = $this->createMainQueriesCode();
+				if ($fc !== '')
+				{
+					$c .= "<div class='filters'>";
+					$c .= $fc;
+					$c .= '</div>';
+				}
+
 			$c .= '</div>';
 		}
 
@@ -140,12 +165,43 @@ class TableViewRenderer extends Renderer
 		{
 			$c .= $detailCode;// . $reportCode;
 		}
+
+		$c .= $this->createPanelsCode();
+
+
 		$c .= "</data-viewer>";
 
-//		if ($jsinit)
-//			$c .= "<script type='text/javascript'>jQuery(function tst (){initViewer ('$this->viewer->vid')});</script>";
-
     return $c;
+	}
+
+	function createDetailsCode()
+	{
+		$c = '';
+		$c .= "<div style='' class='detail' id='{$this->viewer->vid}Details'>";
+		$c .= "<div class='header'></div>";
+		$c .= "<div class='content' data-e10mxw='1'></div>";
+
+
+		$details = $this->viewer->createDetails ();
+		if (count($details))
+		{
+			$active = ' active';
+
+			$c .= "<div class='tabs'>\n";
+			foreach ($details as $id => $detail)
+			{
+				$c .= "<span data-detail='$id' class='shp-widget-action$active' data-action='detailSelect'>";
+				$c .= $this->app()->ui()->icon ($detail['icon']);
+				$c .= "<div>".\E10\es ($detail['title']).'</div>';
+				$c .= '</span>';
+				$active = '';
+			}
+			$c .= "</div>\n";
+		}
+
+		$c .= "</div>";
+
+		return $c;
 	}
 
   function createViewerBodyCode ()
@@ -158,36 +214,83 @@ class TableViewRenderer extends Renderer
 		if ($this->viewer->htmlRowsElementClass !== '')
 			$listClass .= ' '.$this->viewer->htmlRowsElementClass;
 
-		$c .= $this->viewer->createLeftPanelCode();
-
-		//if ($this->viewer->fullWidthToolbar)
-		//	$c .= $this->viewer->createFullWidthToolbarCode();
+		$c .= $this->createLeftPanelCode();
 
 		$c .= "<div class='body'>";
-
-		if (!$this->viewer->fullWidthToolbar)
-			$c .= $this->createTopMenuSearchCode ();
-
-      $c .= "<div class='rows'>";
-
-
-		$c .= "<div style='z-index: 499;' class='rows-list e10-viewer-list$listClass' id='{$this->viewer->vid}Items' data-rowspagenumber='0'".
-					"data-viewer='{$this->viewer->vid}' data-rowelement='{$this->viewer->htmlRowElement}'>";
-
-		$c .= $this->viewer->rows ();
-
-
-
-		$c .= "</div>";
-
-    $c .= "</div>";
-
-
-		$c .= $this->viewer->createBottomTabsCode ();
+			$c .= "<div class='rows'>";
+				$c .= "<div style='z-index: 499;' class='rows-list e10-viewer-list$listClass' id='{$this->viewer->vid}Items' data-rowspagenumber='0'".
+							"data-viewer='{$this->viewer->vid}' data-rowelement='{$this->viewer->htmlRowElement}'>";
+					$c .= $this->viewer->rows ();
+				$c .= "</div>";
+			$c .= "</div>";
+			$c .= $this->createBottomTabsCode ();
 		$c .= '</div>';
 
-		$c .= $this->viewer->createRightPanelCode();
+		return $c;
+	}
 
+	public function createLeftPanelCode()
+	{
+		if (!$this->viewer->usePanelLeft)
+			return '';
+
+		$this->viewer->panelLeft = $this->viewer->panel('left');
+		$this->viewer->createPanelContent ($this->viewer->panelLeft);
+
+		$c = '';
+
+		$c .= "<div class='sidebar' id='{$this->viewer->vid}PanelLeft'>";
+		$c .= $this->viewer->panelLeft->createCode();
+		$c .= '</div>';
+
+		return $c;
+	}
+
+
+	public function createPanelsCode()
+	{
+		if ($this->viewer->panels === FALSE)
+			return '';
+
+		$c = '';
+
+		$c .= "<div class='panels'>";
+			$c .= $this->createPanelsTabsCode();
+			$c .= "<div class='activePanelContent'>".$this->viewer->report ()."</div>";
+			$c .= "</div>";
+		$c .= "</div>";
+
+		return $c;
+	}
+
+	public function createPanelsTabsCode()
+	{
+		if ($this->viewer->panels === FALSE)
+			return '';
+		$c = '';
+
+		$title = isset ($this->viewer->viewerDefinition['title']) ? $this->viewer->viewerDefinition['title'] : $this->viewer->table->tableName ();
+
+		$c .= "<div class='viewerPanelsTabs'>";
+
+		if ($title !== '')
+			$c .= "<span class='title'>". Utils::es ($title) . '</span>';
+		$c .= "<span class='tabs'>";
+		$activeTabId = $this->viewer->panels[0]['id'];
+		forEach ($this->viewer->panels as $q)
+		{
+			$txt = Utils::es ($q ['title']);
+			$c .= "<span class='tab shp-widget-action";
+
+			if ($q['id'] === $activeTabId)
+				$c .= ' active';
+
+			$c .= "' data-id='{$q['id']}' data-action='viewerPanelTab'>";
+			$c .= $txt;
+			$c .= '</span>';
+		}
+		$c .= '</span>';
+		$c .= '</div>';
 		return $c;
 	}
 
@@ -197,12 +300,13 @@ class TableViewRenderer extends Renderer
 		$tlbr = $this->viewer->createToolbar ();
 
 		/*
-    if ($this->fullWidthToolbar)
+    if ($this->viewer->fullWidthToolbar)
 		{
 			$c .= $this->app()->ui()->composeTextLine($tlbr);
 			return $c;
 		}
-    */
+		*/
+
 
 		$btnClass = 'btn-large';
 		if ($this->viewer->objectSubType == TableView::vsMini)
@@ -210,13 +314,16 @@ class TableViewRenderer extends Renderer
 
 		foreach ($tlbr as $btn)
 		{
+			$buttonsParams = [];
+			$buttonsParams['data-action-param-table'] = $this->viewer->tableId();
+
 			if ($btn['type'] == 'code')
 			{
 				$c .= $btn['code'];
 			}
 			else
 			{
-				$class = '';
+				$class = ' shp-widget-action';
 
 				if (isset ($btn['doubleClick']))
 					$class .= ' dblclk';
@@ -232,7 +339,7 @@ class TableViewRenderer extends Renderer
 														$icon = $this->app()->ui()->icon($btn['icon'] ?? 'system/actionAddWizard');
 														break;
 					case 'new':
-													$class .= ' e10-document-trigger';
+													//$class .= ' e10-document-trigger';
 													$icon = $this->app()->ui()->icon('system/actionAdd');
 													if (isset ($btn ['table']))
 														$dataTable = "data-table='{$btn ['table']}' ";
@@ -243,20 +350,25 @@ class TableViewRenderer extends Renderer
 			}
 				$btnParams = '';
 				if (isset ($btn['data-class']))
-					$btnParams .= "data-class='{$btn['data-class']}' ";
+					//$btnParams .= "data-class='{$btn['data-class']}' ";
+					$buttonsParams['data-action-class'] = $btn['data-class'];
 
 				if (isset ($btn['data-addparams']))
-					$btnParams .= "data-addparams='{$btn['data-addparams']}' ";
+//					$btnParams .= "data-addparams='{$btn['data-addparams']}' ";
+					$buttonsParams['data-action-add-params'] = $btn['data-addparams'];
 
 				$btnText = $btn['text'];
+
+				foreach ($buttonsParams as $bpk => $bpv)
+					$btnParams.= ' '.$bpk."='".Utils::es($bpv)."'";
 
 				if (isset ($btn['subButtons']) || isset ($btn['dropdownMenu']))
 					$c .= "<div class='btn-group'>";
 
 				if ($btn['action'] === '')
-					$c .= "<button type='button' class='$class $btnClass dropdown-toggle' data-toggle='dropdown'>{$icon}&nbsp;{$btnText}&nbsp;<span class='caret'></span></button>";
+					$c .= "<button type='button' class='$class $btnClass dropdown-toggle' data-toggle='dropdown'>{$icon}&nbsp;{$btnText}XX &nbsp;<span class='caret'></span></button>";
 				else
-					$c .= "<button class='btn {$btnClass}$class df2-{$btn['type']}-trigger e10-sv-tlbr-btn-{$btn['action']}' {$dataTable}data-action='{$btn['action']}' data-viewer='{$this->vid}' $btnParams>{$icon}&nbsp;{$btnText}</button>";
+					$c .= "<button class='btn {$btnClass}$class e10-sv-tlbr-btn-{$btn['action']}' {$dataTable}data-action='{$btn['action']}' data-viewer='{$this->viewer->vid}' $btnParams>{$icon}&nbsp;{$btnText}</button>";
 				if (isset ($btn['subButtons']))
 				{
 					foreach($btn['subButtons'] as $subbtn)
@@ -285,118 +397,100 @@ class TableViewRenderer extends Renderer
 		return $c;
 	}
 
-
-	public function createTopMenuSearchCode ()
+	public function createMainQueriesCode()
 	{
-		$h = '';
-		if ($this->viewer->enableFullTextSearch || ($this->viewer->objectSubType === TableView::vsMini && $this->viewer->enableToolbar))
+		$c = '';
+		if (!isset ($this->viewer->mainQueries))
+			return '';
+
+
+		$c .= "<div class='viewerQuerySelect'>";
+		$c .= "<input name='mainQuery' type='hidden' value='{$this->viewer->mainQueries[0]['id']}'/>";
+		$idx = 0;
+
+		$code = ['left' => '', 'right' => ''];
+
+		forEach ($this->viewer->mainQueries as $q)
 		{
-			$h .=	"<table style='width: 100%'><tr>";
+			$txt = Utils::es ($q ['title']);
 
-			if ($this->viewer->type === 'form')
+			if ($idx === 0 || (isset($q['side']) && $q['side'] === 'left'))
 			{
-				if ($this->viewer->toolbarTitle)
-					$h .= "<td class='pr1'>".$this->app()->ui()->composeTextLine($this->viewer->toolbarTitle).'</td>';
-
-				$h .= "<td id='{$this->viewer->toolbarElementId}__Main'>";
-				$h .= $this->createToolbarCode ();
-				$h .= "<div id='{$this->viewer->toolbarElementId}' style='display: inline-block; padding-left: 1em; padding-right: 1em;'>";
-				$h .= '</div>';
-				$h .= '</td>';
-			}
-
-			if ($this->viewer->enableFullTextSearch && $this->viewer->enableToolbar)
-			{
-				$style = '';
-				$fulltextClass = 'main';
-				if (isset ($this->viewer->topParams))
-				{
-					$style .= ' width: 12em;';
-					$fulltextClass = 'params';
-				}
-				if ($this->viewer->disableFullTextSearchInput)
-					$h .=	"<td style='width: 2em!important; font-size: 40%;'>" .
-						"<span  data-action='fulltextsearchclear' id='{$this->vid}Progress' data-run='0'>&nbsp;&nbsp;</span>" .
-						'</td>';
+				if ($idx == 0)
+					$code['left'] .= "<span class='q shp-widget-action active left' data-action='viewerTabsReload' data-value='{$q['id']}'>$txt</span>";
 				else
-				{
-					$placeholder = ($this->viewer->disableIncrementalSearch) ? 'hledat ⏎' : 'hledat';
-
-					$h .= "<td class='fulltext $fulltextClass' style='$style'>" .
-							"<span class='df2-background-button df2-action-trigger df2-fulltext-clear' data-action='fulltextsearchclear' id='{$this->viewer->vid}Progress' data-run='0'>".$this->app()->ui()->icon('system/actionInputClear')."</span>";
-					$h .= "<input name='fullTextSearch' type='text' class='fulltext e10-viewer-search' autocomplete='off' placeholder='".utils::es($placeholder)."' value=''";
-					if ($this->viewer->disableIncrementalSearch)
-						$h .= " data-onenter='1'";
-					$h .= '/></td>';
-				}
-				if (isset ($this->viewer->topParams))
-				{
-					$h .= "<td style='padding-left: 1ex;'>".$this->viewer->topParams->createCode().'</td>';
-				}
-
-				if (isset ($this->viewer->gridStruct) && !$this->viewer->inlineSourceElement)
-				{
-					$h .= "<td style='vertical-align: middle; text-align: right; width: 90px;'>";
-
-					$h .= "<div class='btn-group pull-right'>";
-					$h .= "<button class='btn btn-large btn-default df2-action-trigger' data-action='printviewer' data-viewer='{$this->vid}' data-format='pdf'>".$this->app()->ui()->icon('system/actionPrint')."</button>";
-
-					$h .= "<button type='button' class='btn btn-default dropdown-toggle'' data-toggle='dropdown'><span class='caret'></span></button>";
-					$h .= '<ul class="dropdown-menu" role="menu">';
-
-					$h .= "<li><a class='df2-action-trigger' data-action='printviewer' data-viewer='{$this->vid}' data-format='csv'>".$this->app()->ui()->icon('system/actionSave')." ".utils::es('Uložit jako CSV soubor')."</a></li>";
-					//$h .= "<li><a class='df2-action-trigger' data-action='printviewer' data-viewer='{$this->vid}' data-format='xls'><i class='fa fa-file-excel-o'></i> ".utils::es('Uložit jako Excel')."</a></li>";
-
-					$h .= '</ul>';
-					$h .= '</div>';
-
-					$h .= '</td>';
-				}
+					$code['left'] .= "<span class='q shp-widget-action left' data-action='viewerTabsReload' data-value='{$q['id']}'>$txt</span>";
 			}
-			if ($this->viewer->objectSubType === TableView::vsMini && $this->viewer->enableToolbar)
-				$h .= "<td><span class='e10-sv-search-toolbar'>" . $this->createToolbarCode () . '</span></td>';
-
-			$h .= '</tr></table>';
+			else
+			{
+				$code['right'] .= "<span class='q shp-widget-action right' data-action='viewerTabsReload' data-value='{$q['id']}'>$txt</span>";
+			}
+			$idx++;
 		}
 
-		$h .= $this->viewer->createTopTabsCode();
+		if ($code['left'] !== '')
+			$c .= $code['left'];
+		if ($code['right'] !== '')
+			$c .= $code['right'];
 
-		if (isset ($this->viewer->mainQueries))
+		$c .= '</div>';
+
+		return $c;
+	}
+
+	public function createBottomTabsCode ()
+	{
+		if (!isset ($this->viewer->bottomTabs))
+			return;
+
+		$h = "";
+
+		$activeTab = 0;
+		$idx = 0;
+		forEach ($this->viewer->bottomTabs as $q)
 		{
-			$h .= "<div class='viewerQuerySelect'>";
-			$h .= "<input name='mainQuery' type='hidden' value='{$this->viewer->mainQueries[0]['id']}'/>";
-			$idx = 0;
-
-			$code = array ('left' => '', 'right' => '');
-
-			forEach ($this->viewer->mainQueries as $q)
+			if ($q['active'])
 			{
-				$txt = \E10\es ($q ['title']);
-
-				if ($idx === 0 || (isset($q['side']) && $q['side'] === 'left'))
-				{
-					if ($idx == 0)
-						$code['left'] .= "<span class='q active' data-mqid='{$q['id']}'>$txt</span>";
-					else
-						$code['left'] .= "<span class='q' style='margin-left: 1em;' data-mqid='{$q['id']}'>$txt</span>";
-				}
-				else
-				{
-					$code['right'] .= "<span class='q' data-mqid='{$q['id']}'>$txt</span>";
-				}
-				$idx++;
+				$activeTab = $idx;
+				break;
 			}
-
-			if ($code['left'] !== '')
-				$h .= $code['left'];
-			if ($code['right'] !== '')
-				$h .= "<span style='float: right'>" . $code['right'] . '</span>';
-
-			$h .= '</div>';
+			$idx++;
 		}
 
-		if ($h !== '')
-			$h = "<div class='search' id='{$this->viewer->vid}Search'>".$h.'</div>';
+		$h .= "<div class='viewerBottomTabs'>";
+		$h .= "<input name='bottomTab' type='hidden' value='{$this->viewer->bottomTabs[$activeTab]['id']}'/>";
+
+		$activeTab = 0;
+		$idx = 0;
+		forEach ($this->viewer->bottomTabs as $q)
+		{
+			if ($q['active'])
+			{
+				$activeTab = $idx;
+				break;
+			}
+			$idx++;
+		}
+
+		$idx = 0;
+		forEach ($this->viewer->bottomTabs as $q)
+		{
+			$addParams = '';
+			if (isset ($q['addParams']))
+			{
+				forEach ($q['addParams'] as $apCol => $apValue)
+				{
+					if ($addParams != '')
+						$addParams .= '&';
+					$addParams .= "__$apCol=$apValue";
+				}
+			}
+
+			$active = ($idx == $activeTab) ? ' active' : '';
+			$h .= "<span class='q shp-widget-action $active' data-action='viewerTabsReload' data-value='{$q['id']}' data-addparams='$addParams'>".Utils::es($q['title']).'</span>';
+			$idx++;
+		}
+		$h .= '</div>';
 
 		return $h;
 	}
@@ -491,7 +585,7 @@ class TableViewRenderer extends Renderer
 		if (isset ($listItem ['level']))
 			$itemLevel = intval ($listItem ['level']);
 
-		$codeLine .= "<div class='df2-list-item-recnum df2-list-item-level$itemLevel'>";
+		$codeLine .= "<div class='df2-list-item-recnum lnr df2-list-item-level$itemLevel'>";
 		if ($this->viewer->checkboxes)
 			$codeLine .= "<span><input type='checkbox' name='vchbx_{$listItem['pk']}' value='{$listItem ['pk']}'/></span>";
 		if ($this->viewer->onlyOneRec === 0)
@@ -503,23 +597,23 @@ class TableViewRenderer extends Renderer
 		if ((isset ($listItem ['icon'])) && ($listItem ['icon'] != ''))
 		{
 			$icon = $this->app()->ui()->icon($listItem ['icon'], $listItem['!error'] ?? '', 'span');
-			$codeLine .= "<div class='df2-list-item-icon'>{$icon}</div>";
+			$codeLine .= "<div class='df2-list-item-icon icon'>{$icon}</div>";
 		}
 		else
 		if (isset ($listItem ['image']))
 		{
-			$codeLine .= "<div class='df2-list-item-image'>";
+			$codeLine .= "<div class='df2-list-item-image icon'>";
 			if ($listItem ['image'] !== '')
 				$codeLine .= "<img src='{$listItem ['image']}'>";
 			$codeLine .= '</div>';
 		}
 		elseif ((isset ($listItem ['emoji'])))
 		{
-			$codeLine .= "<div class='df2-list-item-emoji'><span>{$listItem ['emoji']}</span></div>";
+			$codeLine .= "<div class='df2-list-item-emoji icon'><span>{$listItem ['emoji']}</span></div>";
 		}
 		elseif ((isset ($listItem ['svgIcon'])) && ($listItem ['svgIcon'] != ''))
 		{
-			$codeLine .= "<div class='df2-list-item-icon'><img style='width:100%;' src='{$listItem ['svgIcon']}'></div>";
+			$codeLine .= "<div class='df2-list-item-icon icon'><img style='width:100%;' src='{$listItem ['svgIcon']}'></div>";
 		}
 
 		if (isset($listItem['code']))
@@ -536,10 +630,12 @@ class TableViewRenderer extends Renderer
 			$t1 = "&nbsp;";
 
 		$t2 = isset ($listItem ['t2']) ? $this->app()->ui()->composeTextLine ($listItem ['t2']) : '&nbsp;';
-		if (isset ($listItem ['i2']))
-			$t2 .= $this->app()->ui()->composeTextLine ($listItem['i2']);
 
-		$codeLine .= "<div class='row-content'>";
+		$i2 = '';
+		if (isset ($listItem ['i2']))
+			$i2 = $this->app()->ui()->composeTextLine ($listItem['i2']);
+
+		//$codeLine .= "<div class='row-content'>";
 
 
 		if (isset($listItem ['tt']))
@@ -550,16 +646,18 @@ class TableViewRenderer extends Renderer
 		}
 		elseif (isset ($listItem ['t1']) || (!isset ($listItem ['t1']) && !isset ($listItem ['txt'])))
 		{
-			$codeLine .= "<div class='df2-list-item-t1'>$t1</div>";
+			$codeLine .= "<div class='df2-list-item-t1 t1'>$t1</div>";
 			if (isset ($listItem ['i1']))
-				$codeLine .= "<div class='df2-list-item-i1'>" . $this->app()->ui()->composeTextLine ($listItem['i1']) . '</div>';
+				$codeLine .= "<div class='df2-list-item-i1 i1'>" . $this->app()->ui()->composeTextLine ($listItem['i1']) . '</div>';
 		}
+		if ($i2 !== '')
+			$codeLine .= "<div class='i2'>" . $i2 . '</div>';
 
 		if (isset ($listItem ['t2']) || (!isset ($listItem ['t2']) && !isset ($listItem ['txt'])))
-			$codeLine .= "<div class='break-break'></div><div class='df2-list-item-t2'>$t2</div>";
+			$codeLine .= "<div class='df2-list-item-t2 t2'>$t2</div>";
 
 		if (isset($listItem ['t3']))
-			$codeLine .= "<div class='df2-list-item-t3'>" . $this->app()->ui()->composeTextLine ($listItem['t3']) . '</div>';
+			$codeLine .= "<div class='df2-list-item-t3 t3'>" . $this->app()->ui()->composeTextLine ($listItem['t3']) . '</div>';
 
 		if (isset ($listItem ['txt']))
 			$codeLine .= "<div class='pageText'>{$listItem ['txt']}</div>";
@@ -575,7 +673,7 @@ class TableViewRenderer extends Renderer
 		}
     */
 
-		$codeLine .= "</div>";
+		//$codeLine .= "</div>";
 
     /*
 		if (isset ($listItem ['rightImage']))
@@ -618,5 +716,9 @@ class TableViewRenderer extends Renderer
   public function render()
   {
     $this->renderedData['hcFull'] = $this->createViewerCode();
+		if ($this->isModal)
+		{
+			$this->renderedData['hcBackIcon'] = $this->app()->ui()->icon('user/arrowLeft');
+		}
   }
 }

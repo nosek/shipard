@@ -1,0 +1,38 @@
+{
+	"id": "e10pro.soci.entriesKinds", "sql": "e10pro_soci_entriesKinds", "name": "Druhy přihlášek",
+	"columns": [
+		{"id": "ndx", "name": "id", "type": "int_ai"},
+		{"id": "fullName", "name": "Název", "type": "string", "len": 120},
+		{"id": "shortName", "name": "Zkrácený název", "type": "string", "len": 40},
+		{"id": "order", "name": "Pořadí", "type": "int"},
+
+    {"id": "inputPerson", "name": "Zadávat Osobu", "type": "enumInt",
+      "enumValues": {"0": "Jménem a příjmením", "1": "Výběrem ze seznamu Osob"}},
+
+		{"id": "useInbox", "name": "Používat Došlou poštu", "type": "logical"},
+		{"id": "inboxSection", "name": "Sekce Došlé pošty", "type": "int", "reference": "wkf.base.sections"},
+		{"id": "usePeriods", "name": "Používat Období", "type": "logical"},
+		{"id": "useTestDrive", "name": "Používat Přihlášky na zkoušku", "type": "logical"},
+		{"id": "useSaleType", "name": "Používat Slevu", "type": "logical"},
+		{"id": "usePaymentPeriod", "name": "Používat Platbu na období", "type": "logical"},
+		{"id": "workOrderKind", "name": "Druh Zakázky", "type": "int", "reference": "e10mnf.base.dockinds"},
+
+		{"id": "useItem", "name": "Používat Položku pro prodej", "type": "logical", "options": ["saveOnChange"]},
+		{"id": "itemType", "name": "Typ položky", "type": "int", "reference": "e10.witems.itemtypes"},
+
+    {"id": "docNumberType", "name": "Kód přihlášky", "type": "enumInt",
+      "enumValues": {"0": "Náhodný kód", "1": "Datum narození"}},
+
+		{"id": "docState", "name": "Stav", "type": "int"},
+		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}
+	],
+	"views": [
+		{"id": "default", "class": "e10pro.soci.ViewEntriesKinds"}
+	],
+	"forms": [
+		{"id": "default", "class": "e10pro.soci.FormEntryKind"}
+	],
+	"options": ["configSource"],
+	"states": {"stateColumn": "docState", "mainStateColumn": "docStateMain", "statesCfg": "e10.base.defaultDocStatesArchive"},
+	"autocomplete": {"columnValue": "ndx", "columnTitle": "fullName"}
+}

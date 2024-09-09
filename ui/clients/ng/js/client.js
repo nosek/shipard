@@ -21,10 +21,14 @@ class ShipardClient {
 
 	mainAppContent = null;
 
+	counter = 1;
+
 	on(eventType, selector, callback) {
 		document.addEventListener(eventType, function (event) {
-			if (event.target.matches(selector)) {
-				callback.call(event.target, event.target);
+			var ce = event.target.closest(selector);
+			if (ce) {
+
+				callback.call(ce, ce);
 			}
 		});
 	}
@@ -38,9 +42,10 @@ class ShipardClient {
 	 */
 	simpleTabsEvent(e)
 	{
+		console.log('tabs...');
 		let tabsId = e.getAttribute('data-tabs');
 		let tabsElement = document.getElementById(tabsId+'-tabs');
-		let oldActiveTabElement = tabsElement.querySelector('a.active');
+		let oldActiveTabElement = tabsElement.querySelector('.active');
 		oldActiveTabElement.classList.remove('active');
 
 		let oldActiveContentId = oldActiveTabElement.getAttribute('data-tab-id');
@@ -100,6 +105,8 @@ class ShipardClient {
 			case 'workplaceLogin': return this.workplaceLogin(e);
 			case 'inline-action': return this.inlineAction(e);
     }
+
+		console.log("APP-ACTION", actionId);
 
     return 0;
   }
@@ -170,10 +177,10 @@ class ShipardClient {
     this.numPad = abc;
   }
 
-	setColorMode(e)
+	setColorMode(event)
 	{
-		let colorMode = e.getAttribute('data-app-color-mode');
-		localStorage.setItem('shpAppColorMode', colorMode);
+		let colorMode = event.target.value;
+		localStorage.setItem('shpAppThemeVariant', colorMode);
 		this.doColorMode(colorMode);
 		return 0;
 	}
@@ -195,20 +202,23 @@ class ShipardClient {
 
 	initColorMode(firstCall)
 	{
+		//console.log("=== initColorMode ===", firstCall);
 		if (firstCall)
 		{
 			window.matchMedia('(prefers-color-scheme: dark)')
 				.addEventListener('change', function() {this.initColorMode()}.bind(this));
 		}
 
-		let colorMode = localStorage.getItem('shpAppColorMode');
-		if (!colorMode || colorMode === 'auto')
+		var colorMode = localStorage.getItem('shpAppThemeVariant');
+		const themeVariant = uiThemesVariants[colorMode];
+		//console.log("loadedColorMode: ", colorMode);
+		if (!themeVariant || !colorMode || colorMode === 'auto')
 		{
 			const isSystemDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
 			if (isSystemDarkMode)
-				colorMode = 'dark';
+				colorMode = 'systemDefaultDark';
 			else
-				colorMode = 'light';
+				colorMode = 'systemDefaultLight';
 		}
 
 		this.doColorMode(colorMode);
@@ -216,32 +226,50 @@ class ShipardClient {
 
 	doColorMode(colorMode)
 	{
-		if (colorMode === 'light')
-		{
-			document.body.removeAttribute('data-bs-theme');
-		}
-		else if (colorMode === 'dark')
-		{
-			document.body.setAttribute('data-bs-theme', 'dark');
-		}
-		else if (colorMode === 'auto')
+		if (colorMode === 'auto')
 		{
 			this.initColorMode();
+			return;
 		}
 
-		var uiColorMode = colorMode;
-		let savedColorMode = localStorage.getItem('shpAppColorMode');
-		if (!savedColorMode || savedColorMode === 'auto')
-			uiColorMode = 'auto';
-
-		let colorModeElements = document.querySelectorAll('[data-action="setColorMode"]');
-		for (let idx = 0; idx < colorModeElements.length; idx++)
+		const themeVariant = uiThemesVariants[colorMode];
+		if (!themeVariant)
 		{
-			if (colorModeElements[idx].getAttribute('data-app-color-mode') === uiColorMode)
-				colorModeElements[idx].classList.add('active');
-			else
-				colorModeElements[idx].classList.remove('active');
+			this.initColorMode();
+			return;
 		}
+
+		//console.log("themeVariant: ", themeVariant);
+		var linkElement = document.getElementById('themeVariant');
+		if (!linkElement)
+		{
+			linkElement = document.createElement('link');
+			linkElement.href = httpDSRootPath + themeVariant.file+'?v='+themeVariant.integrity.sha384;
+			linkElement.type = 'text/css';
+			linkElement.rel = 'stylesheet';
+			linkElement.id = 'themeVariant';
+			document.getElementsByTagName('head')[0].appendChild(linkElement);
+		}
+		else
+		{
+			linkElement.href = httpDSRootPath + themeVariant.file+'?v='+themeVariant.integrity.sha384;
+		}
+
+		document.body.setAttribute('data-shp-theme-variant', colorMode);
+		document.body.setAttribute('data-shp-dark-mode', themeVariant.dm);
+	}
+
+	setThemeVariantInput()
+	{
+		var inputElement = document.getElementById('input-shp-theme-variant');
+		if (!inputElement)
+			return;
+
+		let themeVariant = localStorage.getItem('shpAppThemeVariant');
+		if (!themeVariant)
+			themeVariant = 'auto';
+
+		inputElement.value = themeVariant;
 	}
 
   elementPrefixedAttributes (iel, prefix, data)
@@ -259,6 +287,8 @@ class ShipardClient {
 
 	initUI()
 	{
+		this.setThemeVariantInput();
+
 		if (!this.mainAppContent)
 			return 0;
 
@@ -284,6 +314,8 @@ class ShipardClient {
 
 		if (objectElementType === 'data-viewer')
 			return initWidgetTableViewer(id);
+		if (objectElementType === 'data-widget-board')
+			return initWidgetBoard(id);
 
 		console.log(objectElementType);
 
@@ -302,7 +334,7 @@ class ShipardClient {
 
 		this.initColorMode(true);
 
-		this.onClick ('a.shp-simple-tabs-item', function () {shc.simpleTabsEvent(this);});
+		this.onClick ('.shp-simple-tabs-item', function () {shc.simpleTabsEvent(this);});
 		this.onClick ('.shp-app-action', function (e) {this.widgetAction(e);}.bind(this));
 
 		this.initUI();
@@ -314,6 +346,8 @@ class ShipardClient {
 				console.log("Service worker registration error: ", err)
 			});
 		}
+
+		initWidgetApplication('shp-app-window');
 	}
 
 	applyUIData (responseUIData)

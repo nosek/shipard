@@ -9,10 +9,21 @@
 		"mac-get-lan-control-cfg": {"classId": "mac.lan.libs.GetLanControlConfig"},
 		"mac-set-lan-control-request-state": {"classId": "mac.lan.libs.SetLanControlRequestState"},
 
+		"mac-get-lan-device-init-script": {"classId": "mac.lan.libs.GetLanDeviceInitScript"},
+		"mac-get-lan-auth-tokens": {"classId": "mac.lan.libs.GetLanAuthTokens"},
+
 		"mac-lan-info-upload": {"classId": "mac.lan.LanInfoUpload"},
 		"mac-lan-macs-upload": {"classId": "mac.lan.libs.LanMacsUpload"},
 		"mac-lan-wifi-upload": {"classId": "mac.lan.libs.LanWifiUpload"},
 		"mac-lan-info-download": {"classId": "mac.lan.LanInfoDownload"},
 		"mac-lan-alerts-download": {"classId": "mac.lan.libs.alerts.LanAlertsDownload"}
+	},
+	"feed": {
+		"lan-device-init-script": {
+			"classId": "mac.lan.libs.FeedLanDeviceInitScript"
+		},
+		"lan-user-pub-key": {
+			"classId": "mac.lan.libs.FeedLanUserPubKey"
+		}
 	}
 }

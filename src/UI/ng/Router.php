@@ -15,6 +15,7 @@ class Router extends Utility
 	var $uiId = '';
 	var $uiRoot = '';
 	var $urlPath = [];
+	var $workplace = NULL;
 	var ?\Shipard\UI\ng\TemplateUI $uiTemplate = NULL;
 
 	public function setUIId($uiId)
@@ -76,6 +77,16 @@ class Router extends Utility
 		$this->uiTemplate->data['uiRoot'] = $this->uiRoot;
 		$this->uiTemplate->uiRoot = $this->uiRoot;
 
+		$workplaceGID = $this->testCookie ('_shp_gwid');
+		if ($workplaceGID !== '')
+		{
+			$this->workplace = $this->app->searchWorkplaceByGID($workplaceGID);
+			$this->app->workplace = $this->workplace;
+		}
+
+		$dsIcon = $this->app->dsIcon();
+		$this->uiTemplate->data['dsIconUrl'] = $dsIcon['iconUrl'];
+
 		header ('Cache-control: no-store');
 
 		$this->app->mobileMode = TRUE;
@@ -87,6 +98,8 @@ class Router extends Utility
 		{
 			return new Response ($this->app, "invalid url 1/".$this->uiId, 404);
 		}
+
+    $this->uiTemplate->data['uiCfg'] = $this->uiCfg;
 
 		if ($first === 'a')
 		{
@@ -165,6 +178,7 @@ class Router extends Utility
 	{
 		if (!isset($this->urlPath[1]) || $this->urlPath[1] !== 'v2')
 		{
+			error_log("__OLD_API__");
 			return $this->app()->routeApiRun();
 		}
 
@@ -211,5 +225,34 @@ class Router extends Utility
 		$redirTo = $this->uiRoot.'/user/activate/'.$shortId;
 		$redirTo = str_replace('//', '/', $redirTo);
 		header ('Location: ' . $redirTo);
+	}
+
+	function testCookie ($cookieName)
+	{
+    return $_COOKIE [$cookieName] ?? NULL;
+	}
+
+	public function sessionCookieDomain ()
+	{
+		return $_SERVER['HTTP_HOST'];
+	}
+
+	public function sessionCookiePath ()
+	{
+    return ($this->app()->dsRoot === '') ? '/' : $this->app()->dsRoot;
+	}
+
+  public function setCookie (string $name, string $value, int $expires)
+	{
+		$options = [
+			'expires' => $expires,
+			'path' => $this->sessionCookiePath(),
+			'domain' => $this->sessionCookieDomain(),
+			'secure' => TRUE,
+			'httponly' => TRUE,
+			'samesite' => 'strict',
+		];
+
+		return \setCookie($name, $value, $options);
 	}
 }

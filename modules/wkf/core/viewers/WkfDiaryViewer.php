@@ -59,6 +59,9 @@ class WkfDiaryViewer extends TableView
 	/** @var  \wkf\core\TableIssues */
 	var $tableIssues;
 
+	/** @var \Shipard\Table\DbTable */
+	var $srcTable = NULL;
+
 	var $issuesMarks;
 
 	public function init ()
@@ -84,14 +87,17 @@ class WkfDiaryViewer extends TableView
 		{
 			$srcTable = $this->app()->tableByNdx($this->srcTableNdx);
 			if ($srcTable)
+			{
 				$this->diaryInfo = $srcTable->getDiaryInfo($srcRecData);
+				$this->srcTable = $srcTable;
+			}
 		}
 		//error_log("--SRC-REC-DATA--".json_encode($srcRecData));
 
 
 		$this->issuesStatuses = $this->app->cfgItem ('wkf.issues.statuses.all');
 
-		$this->viewerStyle = /*self::dvsPanesMini*/self::dvsPanesOneCol;
+		$this->viewerStyle = /*self::dvsPanesMini*/self::dvsRows;
 		if ($this->app()->testPostParam('viewer-mode') !== '')
 		{
 			//$this->viewerStyle = intval($this->app()->testPostParam('viewer-mode'));
@@ -189,14 +195,15 @@ class WkfDiaryViewer extends TableView
 	{
 		$q = [];
 
-		if (!$this->selectParts)
+		if (0 && !$this->selectParts)
 		{
 			$this->qrySelectRows($q, NULL, 0);
 		}
 		else
 		{
 			$index = 0;
-			foreach ($this->selectParts as $selectPart)
+			$sp = [0, 1];
+			foreach (/*$this->selectParts*/$sp as $selectPart)
 			{
 				if ($index)
 					array_push($q, ' UNION ');
@@ -221,10 +228,10 @@ class WkfDiaryViewer extends TableView
 		if ($mqId === '')
 			$mqId = $this->mainQueries[0]['id'];
 
-		$q [] = 'SELECT issues.*, ';
+		$q [] = 'SELECT [issues].*, ';
 
-		if ($selectPart)
-			array_push ($q, ' %i', $selectPartNumber, ' AS selectPartOrder, %s', $selectPart, ' AS selectPart,');
+		//if ($selectPart)
+		//	array_push ($q, ' %i', $selectPartNumber, ' AS selectPartOrder, %s', $selectPart, ' AS selectPart,');
 
 		array_push ($q, ' persons.fullName AS authorFullName, ');
 		array_push ($q, ' targets.shortName AS targetName,');
@@ -235,8 +242,37 @@ class WkfDiaryViewer extends TableView
 		array_push ($q, ' LEFT JOIN wkf_base_issuesStatuses AS [statuses] ON issues.status = statuses.ndx');
 		array_push ($q, ' WHERE 1');
 
-		array_push ($q, ' AND [issues].[tableNdx] = %i', $this->srcTableNdx);
-		array_push ($q, ' AND [issues].[recNdx] = %i', $this->srcRecNdx);
+		array_push ($q, ' AND (');
+
+		if ($selectPart === 0)
+		{
+			array_push ($q, ' ([issues].[tableNdx] = %i', $this->srcTableNdx);
+			array_push ($q, ' AND [issues].[recNdx] = %i)', $this->srcRecNdx);
+		}
+
+		else
+		if ($selectPart === 1)
+		{
+			if ($this->srcTableNdx === 1000)
+			{ // e10.persons.persons
+				array_push ($q, ' EXISTS (',
+							'SELECT docLinks.ndx FROM [e10_base_doclinks] AS docLinks',
+							' WHERE issues.ndx = srcRecId AND srcTableId = %s', 'wkf.core.issues',
+							' AND dstTableId = %s', 'e10.persons.persons', 'AND docLinks.dstRecId = %i', $this->srcRecNdx,
+							')'
+				);
+			}
+			elseif ($this->srcTable)
+			{
+				array_push ($q, ' EXISTS (',
+							'SELECT docLinks.ndx FROM [e10_base_doclinks] AS docLinks',
+							' WHERE issues.ndx = dstRecId AND dstTableId = %s', 'wkf.core.issues',
+							' AND srcTableId = %s', $this->srcTable->tableId(), 'AND docLinks.srcRecId = %i', $this->srcRecNdx,
+							')'
+				);
+			}
+		}
+		array_push ($q, ') ');
 
 		if ($fts != '')
 		{
@@ -262,7 +298,7 @@ class WkfDiaryViewer extends TableView
 		}
 
 		$this->qryDocState($q, $mqId, $fts, $selectPart);
-		$this->qryOrder($q, $selectPart);
+		//$this->qryOrder($q, $selectPart);
 	}
 
 	function qryDocState(&$q, $mqId, $fts, $selectPart)
@@ -292,7 +328,7 @@ class WkfDiaryViewer extends TableView
 
 	protected function qryOrderAll (&$q)
 	{
-		array_push ($q, ' ORDER BY selectPartOrder, displayOrder');
+		array_push ($q, ' ORDER BY displayOrder');
 	}
 
 	public function selectRows2 ()

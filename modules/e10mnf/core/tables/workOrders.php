@@ -7,6 +7,8 @@ require_once __SHPD_MODULES_DIR__ . 'e10/base/base.php';
 
 use \e10\utils, \Shipard\Viewer\TableView, \Shipard\Viewer\TableViewDetail, \Shipard\Viewer\TableViewPanel, \e10\TableForm, \e10\DbTable, \e10doc\core\e10utils;
 use \e10doc\core\libs\GlobalParams;
+use \e10\base\libs\UtilsBase;
+
 
 /**
  * Class TableWorkOrders
@@ -165,6 +167,18 @@ class TableWorkOrders extends DbTable
 
 		if (isset($recData['customer']) && $recData['customer'])
 			$info ['persons']['to'][] = $recData['customer'];
+		else
+		{ // workOrder admins
+			$admins = $this->db()->query('SELECT *',
+												' FROM e10_base_doclinks as links ',
+												' WHERE srcTableId = %s', 'e10mnf.core.workOrders',
+												' AND linkId = %s', 'e10mnf-workRecs-admins',
+												' AND dstTableId = %s', 'e10.persons.persons',
+												' AND links.srcRecId = %i', $recData['ndx']);
+			foreach ($admins as $a)
+				$info ['persons']['to'][] = $a['dstRecId'];
+		}
+
 		$info ['persons']['from'][] = intval($this->app()->cfgItem ('options.core.ownerPerson', 0));
 
 		return $info;
@@ -300,6 +314,11 @@ class ViewWorkOrders extends TableView
 	var $personsLists = [];
 	var $classification;
 	var $dbCounters;
+	var $fixedDbCounter = 0;
+
+	var $useLinkedPersons = 0;
+	var $linkedPersons = NULL;
+
 
 	CONST vptCustomer = 0, vptDocNumber = 1, vptTitle = 2;
 
@@ -307,14 +326,7 @@ class ViewWorkOrders extends TableView
 	{
 		parent::init();
 
-		$mq [] = ['id' => 'active', 'title' => 'Živé', 'side' => 'left'];
-		$mq [] = ['id' => 'done', 'title' => 'Hotové', 'side' => 'left'];
-		$mq [] = ['id' => 'allActive', 'title' => 'Vše', 'side' => 'left'];
-
-		$mq [] = ['id' => 'all', 'title' => 'Vše'];
-		$mq [] = ['id' => 'trash', 'title' => 'Koš'];
-		$this->setMainQueries ($mq);
-
+		$this->createMainQueries();
 		$this->createBottomTabs();
 
 		$this->setPanels (TableView::sptQuery);
@@ -323,31 +335,64 @@ class ViewWorkOrders extends TableView
 		$this->tableDocsHeads = $this->app()->table ('e10doc.core.heads');
 	}
 
+	protected function createMainQueries()
+	{
+		$mq [] = ['id' => 'active', 'title' => 'Živé', 'side' => 'left'];
+		$mq [] = ['id' => 'done', 'title' => 'Hotové', 'side' => 'left'];
+		$mq [] = ['id' => 'allActive', 'title' => 'Vše', 'side' => 'left'];
+
+		$mq [] = ['id' => 'all', 'title' => 'Vše'];
+		$mq [] = ['id' => 'trash', 'title' => 'Koš'];
+		$this->setMainQueries ($mq);
+	}
+
 	public function createBottomTabs ()
 	{
+		$enabledDbCounters = NULL;
+		$enabledDbCountersStr = $this->queryParam('enabledDbCounters');
+		if ($enabledDbCountersStr !== FALSE)
+		{
+			$enabledDbCounters = [];
+			$enabledDbCountersParts = explode(',', $enabledDbCountersStr);
+			foreach ($enabledDbCountersParts as $edbc)
+			{
+				$enabledDbCounters[] = intval(trim($edbc));
+			}
+			if (!count($enabledDbCounters))
+				$enabledDbCounters = NULL;
+		}
+
 		// -- dbCounters
 		$this->dbCounters = $this->table->app()->cfgItem ('e10mnf.workOrders.dbCounters', FALSE);
 		if ($this->dbCounters !== FALSE)
 		{
-			$activeDbCounter = key($this->dbCounters);
+			$activeDbCounter = 0;
 			if (count ($this->dbCounters) > 1)
 			{
 				forEach ($this->dbCounters as $cid => $c)
 				{
-					if (isset ($this->disabledActivitiesGroups) && in_array($c['activitiesGroup'], $this->disabledActivitiesGroups))
+					if ($enabledDbCounters && !in_array($cid, $enabledDbCounters))
 						continue;
+					if (!$activeDbCounter)
+						$activeDbCounter = $cid;
 					$addParams = ['dbCounter' => intval($cid)];
 					$nbt = [
 							'id' => $cid, 'title' => ($c['tabName'] !== '') ? $c['tabName'] : $c['shortName'],
-							'active' => ($activeDbCounter === $cid),
+							'active' => ($activeDbCounter == $cid),
 							'addParams' => $addParams
 					];
 					$bt [] = $nbt;
 				}
-				$this->setBottomTabs ($bt);
+				if (count($bt) > 1)
+					$this->setBottomTabs ($bt);
+				else
+				{
+					$this->addAddParam ('dbCounter', $activeDbCounter);
+					$this->fixedDbCounter = intval($activeDbCounter);
+				}
 			}
 			else
-				$this->addAddParam ('dbCounter', $activeDbCounter);
+				$this->addAddParam ('dbCounter', key($this->dbCounters));
 		}
 	}
 
@@ -358,13 +403,17 @@ class ViewWorkOrders extends TableView
 		$bottomTabId = intval($this->bottomTabId());
 
 		$q [] = 'SELECT workOrders.*, ';
-		array_push ($q, ' customers.fullName as customerFullName ');
+		array_push ($q, ' customers.fullName as customerFullName,');
+		array_push ($q, ' places.fullName as placeFullName');
 		array_push ($q, ' FROM [e10mnf_core_workOrders] as workOrders');
 		array_push ($q, ' LEFT JOIN e10_persons_persons as customers ON workOrders.customer = customers.ndx');
+		array_push ($q, ' LEFT JOIN e10_base_places AS places ON workOrders.place = places.ndx ');
 		array_push ($q, ' WHERE 1');
 
 		// -- bottom tabs
-		if ($bottomTabId != 0)
+		if ($this->fixedDbCounter)
+			array_push ($q, ' AND workOrders.dbCounter = %i', $this->fixedDbCounter);
+		elseif ($bottomTabId != 0)
 			array_push ($q, ' AND workOrders.dbCounter = %i', $bottomTabId);
 
 		// -- fulltext
@@ -374,11 +423,21 @@ class ViewWorkOrders extends TableView
 			array_push ($q, ' workOrders.docNumber LIKE %s', '%'.$fts.'%');
 			array_push ($q, ' OR workOrders.title LIKE %s', '%'.$fts.'%');
 			array_push ($q, ' OR customers.fullName LIKE %s', '%'.$fts.'%');
+			array_push ($q, ' OR EXISTS (SELECT ndx FROM e10_base_properties WHERE workOrders.customer = e10_base_properties.recid AND tableid = %s', 'e10.persons.persons', ' AND valueString LIKE %s)', '%'.$fts.'%');
 			array_push ($q, ')');
 		}
 
 		$this->qryPanel($q);
+		$this->qryMainQuery($q, $fts, $mainQuery);
+		$this->qryOrder($q);
 
+		array_push($q, $this->sqlLimit());
+
+		$this->runQuery ($q);
+	}
+
+	protected function qryMainQuery(&$q, $fts, $mainQuery)
+	{
 		if ($mainQuery === 'active' || $mainQuery == '')
 		{
 			if ($fts != '')
@@ -395,12 +454,6 @@ class ViewWorkOrders extends TableView
 			array_push ($q, ' AND workOrders.[docStateMain] = 5');
 		if ($mainQuery === 'trash')
 			array_push ($q, ' AND workOrders.[docStateMain] = 4');
-
-		$this->qryOrder($q);
-
-		array_push($q, $this->sqlLimit());
-
-		$this->runQuery ($q);
 	}
 
 	protected function qryOrder(&$q)
@@ -434,8 +487,11 @@ class ViewWorkOrders extends TableView
 
 		if ($dko['workOrderType'] === TableWorkOrders::wotMnf)
 		{
-			$i1 = ['text' => utils::nf ($item['sumPrice'], 2), 'prefix' => $this->currencies[$item ['currency']]['shortcut']];
-			$listItem ['i1'] = $i1;
+			if ($item['sumPrice'])
+			{
+				$i1 = ['text' => utils::nf ($item['sumPrice'], 2), 'prefix' => $this->currencies[$item ['currency']]['shortcut']];
+				$listItem ['i1'] = $i1;
+			}
 		}
 
 		if ($item ['intTitle'] !== '')
@@ -451,6 +507,9 @@ class ViewWorkOrders extends TableView
 
 		if ($dko['workOrderType'] === TableWorkOrders::wotMnf)
 		{
+			if ($item['dateBegin'])
+				$props[] = ['icon' => 'system/iconDateOfOrigin', 'text' => utils::datef ($item ['dateBegin'], '%d'), 'class' => ''];
+			else
 			if ($item['dateIssue'])
 				$props[] = ['icon' => 'system/iconDateOfOrigin', 'text' => utils::datef ($item ['dateIssue'], '%d'), 'class' => ''];
 
@@ -470,6 +529,14 @@ class ViewWorkOrders extends TableView
 		}
 
 		$listItem ['t2'] = $props;
+
+		$props3 = [];
+
+		if ($item['placeFullName'])
+			$props3[] = ['icon' => 'tables/e10.base.places', 'text' => $item ['placeFullName'], 'class' => 'label label-default'];
+
+		if (count($props3))
+			$listItem ['t3'] = $props3;
 
 		return $listItem;
 	}
@@ -540,6 +607,9 @@ class ViewWorkOrders extends TableView
 				$this->personsLists[$r['workOrder']][] = $pl;
 			}
 		}
+
+		if ($this->useLinkedPersons)
+			$this->linkedPersons = UtilsBase::linkedPersons ($this->table->app(), $this->table, $this->pks, 'label label-info');
 	}
 
 	function decorateRow (&$item)
@@ -617,6 +687,14 @@ class ViewWorkOrders extends TableView
 		if (isset($this->personsLists[$item ['pk']]))
 		{
 			$item['t2'] = array_merge($item['t2'], $this->personsLists[$item ['pk']]);
+		}
+
+
+		if ($this->linkedPersons && isset ($this->linkedPersons [$item ['pk']]))
+		{
+			if (!isset($item ['t3']))
+				$item ['t3'] = [];
+			$item ['t3'] = array_merge($item ['t3'], $this->linkedPersons [$item ['pk']]);
 		}
 	}
 
@@ -766,8 +844,14 @@ class FormWorkOrder extends TableForm
 					if ($manualNumbering)
 						$this->addColumnInput ('docNumber');
 
-					$this->addColumnInput ('customer');
-					$this->addColumnInput ('currency');
+					if ($dko['useUsersPeriods'] ?? 0)
+						$this->addColumnInput ('usersPeriod');
+
+					if (!($dko['disableCustomer'] ?? 0))
+						$this->addColumnInput ('customer');
+
+					if ($dko['priceOnHead'])
+						$this->addColumnInput ('currency');
 					$this->addColumnInput ('title');
 
 					if ($useDocKinds === 2)
@@ -782,11 +866,12 @@ class FormWorkOrder extends TableForm
 						$this->addColumnInput ('dateContract');
 					if ($dko['useDateDeadlineRequested'])
 						$this->addColumnInput ('dateDeadlineRequested');
-					if ($dko['useDateBegin'])
-					{
+					if ($dko['useDateBegin'] ?? 0)
 						$this->addColumnInput ('dateBegin');
+					if ($dko['useDateClosed'] ?? 0)
 						$this->addColumnInput ('dateClosed');
-					}
+					if ($dko['useReasonClosed'] ?? 0)
+						$this->addColumnInput ('reasonClosed');
 
 					if ($dko['useInvoicingPeriodicity'])
 						$this->addColumnInput ('invoicingPeriod');
@@ -808,6 +893,9 @@ class FormWorkOrder extends TableForm
 							$this->addColumnInput ('rgPercent');
 					}
 
+					if ($dko['usePlaces'] ?? 0)
+						$this->addColumnInput ('place');
+
 					if ($this->table->app()->cfgItem ('options.core.useCentres', 0))
 						$this->addColumnInput ('centre');
 					if ($this->table->app()->cfgItem ('options.core.useProjects', 0))
@@ -820,16 +908,19 @@ class FormWorkOrder extends TableForm
 						$this->addColumnInput ('symbol1');
 					//$this->addColumnInput ('symbol2');
 
+					if ($dko['useOwnerWorkOrder'])
+						$this->addColumnInput ('parentWorkOrder');
+					if ($dko['useFollowUpWorkOrder'] ?? 0)
+						$this->addColumnInput ('followUpWorkOrder');
+
 					if ($dko['useMembers'])
-						$this->addList ('doclinks', '', TableForm::loAddToFormLayout/*|TableForm::coColW12*/);
+						$this->addList ('doclinksMembers', '', TableForm::loAddToFormLayout/*|TableForm::coColW12*/);
+
 					$this->addList ('clsf', '', TableForm::loAddToFormLayout);
 
 					$this->addSeparator(self::coH4);
 					if ($this->addSubColumns('vdsData'))
 						$this->addSeparator(self::coH4);
-
-					if ($dko['useMembers'])
-						$this->addColumnInput ('useOwnerWorkOrder');
 				$this->closeTab ();
 				if (!$dko['disableRows'])
 				{
@@ -926,6 +1017,8 @@ class FormWorkOrder extends TableForm
 			case'dateIssue': return $dko['labelDateIssue'];
 			case'dateContract': return $dko['labelDateContract'];
 			case'dateBegin': return $dko['labelDateBegin'];
+			case'dateClosed': return $dko['labelDateClosed'];
+			case'reasonClosed': return $dko['labelReasonClosed'];
 			case'dateDeadlineRequested': return $dko['labelDateDeadlineRequested'];
 			case'dateDeadlineConfirmed': return $dko['labelDateDeadlineConfirmed'];
 			case'refId1': return $dko['labelRefId1'];
@@ -945,5 +1038,49 @@ class FormWorkOrder extends TableForm
 		}
 
 		return $useDocKinds;
+	}
+
+	public function validNewDocumentState ($newDocState, $saveData)
+	{
+		$this->dko = $this->table->docKindOptions ($this->recData);
+		if ($this->dko['useDateBegin'] ?? 0)
+		{
+			if ($newDocState === 4000)
+			{
+				if ($this->dko['useDateClosed'] === 2)
+				{
+					if (Utils::dateIsBlank($saveData['recData']['dateClosed']))
+					{
+						$this->setColumnState('dateClosed', utils::es ('Hodnota'." `".$this->columnLabel($this->table->column ('dateClosed'), 0)."` ".'není vyplněna'));
+						return FALSE;
+					}
+				}
+
+				if ($this->dko['useReasonClosed'] === 2)
+				{
+					if (trim($saveData['recData']['reasonClosed']) === '')
+					{
+						$this->setColumnState('reasonClosed', utils::es ('Hodnota'." `".$this->columnLabel($this->table->column ('reasonClosed'), 0)."` ".'není vyplněna'));
+						return FALSE;
+					}
+				}
+
+				if ($saveData['recData']['ndx'])
+				{
+					$q = [];
+					array_push($q, 'SELECT ndx, docState, docNumber, title');
+					array_push($q, ' FROM [e10mnf_core_workOrders]');
+					array_push($q, ' WHERE parentWorkOrder = %i', $saveData['recData']['ndx']);
+					array_push($q, ' AND docState NOT IN %in', [4000, 4100, 9800]);
+					$rows = $this->app()->db()->query($q);
+					foreach ($rows as $r)
+					{
+						$this->setColumnState('title', utils::es ('Podřízená zakázka'." `".$r['docNumber']."` (".$r['title'].")".' není ukončena'));
+						return FALSE;
+					}
+				}
+			}
+		}
+		return parent::validNewDocumentState($newDocState, $saveData);
 	}
 }

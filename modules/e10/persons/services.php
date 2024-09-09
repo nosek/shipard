@@ -95,20 +95,29 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		// -- address
 		if (isset ($personData ['address']))
 		{
+			/** @var \e10\persons\TablePersonsContacts */
+			$tablePersonsContact = $this->app->table('e10.persons.personsContacts');
+			$cntAddr = 0;
 			forEach ($personData ['address'] as $address)
 			{
-				$newAddress = ['tableid' => 'e10.persons.persons', 'recid' => $newPersonNdx];
-				Utils::addToArray ($newAddress, $address, 'specification', '');
-				Utils::addToArray ($newAddress, $address, 'street', '');
-				Utils::addToArray ($newAddress, $address, 'city', '');
-				Utils::addToArray ($newAddress, $address, 'zipcode', '');
-				Utils::addToArray ($newAddress, $address, 'country', $this->app()->cfgItem ('options.core.ownerDomicile', 'cz'));
+				$newAddress = [
+					'person' => $newPersonNdx,
+					'adrSpecification' => $address['specification'] ?? '',
+					'adrStreet' => $address['street'] ?? '',
+					'adrCity' => $address['city'] ?? '',
+					'adrZipCode' => $address['zipcode'] ?? '',
+					'adrCountry' => $address['worldCountry'] ?? World::countryNdx($this->app, $this->app->cfgItem ('options.core.ownerDomicile', 'cz')),
+					'flagAddress' => 1,
+					'onTop' => 99,
+					'docState' => 4000, 'docStateMain' => 2,
+				];
 
-				Utils::addToArray ($newAddress, $address, 'worldCountry', 0);
-				if ($newAddress['worldCountry'] === 0) // TODO: for compatibility with old hosting
-					$newAddress['worldCountry'] = World::countryNdx($this->app(), $newAddress['country']);
+				if ($cntAddr === 0)
+					$newAddress['flagMainAddress'] = 1;
 
-				$this->db()->query ("INSERT INTO [e10_persons_address]", $newAddress);
+				$tablePersonsContact->checkBeforeSave($newAddress);
+				$this->app->db->query ('INSERT INTO [e10_persons_personsContacts]', $newAddress);
+				$cntAddr++;
 			}
 		}
 
@@ -137,7 +146,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 	public function onAppUpgrade ()
 	{
 		$s = [];
-		$s [] = ['end' => '2022-12-31', 'sql' => "update e10_persons_address set docState = 4000, docStateMain = 2 where docState = 0"];
+		$s [] = ['end' => '2023-12-20', 'sql' => "update e10_persons_address set docState = 4000, docStateMain = 2 where docState = 0"];
 		$s [] = ['end' => '2022-12-31', 'sql' => "update e10_persons_address set docState = 4000, docStateMain = 2 where docState = 2"];
 		$s [] = ['end' => '2023-06-01', 'sql' => "update e10_persons_personsContacts set onTop = 99 where onTop = 0"];
 		$this->doSqlScripts ($s);
@@ -233,37 +242,112 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		return TRUE;
 	}
 
-	public function geoCode ()
+	public function geoCode ($fromCli = 0)
 	{
-		$limit = 20;
-		$tableAddress = $this->app->table('e10.persons.address');
+		$debug = 0;
+		$limit = 0;
 
-		$q[] = 'SELECT * FROM [e10_persons_address] AS [address]';
-		array_push ($q, ' WHERE locState = 0');
-		array_push ($q, ' ORDER BY ndx DESC');
-
-		$cnt = 0;
-		$rows = $this->app->db()->query ($q);
-		forEach ($rows as $r)
+		if ($fromCli)
 		{
-			if (!$tableAddress->geoCode ($r))
+			$debug = intval($this->app()->arg('debug'));
+			$limit = intval($this->app()->arg('limit'));
+		}
+
+		if (!$limit)
+			$limit = 20;
+
+		if ($fromCli)
+			echo ":: debug is `{$debug}`, limit is `{$limit}`\n\n";
+
+		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
+
+		if ($testNewPersons)
+		{
+			if ($debug > 1)
+				echo ":: new persons\n";
+
+			$personRecData = NULL;
+			/** @var \e10\persons\TablePersonsContacts */
+			$tableContacts = $this->app->table('e10.persons.personsContacts');
+			/** @var \e10\persons\TablePersons */
+			$tablePersons = $this->app->table('e10.persons.persons');
+
+			$q = [];
+			array_push ($q, 'SELECT * FROM [e10_persons_personsContacts] AS [contacts]');
+			array_push ($q, ' WHERE 1');
+			array_push ($q, ' AND adrLocState = %i', 0, ' AND [flagAddress] = %i', 1);
+			array_push ($q, ' AND docState = %i', 4000);
+			if ($fromCli)
+				array_push ($q, ' ORDER BY ndx ASC');
+			else
+			array_push ($q, ' ORDER BY ndx DESC');
+
+			$cnt = 1;
+			$rows = $this->app->db()->query ($q);
+			forEach ($rows as $r)
 			{
-				// TODO: message
+				if ($debug)
+				{
+					$personRecData = $tablePersons->loadItem($r['person']);
+					echo "* #".$r['person'].' / '.$personRecData['fullName'];
+				}
+
+				if (!$tableContacts->geoCode ($r, $debug))
+				{
+					// TODO: message
+				}
+
+				if ($debug)
+					echo "\n";
+				if ($debug > 1)
+					echo "\n";
+
+				$cnt++;
+				if ($cnt > $limit)
+					break;
+
+				usleep(150000); // max 5 request per second
 			}
+		}
+		else
+		{
+			/** @var \e10\persons\TableAddress */
+			$tableAddress = $this->app->table('e10.persons.address');
 
-			$cnt++;
-			if ($cnt > $limit)
-				break;
+			$q[] = 'SELECT * FROM [e10_persons_address] AS [address]';
+			array_push ($q, ' WHERE locState = 0');
+			array_push ($q, ' ORDER BY ndx DESC');
 
-			usleep(150000); // max 5 request per second
+			$cnt = 0;
+			$rows = $this->app->db()->query ($q);
+			forEach ($rows as $r)
+			{
+				if (!$tableAddress->geoCode ($r))
+				{
+					// TODO: message
+				}
+
+				$cnt++;
+				if ($cnt > $limit)
+					break;
+
+				usleep(150000); // max 5 request per second
+			}
 		}
 	}
 
 	public function personValidator()
 	{
 		$testNewPersons = intval($this->app->cfgItem ('options.persons.testNewPersons', 0));
+
 		if ($testNewPersons)
+		{
+			$e = new \e10doc\core\libs\PersonValidator($this->app);
+			//$e->maxCount = 5;
+			$e->batchCheck();
+
 			return;
+		}
 
 		if ($this->app->model()->table ('e10doc.debs.journal') === FALSE)
 			return;
@@ -274,6 +358,19 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		if ($personId)
 			$e->qryPersonId = $personId;
 		$e->run();
+	}
+
+	public function personsRevalidate()
+	{
+		$testNewPersons = intval($this->app->cfgItem ('options.persons.testNewPersons', 0));
+		if (!$testNewPersons)
+			return TRUE;
+
+		$e = new \e10doc\core\libs\PersonValidator($this->app);
+		$e->maxCount = 10;
+		$e->revalidate();
+
+		return TRUE;
 	}
 
 	public function lastPersonsUseCreate()
@@ -323,6 +420,11 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$this->lastPersonsUseCreate();
 	}
 
+	public function onCronHourly()
+	{
+		$this->personsRevalidate();
+	}
+
 	public function importNewPersons()
 	{
 		$e = new \e10\persons\libs\ImportNewPersons($this->app);
@@ -351,9 +453,10 @@ class ModuleServices extends \E10\CLI\ModuleServices
 	{
 		switch ($actionId)
 		{
-			case 'geo-code': return $this->geoCode();
+			case 'geo-code': return $this->geoCode(1);
 			case 'last-persons-use-create': return $this->lastPersonsUseCreate();
 			case 'person-validator': return $this->personValidator();
+			case 'persons-revalidate': return $this->personsRevalidate();
 			case 'import-new-persons': return $this->importNewPersons();
 			case 'import-new-persons-ba': return $this->importNewPersonsBA();
 			case 'import-new-persons-ba-clean': return $this->importNewPersonsBAClean();
@@ -369,6 +472,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		{
 			case 'services':  $this->onCronServices(); break;
 			case 'stats':     $this->onStats(); break;
+			case 'hourly': 		$this->onCronHourly(); break;
 		}
 		return TRUE;
 	}

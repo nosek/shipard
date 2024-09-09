@@ -7,6 +7,40 @@
   color: var(--bs-btn-color);
 }
 
+a.dropdown-item>i {
+  width: 1.4rem;
+  text-align: center;
+}
+
+/*button.btn {
+  color: var(--shpd-body-color) !important;
+}*/
+
+// re-do with different variables for bg and color
+.dropdown-menu{
+  border: 1px solid var(--shpd-card-border);
+  background-color: var(--shpd-card-bg) !important;
+}
+
+.dropdown-item {
+  background-color: var(--shpd-card-bg);
+  color: var(--shpd-body-color);
+}
+
+.dropdown-menu li:not(:last-of-type) {
+  border-bottom: 1px solid var(--shpd-card-border) !important;
+}
+
+.dropdown-item:hover {
+  background-color: var(--shpd-primary-gray);
+  color: var(--shpd-body-color);
+}
+
+.dropdown-item.active {
+  background-color: var(--shpd-primary-subtle);
+  color: #101010 !important;
+}
+
 /* zuš - univerzální velké tlačítko */
 a.dashboardButton {
     width: 4rem;
@@ -25,10 +59,10 @@ a.dashboardButton i, b {
     padding-top: .5rem;
 }
 
-/* dropdown na ovládání dark light módu*/
+/* dropdown na ovládání dark light módu
 .dropdown-item.active {
 	background-color: #{$shipard-primary};
-}
+}*/
 
 ul.dropdown-menu {
 	background-color: var(--cardBackground);
@@ -75,4 +109,149 @@ a.cancelButton {
 
 a.saveButton {
 	width: 30%;
+}
+
+// offcanvas close button (re-do of bootstrap close icon)
+button.shpd-close {
+  background-color: transparent;
+  font-size: 2rem;
+  color: var(--shpd-nav-color);
+}
+
+
+
+
+
+
+/* shpd buttons (not used yet) - fix border + shadow */
+.shpd-btn {
+  padding: .3rem 1rem;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  border: 1px solid var(--shpd-universal-border);
+  color: var(--shpd-body-color);
+}
+
+// default buttons
+.shpd-btn-primary {
+  background-color: var(--shpd-primary);
+  border: 1px solid var(--shpd-primary);
+  color: var(--shpd-btn-color-darks);
+}
+.shpd-btn-primary-light {
+  background-color: var(--shpd-primary-subtle);
+  border: 1px solid var(--shpd-primary-subtle);
+  color: var(--shpd-btn-color-lights);
+}
+.shpd-btn-secondary {
+  background-color: var(--shpd-secondary);
+  border: 1px solid var(--shpd-secondary);
+  color: var(--shpd-btn-color-lights);
+}
+.shpd-btn-success {
+  background-color: var(--shpd-success);
+  border: 1px solid var(--shpd-success);
+  color: var(--shpd-btn-color-darks);
+}
+.shpd-btn-info {
+  background-color: var(--shpd-info);
+  border: 1px solid var(--shpd-info);
+  color: var(--shpd-btn-color-lights);
+}
+.shpd-btn-warning {
+  background-color: var(--shpd-warning);
+  border: 1px solid var(--shpd-warning);
+  color: var(--shpd-btn-color-lights);
+}
+.shpd-btn-danger {
+  background-color: var(--shpd-danger);
+  border: 1px solid var(--shpd-danger);
+  color: var(--shpd-btn-color-darks);
+}
+
+// default buttons hover
+.shpd-btn-primary:hover {
+  background-color: var(--shpd-primary-gray);
+  border: 1px solid var(--shpd-primary-gray);
+  color: var(--shpd-btn-color-darks);
+}
+.shpd-btn-primary-light:hover {
+  background-color: var(--shpd-primary-gray);
+  border: 1px solid var(--shpd-primary-gray);
+}
+.shpd-btn-secondary:hover {
+  background-color: var(--shpd-secondary-hover);
+  border: 1px solid var(--shpd-secondary-hover);
+}
+.shpd-btn-success:hover {
+  background-color: var(--shpd-success-hover);
+  border: 1px solid var(--shpd-success-hover);
+}
+.shpd-btn-info:hover {
+  background-color: var(--shpd-info-hover);
+  border: 1px solid var(--shpd-info-hover);
+}
+.shpd-btn-warning:hover {
+  background-color: var(--shpd-warning-hover);
+  border: 1px solid var(--shpd-warning-hover);
+}
+.shpd-btn-danger:hover {
+  background-color: var(--shpd-danger-hover);
+  border: 1px solid var(--shpd-danger-hover);
+}
+
+// outline buttons
+.shpd-btn-outline-primary {
+  background-color: transparent;
+  border: 1px solid var(--shpd-primary);
+  color: var(--shpd-primary);
+}
+.shpd-btn-outline-primary-light {
+  background-color: transparent;
+  border: 1px solid var(--shpd-primary-subtle);
+  color: var(--shpd-primary-subtle);
+}
+.shpd-btn-outline-secondary {
+  background-color: transparent;
+  border: 1px solid var(--shpd-secondary);
+  color: var(--shpd-secondary);
+}
+.shpd-btn-outline-success {
+  background-color: transparent;
+  border: 1px solid var(--shpd-success);
+  color: var(--shpd-success);
+}
+.shpd-btn-outline-danger {
+  background-color: transparent;
+  border: 1px solid var(--shpd-danger);
+  color: var(--shpd-danger);
+}
+
+// outline buttons hover
+.shpd-btn-outline-primary:hover {
+  background-color: transparent;
+  border: 1px solid var(--shpd-primary-gray);
+  color: var(--shpd-primary-gray);
+}
+.shpd-btn-outline-primary-light:hover {
+  background-color: transparent;
+  border: 1px solid var(--shpd-primary-gray);
+  color: var(--shpd-primary-gray);
+}
+.shpd-btn-outline-secondary:hover {
+  background-color: transparent;
+  border: 1px solid var(--shpd-secondary-hover);
+  color: var(--shpd-secondary-hover);
+}
+.shpd-btn-outline-success:hover {
+  background-color: transparent;
+  border: 1px solid var(--shpd-success-hover);
+  color: var(--shpd-success-hover);
+}
+.shpd-btn-outline-danger:hover {
+  background-color: transparent;
+  border: 1px solid var(--shpd-danger-hover);
+  color: var(--shpd-danger-hover);
 }

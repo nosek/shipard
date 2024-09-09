@@ -171,6 +171,11 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		}
 		$dsStats->data['users']['lastMonth']['all'] = ['users' => $cntUsers, 'ops' => $cntOps];
 
+		// -- last log rec timestamp
+		$llr = $this->app->db()->query ('SELECT [created] FROM e10_base_docslog ORDER BY ndx DESC LIMIT 1')->fetch();
+		if ($llr)
+			$dsStats->data['lastLogRecTS'] = $llr['created']->format('Y-m-d H:i:s');
+
 		// -- modules
 		$dsStats->data['modules'] = utils::loadCfgFile(__APP_DIR__.'/config/modules.json');
 
@@ -184,6 +189,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 
 	public function onStats()
 	{
+		$this->attRepairFileSize();
 		$this->dataSourceStatsCreate();
 	}
 
@@ -224,6 +230,14 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$e->doTableDocument($attTableId, $attRecId);
 	}
 
+	function attDDMUpdate()
+	{
+		$ndx = intval($this->app->arg('ndx'));
+
+		$e = new \lib\docDataFiles\AttachmentsUpdater($this->app);
+		$e->init();
+		$e->doOne($ndx);
+	}
 
 	function attGeoTags()
 	{
@@ -240,6 +254,15 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			$e->setAttTableDocument ($attTableId, $attRecId);
 
 		$e->run();
+	}
+
+	function attRepairFileSize()
+	{
+		$maxCount = intval($this->app->arg('maxCount'));
+		if (!$maxCount)
+			$maxCount = 10000;
+		$e = new \e10\base\libs\AttachmentsRepairs($this->app);
+		$e->repairFileSize($maxCount);
 	}
 
 	function createUsersSummary()
@@ -271,6 +294,8 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			case 'att-geo-tags': return $this->attGeoTags();
 			case 'att-meta-data': return $this->attMetaData();
 			case 'att-doc-data-files': return $this->attDocDataFiles();
+			case 'att-ddm-update': return $this->attDDMUpdate();
+			case 'att-repair-file-size': return $this->attRepairFileSize();
 			case 'create-users-summary': return $this->createUsersSummary();
 			case 'install-nomenclature': return $this->installNomenclature();
 		}

@@ -13,9 +13,9 @@
 
 		{"id": "order", "name": "Pořadí", "type": "int"},
 
-		{"id": "template", "name": "Šablona", "type": "memo"},
-		{"id": "style", "name": "CSS style", "type": "memo"},
-		{"id": "uiStruct", "name": "Struktura uživatelského rozhraní", "type": "memo"},
+		{"id": "template", "name": "Šablona", "type": "code", "clng": "html"},
+		{"id": "style", "name": "CSS style", "type": "code", "clng": "scss"},
+		{"id": "uiStruct", "name": "Struktura uživatelského rozhraní", "type": "code", "clng": "json"},
 
 		{"id": "domain", "name": "Doména", "type": "string", "len": 80},
 
@@ -23,6 +23,9 @@
 		{"id": "pwaIcon", "name": "Ikona PWA aplikace (na ploše)", "type": "int", "reference": "e10.base.attachments", "comboViewer": "images"},
 
 		{"id": "sendRequestsFromEmail", "name": "E-maily s požadavky odesílat z e-mailu:", "type": "string", "len": 70},
+
+		{"id": "supportEmail", "name": "E-mail na technickou podporu:", "type": "string", "len": 70},
+		{"id": "supportPhone", "name": "Telefon na technickou podporu:", "type": "string", "len": 40},
 
 		{"id": "docState", "name": "Stav", "type": "int"},
 		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}

@@ -1,5 +1,5 @@
 .form-check-input[type=radio]:not(.form-check-input:checked) {
-	border: 4px solid var(--universalBorder);
+	border: 4px solid var(--shpd-universal-border);
 }
 
 .form-check-input[type=checkbox] {
@@ -8,7 +8,7 @@
 }
 
 .form-check-input{
-    border: 3pt solid var(--universalBorder) !important;
+    border: 3pt solid var(--shpd-universal-border) !important;
 }
 
 /*.form-floating input {
@@ -18,3 +18,145 @@
 /*.navbar .form-check-input{
     border: 3pt solid var(--navBorder) !important;
 }*/
+
+
+data-modal-form-env {
+    position: absolute;
+    background-color: #000000C0;
+    z-index: 1000;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+
+
+    .formContainer {
+        display: grid;
+        grid-template-columns: min-content 1fr 1fr;
+        grid-template-rows: min-content 1fr min-content;
+        gap: 0px 0px;
+        grid-auto-flow: row;
+        grid-template-areas:
+          "header header header"
+          "tabs content content"
+          "toolbar toolbar toolbar";
+
+
+
+        max-width: 30em;
+
+
+        background-color: var(--shpd-body-bg);
+      }
+
+      .formHeader { grid-area: header; }
+
+      .formToolbar { grid-area: toolbar; }
+
+      .formTabs { grid-area: tabs; }
+
+      .formContent { grid-area: content; }
+
+}
+
+input.e10-ef-w999 {
+  width: 100%;
+}
+
+select.e10-inputEnum {
+  max-width: 100%;
+}
+
+
+data-modal-env {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: min-content 1fr;
+  gap: 0px 0px;
+  grid-template-areas:
+    "tlbr"
+    "content";
+
+  .tlbr {
+    grid-area: tlbr;
+    display: flex;
+    align-items: center;
+
+    >span {
+      padding-top: .4rem;
+      padding-bottom: .4rem;
+    }
+    >span.backIcon {
+      padding-left: .8rem;
+      padding-right: .8rem;
+    }
+  }
+  .content {
+    grid-area: content;
+    overflow-y: hidden;
+  }
+
+  position: absolute;
+  background-color: #000000C0;
+  z-index: 1000;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+
+  >div, >data-viewer, >document-card {
+    background-color: var(--shpd-body-bg);
+  }
+}
+
+document-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: min-content 1fr;
+  gap: 0px 0px;
+  grid-auto-flow: row;
+  grid-template-areas:
+    "toolbar"
+    "content";
+
+  height: 100%;
+
+  >.toolbar { grid-area: toolbar; padding: .5rem;}
+  >.content { grid-area: content; overflow-y: auto;}
+}
+
+
+@media only screen and (min-width: 701px) {
+  data-modal-env {
+    >div {
+      width: 60%;
+      margin-left: 20%;
+    }
+  }
+}
+
+
+/* visuals */
+form {
+  position: relative;
+  .shpd-form-text {
+    width: 100%;    
+    height: 2.5rem;
+    border: 2pt solid var(--shpd-universal-border);
+    border-radius: 6px;
+    padding: 0.5rem;
+    line-height: 1.5;
+    box-sizing: border-box;
+  }
+  input {
+    background-color: var(--shpd-form-input-bg);
+    color: var(--shpd-body-color);
+  }
+  input:focus {
+    outline: 0;
+    border: 2pt solid var(--shpd-form-input-focus);
+  }
+  .shpd-form-checkbox {
+    background-color: var(--shpd-form-input-bg);
+  }
+}

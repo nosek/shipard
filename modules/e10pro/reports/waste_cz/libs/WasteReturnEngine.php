@@ -12,6 +12,11 @@ class WasteReturnEngine extends Utility
   var $year = 0;
   var $dateBegin;
   var $dateEnd;
+  var $wasteSettings = NULL;
+
+  var $onlyCreateData = 0;
+  var $wasteReturnRows = NULL;
+  var $wasteReturnErrorLabels = [];
 
   /** @var \e10doc\core\TableHeads */
 	var $tableHeads;
@@ -36,18 +41,34 @@ class WasteReturnEngine extends Utility
         continue;
       $this->enabledCodesKinds[] = $ackNdx;
     }
+
+		$this->wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$this->year, NULL);
   }
 
   public function resetYear()
   {
     $this->db()->query('DELETE FROM [e10pro_reports_waste_cz_returnRows] WHERE [calendarYear] = %i', $this->year);
 
-    $this->addPurchases();
-    $this->addInvoicesOut();
+    $this->addAllDocuments();
+  }
+
+  public function addAllDocuments()
+  {
+    $this->addDocuments('purchase', self::rowDirIn);
+    $this->addDocuments('invno', self::rowDirOut);
+    $this->addDocuments('stockout', self::rowDirOut);
+    $this->addDocuments('wastelp', self::rowDirOut);
   }
 
   public function addDocuments($docType, $rowDir)
   {
+		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$this->year, NULL);
+		if (!$wasteSettings)
+			return;
+
+    if (!isset($wasteSettings['docModes'][$docType]) || $wasteSettings['docModes'][$docType] === 0)
+			return;
+
 		$q = [];
 
     array_push ($q, 'SELECT ');
@@ -65,6 +86,9 @@ class WasteReturnEngine extends Utility
     array_push ($q, ' AND [heads].docType = %s', $docType);
     array_push ($q, ' AND [heads].docState = %i', 4000);
 
+    if ($wasteSettings['docModes'][$docType] === 1)
+      array_push ($q, ' AND [heads].addToWasteReport = %i', 1);
+
     if ($this->documentNdx)
       array_push ($q, ' AND [rows].[document] = %i', $this->documentNdx);
     else
@@ -72,7 +96,7 @@ class WasteReturnEngine extends Utility
       array_push ($q, ' AND [heads].dateAccounting >= %d', $this->dateBegin);
       array_push ($q, ' AND [heads].dateAccounting <= %d', $this->dateEnd);
     }
-    array_push ($q, ' ORDER BY [heads].[docNumber]');
+    array_push ($q, ' ORDER BY [heads].[docNumber], [rows].[ndx]');
 
     $cnt = 0;
     $rows = $this->db()->query($q);
@@ -83,6 +107,15 @@ class WasteReturnEngine extends Utility
 
       $row = $r->toArray();
 			$this->tableHeads->loadDocRowItemsCodes($row, $r['personType'], $row, NULL, $rowDestData, $allDestData);
+
+      if ($this->onlyCreateData)
+      {
+        if (isset($rowDestData['rowItemCodesDataErrors']))
+        {
+          foreach ($rowDestData['rowItemCodesDataErrors'] as $errLbl)
+            $this->wasteReturnErrorLabels[] = $errLbl;
+        }
+      }
 
       foreach ($this->enabledCodesKinds as $eck)
       {
@@ -131,7 +164,12 @@ class WasteReturnEngine extends Utility
         //if (!$newRow['wasteCodeText'] || $newRow['wasteCodeText'] === '')
         //  echo "\n".'! '.$r['docNumber'].': '.json_encode($rowDestData['rowItemCodesData'])."\n";
 
-        $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $newRow);
+        if ($this->onlyCreateData)
+        {
+          $this->wasteReturnRows[] = $newRow;
+        }
+        else
+          $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $newRow);
       }
       $cnt++;
 
@@ -141,16 +179,6 @@ class WasteReturnEngine extends Utility
       //  break;
     }
     //echo "\n".$cnt." rows\n";
-  }
-
-  public function addPurchases()
-  {
-    $this->addDocuments('purchase', self::rowDirIn);
-  }
-
-  public function addInvoicesOut()
-  {
-    $this->addDocuments('invno', self::rowDirOut);
   }
 
 	protected function quantityKG ($quantity, $unit)
@@ -174,8 +202,21 @@ class WasteReturnEngine extends Utility
 
     $this->db()->query('DELETE FROM [e10pro_reports_waste_cz_returnRows] WHERE [document] = %i', $this->documentNdx);
 
-    $this->addPurchases();
-    $this->addInvoicesOut();
+    $this->addAllDocuments();
+  }
+
+  public function createDataForDocument($documentNdx)
+  {
+    $this->onlyCreateData = 1;
+
+    $this->init();
+
+    $this->wasteReturnRows = [];
+    $this->wasteReturnErrorLabels = [];
+    $this->documentNdx = $documentNdx;
+    $this->tableHeads = $this->app->table ('e10doc.core.heads');
+
+    $this->addAllDocuments();
   }
 
   public function run()

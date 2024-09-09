@@ -801,6 +801,7 @@ class CfgManager
 		$colOptions = [
 			'mandatory' => DataModel::coMandatory,
 			'saveOnChange' => DataModel::coSaveOnChange,
+			'checkOnChange' => DataModel::coCheckOnChange,
 			'ascii' => DataModel::coAscii,
 			'scanner' => DataModel::coScanner,
 			'computed' => DataModel::coComputed,
@@ -861,6 +862,8 @@ class CfgManager
 				$newTable ['cols'][$col ['id']]['subtype'] = $col['subtype'];
 
 			$newTable ['cols'][$col ['id']]['type'] = $colTypes [$col['type']];
+			if (($col['type'] === 'code' || $col['type'] === 'memo') && isset ($col['clng']))
+				$newTable ['cols'][$col ['id']]['clng'] = $col['clng'];
 
 			if (isset ($col['enumCfg']))
 				$newTable ['cols'][$col ['id']]['enumCfg'] = $col['enumCfg'];

@@ -7,8 +7,7 @@
 				"id": "mode", "name": "Mód", "type": "enumInt", "options": ["saveOnChange"],
 				"enumValues": {
 					"0": "Switch",
-					"1": "AP - Bez nastavení portů",
-					"2": "AP/Bridge - Bridge pro access port",
+					"2": "AP/Bridge",
 					"3": "Router"
 				}
 			},
@@ -17,7 +16,7 @@
 				"id": "wifi", "name": "WiFi", "type": "enumInt", "options": ["saveOnChange"],
 				"enumValues": {
 					"0": "ne",
-					"1": "CAP",
+					"1": "CAPSMAN client",
 					"2": "Z tohoto zařízení",
 					"3": "Z nastavení sítě"
 				}
@@ -26,7 +25,7 @@
 			{"id": "wifiSSID", "name": "WiFi SSID", "type": "string", "len": 40, "enabled": {"wifi": 2}},
 			{"id": "wifiPassword", "name": "WiFi heslo", "type": "string", "len": 40, "enabled": {"wifi": 2}},
 
-			{"id": "capsmanServer", "name": "Zapnout CAPSMAN server", "type": "logical", "enabled": {"mode": 2}},
+			{"id": "capsmanServer", "name": "Zapnout CAPSMAN server", "type": "logical", "enabled": {"mode": 3}},
 
 			{"id": "userLogin", "name": "Uživatel", "type": "string", "len": 30},
 			{"id": "managementWWWAddrList", "name": "Povolené adresy pro správu přes WWW", "type": "int", "reference": "mac.lan.ipAddressLists"},
@@ -58,13 +57,30 @@
 			"sgClassId": "mac.lan.libs.cfgScripts.MikrotikAD_SwitchChip",
 			"types": {
 				"mkt-xap_cap": {"title": "cAP"},
-				"mkt-xap_cap-ac": {"title": "cAP ac"},
-				"mkt-xap_cap-xl-ac": {
-					"title": "cAP XL ac",
-					"wirelessMode": "wireless",
+				"mkt-xap_cap-ac": {
+					"title": "cAP ac",
+					"wirelessMode": "wifi",
 					"ports": [
 						{"kind": 5, "count": 2, "maskId": "ether"},
-						{"kind": 1, "count": 2, "maskId": "wlan"},
+						{"kind": 1, "count": 2, "maskId": "wifi"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
+				"mkt-xap_cap-ax": {
+					"title": "cAP ax",
+					"wirelessMode": "wifi",
+					"ports": [
+						{"kind": 5, "count": 2, "maskId": "ether"},
+						{"kind": 1, "count": 2, "maskId": "wifi"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
+				"mkt-xap_cap-xl-ac": {
+					"title": "cAP XL ac",
+					"wirelessMode": "wifi",
+					"ports": [
+						{"kind": 5, "count": 2, "maskId": "ether"},
+						{"kind": 1, "count": 2, "maskId": "wifi"},
 						{"kind": 10, "count": 1, "maskId": "mng"}
 					]
 				},
@@ -73,7 +89,7 @@
 				"mkt-xap_hap": {"title": "hAP"},
 				"mkt-xap_hap-ax2": {
 					"title": "hAP ax²",
-					"wirelessMode": "wifiwave2",
+					"wirelessMode": "wifi",
 					"ports": [
 						{"kind": 5, "count": 5, "maskId": "ether"},
 						{"kind": 1, "count": 2, "maskId": "wifi"},
@@ -85,10 +101,10 @@
 				"mkt-xap_hap-lite": {"title": "hAP lite / hAP lite TC"},
 				"mkt-xap_hap-ac2": {
 					"title": "hAP ac²",
-					"wirelessMode": "wireless",
+					"wirelessMode": "wifi",
 					"ports": [
 						{"kind": 5, "count": 5, "maskId": "ether"},
-						{"kind": 1, "count": 2, "maskId": "wlan"},
+						{"kind": 1, "count": 2, "maskId": "wifi"},
 						{"kind": 10, "count": 1, "maskId": "mng"}
 					]
 				},
@@ -98,17 +114,36 @@
 				"mkt-xap_map-lite": {"title": "mAP lite"},
 				"mkt-xap_map": {"title": "mAP"},
 
-				"mkt-xap_wap": {"title": "wAP / wAP BE"},
+				"mkt-xap_wap-d2": {
+					"title": "wAP ac",
+					"typeIds": ["RBwAPG-5HacD2HnD"],
+					"wirelessMode": "wifi",
+					"ports": [
+						{"kind": 5, "count": 2, "maskId": "ether"},
+						{"kind": 1, "count": 2, "maskId": "wifi"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 
 				"mkt-xap_wap-r": {"title": "wAP R"},
-				"mkt-xap_wap-ac": {"title": "wAP ac / wAP ac BE"},
+
+				"mkt-xap_wap-ac": {
+					"title": "[OLD] wAP ac / wAP BE (1 ✖️ eth)",
+					"typeIds": ["RBwAPG-5HacT2HnD", "RBwAPG-5HacT2HnD-BE"],
+					"wirelessMode": "wifi",
+					"ports": [
+						{"kind": 5, "count": 1, "maskId": "ether"},
+						{"kind": 1, "count": 2, "maskId": "wifi"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 
 				"mkt-xap_audience": {
 					"title": "Audience",
-					"wirelessMode": "wireless",
+					"wirelessMode": "wifi",
 					"ports": [
 						{"kind": 5, "count": 2, "maskId": "ether"},
-						{"kind": 1, "count": 3, "maskId": "wlan"},
+						{"kind": 1, "count": 3, "maskId": "wifi"},
 						{"kind": 10, "count": 1, "maskId": "mng"}
 					]
 				}
@@ -131,10 +166,25 @@
 				"mkt-ccr1009_7g-1c-1s-pc": {"title": "CCR1009-7G-1C-1S+PC"},
 				"mkt-ccr1009_7g-1c-1s": {"title": "CCR1009-7G-1C-1S+"},
 
-				"mkt-ccr1036_8g-2S": {"title": "CCR1036-8G-2S+ / CCR1036-8G-2S+EM"},
+				"mkt-ccr1036_8g-2S": {
+					"title": "CCR1036-8G-2S+ / CCR1036-8G-2S+EM",
+					"ports": [
+						{"kind": 5, "count": 8, "maskId": "ether"},
+						{"kind": 6, "count": 2, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 				"mkt-ccr1036_12g-4S": {"title": "CCR1036-12G-4S / CCR1036-12G-4S-EM"},
 
-				"mkt-ccr2004_1g-12S-2xs": {"title": "CCR2004-1G-12S+2XS"},
+				"mkt-ccr2004_1g-12S-2xs": {
+					"title": "CCR2004-1G-12S+2XS",
+					"ports": [
+						{"kind": 5, "count": 1, "maskId": "ether"},
+						{"kind": 6, "count": 12, "maskId": "sfp-sfpplus"},
+						{"kind": 6, "count": 2, "maskId": "sfp28-"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 				"mkt-ccr2004_16g-2S": {"title": "CCR2004-16G-2S+"},
 				"mkt-ccr2004_16g-2S-pc": {"title": "CCR2004-16G-2S+PC"}
 			}
@@ -144,9 +194,31 @@
 			"sgClassId": "mac.lan.libs.cfgScripts.MikrotikAD_SwitchChip",
 			"types": {
 				"mkt-crs106-1c-5s": {"title": "CRS106-1C-5S"},
-				"mkt-crs112-8g-4s": {"title": "CRS112-8G-4S-IN"},
-				"mkt-crs112-8p-4s": {"title": "CRS112-8P-4S-IN"},
+				"mkt-crs112-8g-4s": {
+					"title": "CRS112-8G-4S-IN",
+					"ports": [
+						{"kind": 5, "count": 8, "maskId": "ether"},
+						{"kind": 6, "count": 4, "maskId": "sfp", "startNumber": 9},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
+				"mkt-crs112-8p-4s": {
+					"title": "CRS112-8P-4S-IN",
+					"ports": [
+						{"kind": 5, "count": 8, "maskId": "ether"},
+						{"kind": 6, "count": 4, "maskId": "sfp", "startNumber": 9},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 				"mkt-crs125-24g-1s-2hnd": {"title": "CRS125-24G-1S-2HnD-IN"},
+				"mkt-crs305-1g-4s": {
+					"title": "CRS305-1G-4S+IN",
+					"ports": [
+						{"kind": 5, "count": 1, "maskId": "ether"},
+						{"kind": 6, "count": 4, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 				"mkt-crs309-1g-8s": {
 					"title": "CRS309-1G-8S+IN",
 					"ports": [
@@ -156,7 +228,24 @@
 					]
 				},
 				"mkt-crs310-1g-5s-4s": {"title": "CRS310-1G-5S-4S+IN"},
-				"mkt-crs326-24s-2q": {"title": "CRS326-24S+2Q+RM"},
+				"mkt-crs318-16p-2s-out": {
+					"title": "CRS318-16P-2S+OUT",
+					"ports": [
+						{"kind": 5, "count": 16, "maskId": "ether"},
+						{"kind": 6, "count": 2, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
+				"mkt-crs326-24s-2q": {
+					"title": "CRS326-24S+2Q+RM",
+					"ports": [
+						{"kind": 5, "count": 1, "maskId": "ether"},
+						{"kind": 6, "count": 4, "maskId": "qsfpplus1-"},
+						{"kind": 6, "count": 4, "maskId": "qsfpplus2-"},
+						{"kind": 6, "count": 24, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 				"mkt-crs326-24g-2s": {
 					"title": "CRS326-24G-2S+IN / CRS326-24G-2S+RM",
 					"ports": [
@@ -173,8 +262,25 @@
 						{"kind": 10, "count": 1, "maskId": "mng"}
 					]
 				},
-				"mkt-crs328-4c-20s-4s-rm": {"title": "CRS328-4C-20S-4S+RM"},
-				"mkt-crs354-48p-4s-2q": {"title": "CRS354-48P-4S+2Q+RM"}
+				"mkt-crs328-4c-20s-4s-rm": {
+					"title": "CRS328-4C-20S-4S+RM",
+					"ports": [
+						{"kind": 5, "count": 4, "maskId": "combo"},
+						{"kind": 6, "count": 20, "maskId": "sfp"},
+						{"kind": 6, "count": 4, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
+				"mkt-crs354-48p-4s-2q": {
+					"title": "CRS354-48P-4S+2Q+RM",
+					"ports": [
+						{"kind": 5, "count": 49, "maskId": "ether"},
+						{"kind": 6, "count": 4, "maskId": "qsfpplus1-"},
+						{"kind": 6, "count": 4, "maskId": "qsfpplus2-"},
+						{"kind": 6, "count": 4, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				}
 			}
 		}
 	}

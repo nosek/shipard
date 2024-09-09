@@ -47,6 +47,9 @@ class DbTable
 		if ($this->app()->hasRole ('all'))
 			return 2;
 
+		if ($this->app()->ngg)
+			return 2;
+
 		$allRoles = $this->app()->cfgItem ('e10.persons.roles');
 		$userRoles = $this->app()->user()->data ('roles');
 		$accessLevel = 0;
@@ -1025,6 +1028,13 @@ class DbTable
 			return;
 		}
 
+		$specialSetDocState = 0;
+		if ($setDocState == 99001)
+		{
+			$specialSetDocState = $setDocState;
+			$setDocState = 0;
+		}
+
 		$this->app()->db->begin();
 		$needLog = 0;
 		$ds = FALSE;
@@ -1060,6 +1070,12 @@ class DbTable
 				}
 			}
 		}
+
+		if ($specialSetDocState)
+		{
+			$this->checkSpecialDocState(1, $specialSetDocState, $saveData);
+		}
+
 
 		//error_log ('#### setDocState: ' . $saveData ['setDocState']);
 		$formData->checkBeforeSave($saveData);
@@ -1102,6 +1118,15 @@ class DbTable
 		// check after save - table mode
 		$this->checkAfterSave2 ($formData->recData);
 
+		if ($specialSetDocState)
+		{
+			if ($this->checkSpecialDocState(2, $specialSetDocState, $saveData))
+			{
+				$formData->recData = $this->loadItem ($pk);
+				$needLog = 1;
+			}
+		}
+
 		// -- save event to log
 		if ($needLog)
 		{
@@ -1118,6 +1143,10 @@ class DbTable
 		}
 	} // saveFormData
 
+	protected function checkSpecialDocState($phase, $specialDocState, &$saveData)
+	{
+		return FALSE;
+	}
 
 	public function listDefinition ($listId)
 	{

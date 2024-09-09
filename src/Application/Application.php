@@ -19,6 +19,8 @@ class Application extends \Shipard\Application\ApplicationCore
 	var $otherDbs = [];
 	var $cache;
 
+	var $debug = 0;
+
 	static $appLog;
 
 	public $response;
@@ -408,6 +410,15 @@ class Application extends \Shipard\Application\ApplicationCore
 
 	public function checkAccess ($item)
 	{
+		if ($this->ngg)
+			return $this->checkAccessNG($item);
+
+		if (PHP_SAPI === 'cli')
+			return 2;
+
+		if (isset($item['role']) && !$this->hasRole($item['role']))
+			return 0;
+
 		$allRoles = $this->cfgItem ('e10.persons.roles');
 		$userRoles = $this->user()->data ('roles');
 
@@ -500,13 +511,18 @@ class Application extends \Shipard\Application\ApplicationCore
 		return $accessLevel;
 	}
 
+	public function checkAccessNG ($item)
+	{
+		return 2;
+	}
+
 	public function checkUserRights ($item, $minimalRole = 'guest')
 	{
 		if (!$this->authenticator)
 			return true;
 
 		$ok = false;
-		$auth = array ();
+		$auth = [];
 
 		$headers = utils::getAllHeaders();
 
@@ -715,6 +731,17 @@ class Application extends \Shipard\Application\ApplicationCore
 		return false;
 	}
 
+	public function hasMainRole ($roleId)
+	{
+		if (!$this->uiUser || !isset($this->uiUser['mainRoles']))
+			return false;
+
+		if (in_array($roleId, $this->uiUser['mainRoles']))
+			return true;
+
+		return false;
+	}
+
 	public function loadItem ($ndx, $tableId)
 	{
 		$table = $this->table ($tableId);
@@ -911,8 +938,19 @@ class Application extends \Shipard\Application\ApplicationCore
 
 	public function userGroups ()
 	{
+		if ($this->ngg)
+		{
+			$userNdx = $this->userNdx();
+			$groups = [];
+			$rows = $this->db->query ('SELECT * FROM [e10_persons_personsgroups] WHERE [person] = %i', $userNdx);
+			foreach ($rows as $r)
+				$groups[] = $r['group'];
+
+			return $groups;
+		}
+
 		if (!$this->authenticator)
-			return array();
+			return [];
 
 		$groups = $this->user()->data ('groups');
 		if ($groups !== FALSE)
@@ -1060,6 +1098,8 @@ class Application extends \Shipard\Application\ApplicationCore
 
 	public function addPageCodeParts ($type, $parts, $page, $appWindow = FALSE)
 	{
+		$testNewCodeEditor = intval($this->cfgItem ('options.experimental.testNewCodeEditor', 0));
+
 		$absUrl = '';
 		$useNewWebsockets = 1;
 
@@ -1070,7 +1110,7 @@ class Application extends \Shipard\Application\ApplicationCore
 				$dsIcon = $this->dsIcon();
 				$wss = $this->webSocketServers ();
 				$c .= "\t<script type=\"text/javascript\">\nvar httpApiRootPath = '{$this->urlRoot}';var serverTitle=\"" . Utils::es ($this->cfgItem ('options.core.ownerShortName', '')) . "\";" .
-					"var remoteHostAddress = '{$_SERVER ['REMOTE_ADDR']}'; e10ClientType = " . json_encode ($this->clientType) . ";\n";
+					"var g_useMonaco = {$testNewCodeEditor}; var remoteHostAddress = '{$_SERVER ['REMOTE_ADDR']}'; e10ClientType = " . json_encode ($this->clientType) . ";\n";
 				$c .= "var g_useMqtt = {$useNewWebsockets};";
 				$c .= "var deviceId = '{$this->deviceId}';";
 				$c .= "var webSocketServers = ".json_encode($wss).";\n";
@@ -1146,6 +1186,7 @@ class Application extends \Shipard\Application\ApplicationCore
 	public function createPageCodeOpen ($page, $appWindow = FALSE)
 	{
 		$useNewWebsockets = 1;
+		$testNewCodeEditor = intval($this->cfgItem ('options.experimental.testNewCodeEditor', 0));
 
 		$absUrl = '';
 
@@ -1217,9 +1258,17 @@ class Application extends \Shipard\Application\ApplicationCore
 					$c .= "<script type=\"text/javascript\" src=\"{$scRoot}/libs/js/mqttws/mqttws31.min.js\"></script>\n";
 			}
 
-			$c .= "<script type=\"text/javascript\" src=\"{$scRoot}/libs/js/codemirror/codemirror-4.7.1-min.js\"></script>\n";
+			if (!$testNewCodeEditor)
+			{
+				$c .= "<script type=\"text/javascript\" src=\"{$scRoot}/libs/js/codemirror/codemirror-4.7.1-min.js\"></script>\n";
+				$c .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"{$scRoot}/libs/js/codemirror/codemirror-4.7.1.css\">\n";
+			}
+			else
+			{
+				$c .= "<link rel='stylesheet' data-name='vs/editor/editor.main' href='{$scRoot}/libs/monaco-editor-0.47/min/vs/editor/editor.main.css'>";
+			}
+
 			$c .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"{$scRoot}/libs/js/chosen/chosen.css\">\n";
-			$c .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"{$scRoot}/libs/js/codemirror/codemirror-4.7.1.css\">\n";
 			$c .= "<link rel=\"stylesheet\" type=\"text/css\" href=\"//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/smoothness/jquery-ui.css\">\n";
 
 
@@ -1304,6 +1353,9 @@ class Application extends \Shipard\Application\ApplicationCore
 
 	public function table ($tableId)
 	{
+		if (!$tableId)
+			return NULL;
+
 		if (isset($tableId [0]) && $tableId [0] === '_')
 		{
 			$tableClassName = "\\E10\\" . substr ($tableId, 1);
@@ -1763,6 +1815,7 @@ class Application extends \Shipard\Application\ApplicationCore
 		}
 
 		$o = new \Shipard\Api\v2\Router($this);
+		$o->uiRouter = $this;
 		$o->setRequestParams($requestParams);
 		return $o->run();
 	}
@@ -2227,6 +2280,9 @@ class Application extends \Shipard\Application\ApplicationCore
 
 	public function userNdx ()
 	{
+		if ($this->ngg && $this->uiUser)
+			return $this->uiUser['person'] ?? 0;
+
 		if (isset($this->user))
 			return $this->user->data('id');
 		return 0;

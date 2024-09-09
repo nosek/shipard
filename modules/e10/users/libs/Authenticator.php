@@ -68,7 +68,8 @@ class Authenticator extends Utility
     if (!$password)
       return FALSE;
 
-    $userInfo = $this->db()->query('SELECT * FROM [e10_users_users] WHERE [login] = %s', $login)->fetch();
+    $userInfo = $this->db()->query('SELECT * FROM [e10_users_users] WHERE [login] = %s', $login,
+                                    ' AND [docState] = %i', 4000)->fetch();
     if (!$userInfo)
       return FALSE;
 
@@ -83,6 +84,34 @@ class Authenticator extends Utility
 
         return TRUE;
       }
+    }
+
+    return FALSE;
+  }
+
+  function checkUserPin($credentials)
+  {
+    $login = $credentials['login'] ?? NULL;
+    if (!$login)
+      return FALSE;
+    $pin = $credentials['pin'] ?? NULL;
+    if (!$pin)
+      return FALSE;
+
+    $userInfo = $this->db()->query('SELECT * FROM [e10_users_users] WHERE [login] = %s', $login,
+                                    ' AND [docState] = %i', 4000)->fetch();
+    if (!$userInfo)
+      return FALSE;
+
+    $existedPin = $this->db()->query('SELECT * FROM [e10_users_usersKeys] WHERE [keyType] = %i', 0,
+                                      ' AND [user] = %i', $userInfo['ndx'],
+                                      ' AND [docState] = %i', 4000)->fetch();
+    if ($existedPin && $existedPin['key'] === $pin)
+    {
+      $this->createNewSession($userInfo['ndx']);
+      $this->setUserInfo($userInfo['ndx'], 0);
+
+      return TRUE;
     }
 
     return FALSE;
@@ -123,14 +152,34 @@ class Authenticator extends Utility
 
     $this->db()->query('INSERT INTO [e10_users_sessions] ', $newSession);
 
-    $sessionExpiration = time()+60*60*24*14;
+    $sessionExpiration = $apiKeyNdx ? time()+60*60*24*365*5 : time()+60*60*24*14; // robots session expired after 5 years
     $this->setCookie($this->sessionCookieName, $newSession['ndx'], $sessionExpiration);
   }
 
   function setUserInfo($userNdx, $apiKeyNdx = 0)
   {
     $userRecData = $this->db()->query('SELECT * FROM [e10_users_users] WHERE [ndx] = %i', $userNdx)->fetch();
-    $this->app->uiUser = ['ndx' => $userNdx, 'name' => $userRecData['fullName'], 'apiKeyNdx' => $apiKeyNdx];
+
+    // -- main roles
+    $mainRoles = [];
+    $q = [];
+		array_push($q, 'SELECT links.*, [roles].systemId AS systemId');
+		array_push($q, ' FROM e10_base_doclinks AS [links]');
+		array_push($q, ' LEFT JOIN e10_users_roles AS [roles] ON links.dstRecId = [roles].ndx');
+		array_push($q, ' WHERE dstTableId = %s', 'e10.users.roles');
+		array_push($q, ' AND srcTableId = %s', 'e10.users.users');
+		array_push($q, ' AND links.srcRecId = %i', $userNdx);
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+			$mainRoles[] = $r['systemId'];
+
+    $this->app->uiUser = [
+      'ndx' => $userNdx, 'name' => $userRecData['fullName'],
+      'apiKeyNdx' => $apiKeyNdx,
+      'person' => $userRecData['person'],
+      'login' => $userRecData['person'], 'email' => $userRecData['email'],
+      'mainRoles' => $mainRoles,
+    ];
   }
 
   function closeSession()

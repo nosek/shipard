@@ -144,7 +144,7 @@ use \e10\base\libs\UtilsBase;
 		$installModule = $this->app()->cfgItem('hosting.core.installModules.'.$recData['installModule'], NULL);
 		if ($installModule)
 		{
-			$labels['condition'][] = ['text' => $installModule['sn'], 'class' => 'label label-info', 'icon' => 'tables/e10.install.modules'];
+			//$labels['condition'][] = ['text' => $installModule['sn'], 'class' => 'label label-info', 'icon' => 'tables/e10.install.modules'];
 		}
 		else
 			$labels['condition'][] = ['text' => 'Vadný modul', 'class' => 'label label-warning', 'icon' => 'system/iconWarning'];
@@ -171,60 +171,176 @@ use \e10\base\libs\UtilsBase;
 	public function getPlan($data)
 	{
 		$plans = $this->app()->cfgItem('hosting.core.pricePlans');
+		$priceModules = $this->app()->cfgItem('hosting.core.priceModules');
 		$statsData = json::decode ($data['data']);
 		if (!$statsData)
 			$statsData = [];
 
 		$totalSize = $data['usageTotal'] ?? 0;
+		$totalSizeGB = round($data['usageTotal'] / (1024 * 1024 * 1024), 1);
 		$cntDocs12m = $data['cntDocuments12m'] ?? 0;
 		$cntCashRegs12m = $data['cntCashRegs12m'] ?? 0;
-		$cntDocs = $cntDocs12m - $cntCashRegs12m + intval($cntCashRegs12m / 10);
+		$cntDocs = $cntDocs12m - $cntCashRegs12m + intval($cntCashRegs12m / 100);
 
 		$plan = NULL;
+		$planPriceCam = 0;
+		$planPriceLANDevice = 0;
+		$planPriceCam = 0;
+		$planPriceZUSStudium = 0;
 
 		foreach ($plans as $p)
 		{
+			$plan = $p;
+			if (isset($plan['priceCam']))
+				$planPriceCam = $plan['priceCam'];
+			if (isset($plan['priceLANDevice']))
+				$planPriceLANDevice = $plan['priceLANDevice'];
+
+			if (isset($plan['priceLANDevice']))
+				$planPriceZUSStudium = $plan['priceZUSStudium'];
+
 			if ($cntDocs > $p['maxDocs'])
 				continue;
-			$plan = $p;
+
+			if ($totalSizeGB > $p['maxSpaceUsage'] && ($p['allowExtraUsage'] ?? 1) === 0)
+				continue;
+
+			if ($data['invoicingTo'] == 1 && isset($p['b2bOnly']))
+				continue;
+
 			break;
 		}
 
 		$plan['extModulesPoints'] = 0;
+		$plan['extraCharges'] = ['total' => 0, 'charges' => []];
+		$plan['priceUsage'] = 0;
+
+
+		if (isset($statsData['modules']))
+		{
+			foreach ($statsData['modules'] as $moduleId)
+			{
+				if (!isset($priceModules[$moduleId]))
+					continue;
+				$extraPrice = $priceModules[$moduleId]['price'];
+				$plan['extraCharges']['charges'][] = [
+					'price' => $extraPrice,
+					'legend' => 'Modul '.$priceModules[$moduleId]['title'],
+					'icon' => 'tables/e10.install.modules',
+				];
+
+				$plan['extraCharges']['total'] += $extraPrice;
+			}
+		}
 
 		if (isset($statsData['extModules']))
 		{
-			$extModulesLabels = [];
+			//$extModulesLabels = [];
 			foreach ($statsData['extModules'] as $emId => $em)
 			{
 				if ($emId === 'mac')
 				{
+					$cntCams = intval($em['lan']['countDevices']['10'] ?? 0);
+					$cntLANDevices = intval($em['lan']['countDevices']['ALL'] ?? 0) - $cntCams;
+
 					if (isset($em['lan']) && isset($em['lan']['countDevices']['ALL']))
 					{
+						/*
 						$extModulesLabels[] = [
 							'text' => 'Počítačová síť',
-							'suffix' => utils::nf($em['lan']['countDevices']['ALL']).' zařízení',
+							'suffix' => utils::nf($cntLANDevices).' zařízení',
 							'icon' => 'system/iconSitemap', 'class' => 'label label-info'
 						];
+						*/
 						$plan['extModulesPoints'] += intval($em['lan']['countDevices']['ALL']);
+
+						if ($cntLANDevices)
+						{
+							$oneDevicePrice = $planPriceLANDevice;
+							$extraPrice = $cntLANDevices * $oneDevicePrice;
+							$plan['extraCharges']['charges'][] = [
+								'price' => $extraPrice,
+								'legend' => $cntLANDevices.' zařízení × '.$oneDevicePrice,
+								'icon' => 'system/iconSitemap',
+							];
+						}
+
+						$plan['extraCharges']['total'] += $extraPrice;
 					}
 					if (isset($em['lan']) && isset($em['lan']['countDevices']['10']))
 					{
+						/*
 						$extModulesLabels[] = [
 							'text' => 'Kamerový systém',
-							'suffix' => utils::nf($em['lan']['countDevices']['10']).' kamer',
-							'icon' => 'icon-video-camera', 'class' => 'label label-info'
+							'suffix' => utils::nf($cntCams).' kamer',
+							'icon' => 'user/videoCamera', 'class' => 'label label-info'
 						];
+						*/
+						$oneCamPrice = $planPriceCam;
+						$extraPrice = $cntCams * $oneCamPrice;
+						$plan['extraCharges']['charges'][] = [
+							'price' => $extraPrice,
+							'legend' => $cntCams.' kamer × '.$oneCamPrice,
+							'icon' => 'user/videoCamera',
+						];
+
+						$plan['extraCharges']['total'] += $extraPrice;
+					}
+
+					/*
+					if (isset($em['iot']) && isset($em['iot']['countDevices']['ALL']))
+					{
+						$extModulesLabels[] = [
+							'text' => 'Počítačová síť',
+							'suffix' => utils::nf($cntLANDevices).' zařízení',
+							'icon' => 'system/iconSitemap', 'class' => 'label label-info'
+						];
+						$plan['extModulesPoints'] += intval($em['iot']['countDevices']['ALL']);
+
+						if ($cntLANDevices)
+						{
+							$oneDevicePrice = $planPriceLANDevice;
+							$extraPrice = $cntLANDevices * $oneDevicePrice;
+							$plan['extraCharges']['charges'][] = [
+								'price' => $extraPrice,
+								'legend' => $cntLANDevices.' zařízení × '.$oneDevicePrice,
+								'icon' => 'system/iconSitemap',
+							];
+						}
+
+						$plan['extraCharges']['total'] += $extraPrice;
+					}
+					*/
+				}
+
+				if ($emId === 'zus')
+				{
+					if (isset($em['studies']) && isset($em['studies']['count']['ALL']))
+					{
+						/*
+						$extModulesLabels[] = [
+							'text' => 'ZUŠ',
+							'suffix' => Utils::nf($em['studies']['count']['ALL']).' studií',
+							'icon' => 'tables/e10pro.zus.predmety', 'class' => 'label label-info'
+						];
+						*/
+
+						$cntStudies = intval($em['studies']['count']['ALL']);
+						$extraPrice = $cntStudies * $planPriceZUSStudium;
+						$plan['extraCharges']['charges'][] = [
+							'price' => $extraPrice,
+							'legend' => $cntStudies.' studií × '.$planPriceZUSStudium,
+							'icon' => 'tables/e10pro.zus.predmety',
+						];
+
+						$plan['extraCharges']['total'] += $extraPrice;
 					}
 				}
 			}
-
-			//$info[] = ['p1' => 'Rozšíření', 't1' => $extModulesLabels];
 		}
 
 		$plan['numberUserdDocs'] = $cntDocs;
 		$plan['priceDocs'] = $plan['price'];
-		$plan['priceUsage'] = 0;
 		$usageLimit = $plan['maxSpaceUsage'];
 		$usageBlockPrice = $plan['extraSpaceBlockPrice'] ?? 0;
 		$usageBlockSize = $plan['extraSpaceBlockSize'] ?? 0;
@@ -232,10 +348,19 @@ use \e10\base\libs\UtilsBase;
 		if ($usageNow > $usageLimit)
 		{
 			$usageBlocksToPay = intval(($usageNow - $usageLimit) / $usageBlockSize + 1);
-			$plan['priceUsage'] = $usageBlockPrice * $usageBlocksToPay;
+			$plan['priceUsage'] += $usageBlockPrice * $usageBlocksToPay;
 			$plan['priceUsageLegend'] = $usageBlocksToPay.' × '.$usageBlockPrice.' Kč / '.$usageBlockSize.' GB';
+
+			$plan['extraCharges']['charges'][] = [
+				'price' => $plan['priceUsage'],
+				'legend' => $usageBlocksToPay.' × '.$usageBlockPrice.' Kč / '.$usageBlockSize.' GB',
+				'icon' => 'system/iconDatabase',
+			];
+
+			$plan['extraCharges']['total'] += $plan['priceUsage'];
 		}
 
+		$plan['priceUsage'] = $plan['extraCharges']['total'];
 		$plan['extModulesPrice'] = $plan['extModulesPoints'] * 10;
 		$plan['priceTotal'] = $plan['priceDocs'] + $plan['priceUsage'] /*+ $plan['extModulesPrice']*/;
 
@@ -259,21 +384,29 @@ use \e10\base\libs\UtilsBase;
 				'maxDocs' => $docs, //$p['docs'],
 				'price' => $p['price'],
 				'maxUsage' => $p['maxSpaceUsage'],
-				'usageBlockPrice' => $p['extraSpaceBlockPrice'],
+				'notes' => [],
 			];
+
+			if (isset($p['b2bOnly']))
+				$item['notes'][] = ['text' => 'Neveřejný tarif pouze pro partnery', 'class' => 'break'];
+
+			if (isset($p['extraSpaceBlockPrice']))
+				$item['notes'][] = ['text' => 'Příplatek '.$p['extraSpaceBlockPrice'].' Kč / každých '.$p['extraSpaceBlockSize'].' GB', 'class' => 'break'];
+			else
+				$item['notes'][] = ['text' => 'Úložiště nelze navýšit', 'class' => 'break'];
+
+
 			$t[] = $item;
 
 			$prevPlan = $p;
 		}
 
-
-
 		$h = [
 			'title' => 'Tarif',
 			'maxDocs' => ' Počet dokladů / rok',
-			'price' => ' Cena',
 			'maxUsage' => ' Max. velikost v GB',
-			'usageBlockPrice' => ' Příplatek za každých 10 GB',
+			'price' => ' Cena / měsíc',
+			'notes' => 'Poznámky',
 		];
 
 		return ['table' => $t, 'header' => $h];
@@ -536,6 +669,8 @@ class ViewDataSources extends TableView
 
 		if (isset($qv['partners']))
 			array_push ($q, ' AND [partner] IN %in', array_keys($qv['partners']));
+		if (isset($qv['invoicingGroups']))
+			array_push ($q, ' AND [invoicingGroup] IN %in', array_keys($qv['invoicingGroups']));
 		if (isset($qv['servers']))
 			array_push ($q, ' AND ds.[server] IN %in', array_keys($qv['servers']));
 		if (isset($qv['conditions']))
@@ -616,7 +751,13 @@ class ViewDataSources extends TableView
 
 		// -- partners
 		$partners = $this->db()->query ('SELECT ndx, name FROM hosting_core_partners WHERE docStateMain <= 2 ORDER BY name')->fetchPairs ('ndx', 'name');
+		$partners[0] = 'bez partnera';
 		$this->qryPanelAddCheckBoxes($panel, $qry, $partners, 'partners', 'Partneři');
+
+		// -- invoicingGroups
+		$invoicingGroups = $this->db()->query ('SELECT ndx, name FROM hosting_core_invoicingGroups WHERE docStateMain <= 2 ORDER BY name')->fetchPairs ('ndx', 'name');
+		//$invoicingGroups[0] = 'bez skupiny';
+		$this->qryPanelAddCheckBoxes($panel, $qry, $invoicingGroups, 'invoicingGroups', 'Fakturační skupiny');
 
 		// -- servers
 		$servers = $this->db()->query ('SELECT ndx, name FROM hosting_core_servers WHERE docStateMain <= 2 ORDER BY name')->fetchPairs ('ndx', 'name');
@@ -765,6 +906,8 @@ class FormDataSource extends TableForm
 					$this->addColumnInput ('helpdeskMode');
 					$this->addColumnInput ('pricePlanKind');
 					$this->addColumnInput ('invoicingTo');
+					if ($this->recData['invoicingTo'] == 4)
+						$this->addColumnInput ('invoicingGroup');
 				$this->closeTab ();
 
 				$this->openTab ();

@@ -21,6 +21,9 @@ class DCPersonOverview extends \Shipard\Base\DocumentCard
 	var $tableRelations = NULL;
 	var $relationsCategories;
 
+	/** @var \e10\persons\libs\Vcard */
+	var $vcard;
+
 	var $properties = NULL;
 	var $contacts = '';
 	var $validity = NULL;
@@ -63,6 +66,7 @@ class DCPersonOverview extends \Shipard\Base\DocumentCard
 		$this->loadDataValidity();
 		$this->loadDataAddresses();
 		$this->loadDataRelations();
+		$this->loadDataVcard();
 	}
 
 	function loadDataAddresses()
@@ -111,8 +115,26 @@ class DCPersonOverview extends \Shipard\Base\DocumentCard
 
 			$address['isContact'] = $item['flagContact'];
 
-			$address['c2'][] = ['text' => '', 'docAction' => 'edit', 'table' => 'e10.persons.personsContacts', 'pk' => $item['ndx'], 'class' => 'pull-right', 'icon' => 'system/actionOpen'];
+			if ($item['adrLocState'] === 1)
+			{ // success
+				$address['c2'][] = [
+					'type' => 'action', 'action' => 'open-popup',
+					'element' => 'span',
+					'data-popup-url' => 'https://maps.google.com/?q='.$item['adrLocLat'].','.$item['adrLocLon'],
+					'data-popup-width' => '0.5', 'data-popup-height' => '0.8',
+					'text' => '', 'title' => 'GPS: '.$item['adrLocLat'].', '.$item['adrLocLon'],
+					'icon' => 'system/iconMapMarker', 'class' => 'e10-success mr1'
+				];
+			}
+			elseif ($item['adrLocState'] === 1)
+			{ // error
+				$address['c2'][] = [
+					'text' => '', 'title' => 'Chyba GPS zaměření',
+					'icon' => 'system/iconMapMarker', 'class' => 'e10-error mr1'
+				];
+			}
 
+			$address['c2'][] = ['text' => '', 'docAction' => 'edit', 'table' => 'e10.persons.personsContacts', 'pk' => $item['ndx'], 'class' => 'pull-right', 'icon' => 'system/actionOpen'];
 
       if ($item['flagMainAddress'])
         $address['c2'][] = ['text' => 'Sídlo', 'class' => 'label label-default'];
@@ -322,6 +344,15 @@ class DCPersonOverview extends \Shipard\Base\DocumentCard
 		{
 			$line = [['text' => 'V pořádku', 'XXicon' => 'system/iconCheck', 'suffix' => utils::datef ($validity['updated'], '%D, %T')]];
 			if ($validity['revalidate'])
+				$line [] = ['text' => 'Je naplánována nová kontrola', 'icon' => 'system/docStateEdit', 'class' => 'e10-small block'];
+			$this->validity['class'] = 'e10-row-plus';
+			$this->validity['icon'] = 'system/iconCheck';
+			//$this->addContent('body', ['pane' => 'e10-pane e10-pane-table e10-row-plus', 'type' => 'line', 'line' => $line]);
+		}
+		elseif ($validity['valid'] === 3)
+		{
+			$line = [['text' => 'V této zemi nelze kontrolu provést', 'XXicon' => 'system/iconCheck', 'suffix' => utils::datef ($validity['updated'], '%D, %T')]];
+			if ($validity['revalidate'])
 				$line [] = ['text' => 'údaje byly opraveny, je naplánována nová kontrola', 'icon' => 'system/docStateEdit', 'class' => 'e10-small block'];
 			$this->validity['class'] = 'e10-row-plus';
 			$this->validity['icon'] = 'system/iconCheck';
@@ -330,12 +361,13 @@ class DCPersonOverview extends \Shipard\Base\DocumentCard
 		else
 		{
 			$this->validity['icon'] = 'system/iconWarning';
-			$title = ['text' => 'Při kontrole byly nalezeny chyby', 'class' => 'e10-error h2'];
+			$title = ['text' => 'Při kontrole byly nalezeny chyby', 'suffix' => utils::datef ($validity['updated'], '%D, %T'), 'class' => 'e10-error h2'];
 			$line = [$title];
 
 			if ($validity['revalidate'])
 				$line [] = ['text' => 'údaje byly opraveny, je naplánována nová kontrola', 'icon' => 'system/iconCheck', 'class' => 'e10-small block'];
 
+			/*
 			$msg = json::decode($validity['msg']);
 			foreach ($msg as $partId => $part)
 			{
@@ -347,6 +379,7 @@ class DCPersonOverview extends \Shipard\Base\DocumentCard
 					$line[] = $info;
 				}
 			}
+			*/
 
 			$this->validity['class'] = 'e10-warning1';
 		}
@@ -374,6 +407,13 @@ class DCPersonOverview extends \Shipard\Base\DocumentCard
 		$this->validity['content'] = $line;
 	}
 
+	protected function loadDataVcard()
+	{
+		$this->vcard = new \e10\persons\libs\Vcard($this->app());
+		$this->vcard->setPerson($this->recData['ndx']);
+		$this->vcard->run();
+	}
+
 	public function createContentBody ()
 	{
 		$contentContacts = $this->contentContacts();
@@ -399,9 +439,19 @@ class DCPersonOverview extends \Shipard\Base\DocumentCard
 		// -- contacts
 		if ($this->contacts !== '')
 		{
+			$ccc = $this->contacts;
+
+			$qrBtn = "<span class='pull-right' data-toggle='popover' data-trigger='hover' data-html='true' data-placement='left'";
+			$qrBtn .= " data-content=\"<img style='max-width: 100%;' src='{$this->vcard->info['vcardQRCodeURL']}'>\"";
+			$qrBtn .= " onmouseover='$(this).popover(\"show\")'";
+			$qrBtn .= '>';
+			$qrBtn .= $this->app()->ui()->icon('user/addressBook');
+			$qrBtn .= '</span>';
+
+			$ccc[] = ['code' => $qrBtn];
 			$t [] = [
 				'c1' => ['icon' => 'system/iconIdBadge', 'text' => ''],
-				'c2' => $this->contacts,
+				'c2' => $ccc,
 				'_options' => ['cellTitles' => ['c1' => 'Kontaktní údaje']]
 			];
 		}

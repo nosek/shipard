@@ -8,25 +8,30 @@ class ShipardWidget {
     this.rootElm = rootElm;
     this.rootId = this.rootElm.getAttribute('id');
 
-    this.on(this, 'click', '.shp-widget-action', function (e, ownerWidget){ownerWidget.widgetAction(e)});
-    this.on(this, 'click', '.shp-widget-action>i', function (e, ownerWidget){ownerWidget.widgetAction(e.parentElement)});
+    this.on(this, 'click', '.shp-widget-action', function (e, ownerWidget, event){ownerWidget.widgetAction(e, event)});
   }
 
-  widgetAction(e)
+  widgetAction(e, event)
   {
+    //console.log('widgetAction', event);
     let actionId = e.getAttribute('data-action');
     this.doAction(actionId, e);
+    event.stopPropagation();
   }
 
   doAction (actionId, e)
   {
-    console.log("ACTION: ", actionId);
+    console.log("ACTION-WIDGET: ", actionId);
 
     switch (actionId)
     {
       case 'inline-action': return this.inlineAction(e);
       case 'select-main-tab': return this.selectMainTab(e);
+      case 'select-simple-tab': return this.selectSimpleTab(e);
 			case 'open-popup': return this.openPopup(e);
+      case 'open-modal': return this.openModal(e);
+      case 'closeModal': return this.closeModal(e);
+      case 'treeListGroupOC': return this.treeListGroupOC(e);
     }
 
     return 0;
@@ -44,20 +49,74 @@ class ShipardWidget {
 	  if (e.getAttribute('data-pk') !== null)
 		  requestParams['pk'] = e.getAttribute('data-pk');
 
-    /*
-		e10.server.api(requestParams, function(data) {
-		if (data.reloadNotifications === 1)
-			e10NCReset();
-
-		if (e.parent().hasClass('btn-group'))
-		{
-			e.parent().find('>button.active').removeClass('active');
-			e.addClass('active');
-		}
-	  });
-    */
-
     console.log("__INLINE_ACTION", requestParams);
+  }
+
+  openModal(e)
+  {
+    const modalType = e.getAttribute('data-modal-type');
+
+    //console.log("OPEN-MODAL; ", modalType, e);
+
+    var modalParams = {};
+	  var modalAttrs = {
+      'parent-widget-id': this.rootElm.getAttribute('id'),
+      'parent-widget-type': 'unknown',
+    };
+
+    this.elementPrefixedAttributes (e, 'data-action-param-', modalParams);
+
+    let newEnvelope = document.createElement('data-modal-env');
+    newEnvelope.setAttribute('data-request-type', 'dataModal');
+    newEnvelope.innerHTML = "<div class='tlbr'><span class='backIcon shp-widget-action' data-action='closeModal'></span><span class='modalTitle'></span></div><div class='content'></div>";
+
+    for (const oneParamId in modalParams)
+      newEnvelope.setAttribute('data-action-param-'+oneParamId, modalParams[oneParamId]);
+
+    newEnvelope.id = 'shc_meid_'+shc.counter++;
+
+    //newEnvelope.innerHTML = "čekejte, prosím, data se načítají...";
+
+    document.body.appendChild(newEnvelope);
+
+    newEnvelope.shpWidget = new ShipardWidget();
+    newEnvelope.shpWidget.init(newEnvelope);
+
+    switch (modalType)
+    {
+      case 'viewer':  console.log('Viewer!');
+                      break;
+    }
+
+    let apiParams = {
+      'cgType': 2,
+      'requestType': 'openModal',
+      //'formOp': e.formOp,
+    };
+
+    this.elementPrefixedAttributes (e, 'data-action-param-', apiParams);
+
+    console.log("API-CALL-MODAL", apiParams);
+
+    var url = 'api/v2';
+
+    shc.server.post (url, apiParams,
+      function (data) {
+        console.log("--api-call-MODAL-success--", data);
+        this.doWidgetModalResponse(data, newEnvelope.id);
+      }.bind(this),
+      function (data) {
+        console.log("--api-call-MODAL-error--");
+      }.bind(this)
+    );
+
+    return 0;
+  }
+
+  closeModal(e)
+  {
+    this.rootElm.remove();
+    return 0;
   }
 
   openPopup(e)
@@ -68,12 +127,15 @@ class ShipardWidget {
 		let popUpId = '-openPopupAtt';
 
     var nw = window.open(url, "shpd-cl-ng"+popUpId, "location=no,status=no,width=" + width + ",height=" + height);
-		console.log("opened2", nw);
+
     nw.focus();
+
+    return 0;
   }
 
   selectMainTab (e)
   {
+    //console.log("__SELECT_MAIN__TAB__", e);
     const tabsId = e.getAttribute('data-tabs');
     const inputValueId = this.rootId + '_' + tabsId + '_Value';
     const inputElement = document.getElementById(inputValueId);
@@ -87,9 +149,40 @@ class ShipardWidget {
 		e.classList.add('active');
 
     let apiParams = {'cgType': 2};
-
-    this.apiCall('reloadContent', apiParams);
     //console.log("SELECT MAIN TAB: ", inputValueId);
+    this.apiCall('reloadContent', apiParams);
+  }
+
+  selectSimpleTab (e)
+  {
+    //console.log("__SELECT_SIMPLE__TAB__", e);
+    const tabsId = e.getAttribute('data-tabs');
+    const tabsElement = document.getElementById(tabsId);
+
+		let oldActiveTabElement = tabsElement.querySelector('.active');
+		oldActiveTabElement.classList.remove('active');
+		e.classList.add('active');
+
+    const tabsOldElementContentId = oldActiveTabElement.getAttribute('data-tab-id');
+    document.getElementById(tabsOldElementContentId).classList.remove('active');
+
+    const tabsNewElementContentId = e.getAttribute('data-tab-id');
+    document.getElementById(tabsNewElementContentId).classList.add('active');
+  }
+
+  treeListGroupOC(e)
+  {
+    let itemElement = e.parentElement;
+		if (itemElement.classList.contains('open'))
+    {
+      itemElement.classList.remove('open');
+      itemElement.classList.add('closed');
+    }
+    else
+    {
+      itemElement.classList.remove('closed');
+      itemElement.classList.add('open');
+    }
   }
 
   apiCall(apiActionId, outsideApiParams)
@@ -98,12 +191,11 @@ class ShipardWidget {
     apiParams['requestType'] = this.rootElm.getAttribute('data-request-type');
     apiParams['classId'] = this.rootElm.getAttribute('data-class-id');
     apiParams['actionId'] = apiActionId;
+    apiParams['widgetId'] = this.rootElm.id;
     if (outsideApiParams !== undefined)
       apiParams = {...apiParams, ...outsideApiParams};
 
     this.detectValues(apiParams);
-
-    console.log("API-CALL", apiParams);
 
     var url = 'api/v2';
 
@@ -118,12 +210,37 @@ class ShipardWidget {
     );
   }
 
+  apiCallObject(classId, outsideApiParams)
+  {
+    var apiParams = {};
+    apiParams['requestType'] = 'object';
+    apiParams['classId'] = classId;
+    if (outsideApiParams !== undefined)
+      apiParams = {...apiParams, ...outsideApiParams};
+
+    console.log("API-CALL-OBJECT", apiParams);
+
+    var url = 'api/v2';
+
+    shc.server.post (url, apiParams,
+      function (data) {
+        console.log("--api-call-success--");
+        this.doApiObjectResponse(data);
+      }.bind(this),
+      function (data) {
+        console.log("--api-call-error--");
+      }.bind(this)
+    );
+  }
+
   detectValues(data)
   {
-    const inputs = this.rootElm.querySelectorAll("input[data-wid='"+this.rootId+"']");
+    //const inputs = this.rootElm.querySelectorAll("input[data-wid='"+this.rootId+"']");
+    const inputs = this.rootElm.querySelectorAll("input");
 
     for (let i = 0; i < inputs.length; ++i)
     {
+      //console.log("INPUT: ", inputs[i]);
       const valueKey = inputs[i].getAttribute('name');
       data[valueKey] = inputs[i].value;
     }
@@ -137,10 +254,50 @@ class ShipardWidget {
     console.log(data);
   }
 
+  doApiObjectResponse(data)
+  {
+    console.log(data);
+  }
+
+  doWidgetModalResponse(data, targetElementId)
+  {
+    if (data['response'] !== undefined && data['response']['uiData'] !== undefined)
+      shc.applyUIData (data['response']['uiData']);
+
+    //console.log('doWidgetModalResponse', data);
+
+    var targetModalElement = document.getElementById(targetElementId);
+    var contentElement = targetModalElement.querySelector('div.content');
+    var tlbrElement = targetModalElement.querySelector('div.tlbr');
+    console.log("tlbrElement", tlbrElement);
+    var backIconElement = tlbrElement.querySelector('.backIcon');
+    var titleElement = tlbrElement.querySelector('.modalTitle');
+
+    if (data.response.hcBackIcon !== undefined)
+      backIconElement.innerHTML = data.response.hcBackIcon;
+
+    if (data.response.hcTitle !== undefined)
+      titleElement.innerHTML = data.response.hcTitle;
+
+    this.setInnerHTML(contentElement, data.response.hcFull);
+
+    if (data.response.objectType === 'dataView')
+      initWidgetTableViewer(data.response.objectId);
+    else
+    {
+      console.log("init-other-widget");
+      let e = document.getElementById(data.response.objectId);
+      e.shpWidget = new ShipardWidget();
+      e.shpWidget.init(e);
+    }
+  }
+
 	on(ownerWidget, eventType, selector, callback) {
 		this.rootElm.addEventListener(eventType, function (event) {
-			if (event.target.matches(selector)) {
-				callback.call(event.target, event.target, ownerWidget);
+      var ce = event.target.closest(selector);
+			if (ce) {
+
+				callback.call(ce, ce, ownerWidget, event);
 			}
 		});
 	}
@@ -173,7 +330,7 @@ class ShipardWidget {
     var div = document.createElement('div');
     div.appendChild(document.createTextNode(str));
     return div.innerHTML;
-  };
+  }
 
   elmHide(e)
   {
@@ -210,5 +367,47 @@ class ShipardWidget {
       data[attrNameShort] = val;
     }
   }
+
+  openModalForm(formOp, params, attrs)
+  {
+    let newEnvelope = document.createElement('data-modal-form-env');
+    newEnvelope.setAttribute('data-request-type', 'dataForm');
+    for (const oneParamId in params)
+      newEnvelope.setAttribute('data-action-param-'+oneParamId, params[oneParamId]);
+    for (const oneParamId in attrs)
+      newEnvelope.setAttribute('data-'+oneParamId, attrs[oneParamId]);
+
+    newEnvelope.id = 'shc_meid_'+shc.counter++;
+
+    newEnvelope.innerHTML = "čekejte, prosím, data se načítají...";
+
+    document.body.appendChild(newEnvelope);
+
+    newEnvelope.formOp = formOp;
+    newEnvelope.shpWidget = new ShipardTableForm();
+    newEnvelope.shpWidget.init(newEnvelope);
+  }
+
+  setInnerHTML(elm, html) {
+    elm.innerHTML = html;
+
+    Array.from(elm.querySelectorAll("script"))
+      .forEach( oldScriptEl => {
+        const newScriptEl = document.createElement("script");
+
+        Array.from(oldScriptEl.attributes).forEach( attr => {
+          newScriptEl.setAttribute(attr.name, attr.value)
+        });
+
+        const scriptText = document.createTextNode(oldScriptEl.innerHTML);
+        newScriptEl.appendChild(scriptText);
+
+        oldScriptEl.parentNode.replaceChild(newScriptEl, oldScriptEl);
+    });
+  }
 }
 
+function inputCh()
+{
+  console.log("--CHANGE--");
+}

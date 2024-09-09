@@ -29,6 +29,9 @@ class AppLog extends \Shipard\Base\BaseObject
 
 		$e = $this->newEvent();
 		$e['subsystem'] = self::ssTask;
+		$e['cntSqlCmds'] = 0;
+		$e['maxSqlCmdLen'] = 0;
+
 		$this->events[] = $e;
 	}
 
@@ -50,6 +53,9 @@ class AppLog extends \Shipard\Base\BaseObject
 		$this->events[0]['taskType'] = $type;
 		$this->events[0]['taskKind'] = $kind;
 
+		$this->events[0]['cntSqlCmds'] = 0;
+		$this->events[0]['maxSqlCmdLen'] = 0;
+
 		$this->events[0]['url'] = $this->app->requestPath();
 	}
 
@@ -68,8 +74,12 @@ class AppLog extends \Shipard\Base\BaseObject
 		$e['cmd'] = $cmd;
 		$e['timeLen'] = $timeLen;
 		$e['subsystem'] = self::ssSql;
-
 		$this->events[] = $e;
+
+		if ($timeLen > $this->events[0]['maxSqlCmdLen'])
+			$this->events[0]['maxSqlCmdLen'] = $timeLen;
+
+		$this->events[0]['cntSqlCmds']++;
 	}
 
 	function newEvent()

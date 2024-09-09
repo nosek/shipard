@@ -308,6 +308,9 @@ class TemplateCore extends \Mustache
 	{
 		switch ($tagName)
 		{
+			case	'date' 						: return $this->resolveCmd_Date($params);
+			case	'dayInfo' 				: return $this->resolveCmd_DayInfo($params);
+			case	'dowName' 				: return $this->resolveCmd_DOWName($params);
 			case	'icon' 						: return $this->resolveCmd_Icon($params);
 			case	'imgData' 				: return $this->resolveCmd_ImgData($params);
 			case	'include' 				: return $this->resolveCmd_Include($params);
@@ -316,6 +319,7 @@ class TemplateCore extends \Mustache
 			case	'qrCode' 					: return $this->resolveCmd_QrCode($params);
 			case	'script' 					: return $this->resolveCmd_Script($params);
 			case	'var' 						: return $this->resolveCmd_Var($params);
+			case	'json' 						: return $this->resolveCmd_Json($params);
 		}
 
 		$res = $this->app->callRegisteredFunction ('template', $tagName, $params);
@@ -381,6 +385,85 @@ class TemplateCore extends \Mustache
 	{
 		$user = $this->app->user ()->data ();
 		return utils::userImage ($this->app, $user['ndx'], $user);
+	}
+
+	function resolveCmd_Date ($params)
+	{
+		$date = NULL;
+		if (isset ($params['dataItem']))
+			$date = Utils::createDateTime($this->getVar($params['dataItem']));
+		else
+			$date = Utils::today();
+
+		if (!$date)
+			return '';
+
+		if (isset($params['offset']))
+		{
+			if ($params['offset'][0] === '-')
+				$date->sub (new \DateInterval('P'.substr($params['offset'], 1)));
+			elseif ($params['offset'][0] === '+')
+				$date->add (new \DateInterval('P'.substr($params['offset'], 1)));
+			else
+				$date->add (new \DateInterval('P'.$params['offset']));
+		}
+
+		if (isset($params['sf']))
+		{
+			return $date->format($params['sf']);
+		}
+
+		if (isset($params['if']))
+		{
+			$locale = $params['locale'] ?? 'cs_CZ';
+			return \IntlDateFormatter::formatObject($date, $params['if'], $locale);
+		}
+
+		$format	= $params['format'] ?? '%d';
+
+		return Utils::datef($date, $format);
+	}
+
+	function resolveCmd_DayInfo ($params)
+	{
+		$date = NULL;
+		if (isset ($params['dataItem']))
+			$date = Utils::createDateTime($this->getVar($params['dataItem']));
+		else
+			$date = Utils::today();
+
+		if (!$date)
+			return '';
+
+		if (isset($params['offset']))
+		{
+			if ($params['offset'][0] === '-')
+				$date->sub (new \DateInterval('P'.substr($params['offset'], 1)));
+			elseif ($params['offset'][0] === '+')
+				$date->add (new \DateInterval('P'.substr($params['offset'], 1)));
+			else
+				$date->add (new \DateInterval('P'.$params['offset']));
+		}
+
+		$dayInfo = new \Shipard\Utils\DayInfo($this->app);
+		$dayInfo->dayInfo($date);
+
+		if (isset($params['format']))
+		{
+			return $dayInfo->format($params['format']);
+		}
+
+		return '';
+	}
+
+	function resolveCmd_DOWName ($params)
+	{
+		if (isset ($params['dataItem']))
+			$dow = intval($this->getVar($params['dataItem']));
+		else
+			$dow = $params['dow'];
+
+		return Utils::$dayNames[$dow] ?? '';
 	}
 
 	function resolveCmd_Icon ($params)
@@ -493,6 +576,16 @@ class TemplateCore extends \Mustache
 		if (isset($params['text']) && $params['text'] != '')
 		{
 			return Utils::cfgItem($this->data, $params['text'], '');
+		}
+
+		return '';
+	}
+
+	function resolveCmd_Json ($params)
+	{
+		if (isset($params['text']) && $params['text'] != '')
+		{
+			return Json::lint(Utils::cfgItem($this->data, $params['text'], ''));
 		}
 
 		return '';

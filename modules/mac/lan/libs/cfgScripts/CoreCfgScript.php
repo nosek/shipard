@@ -12,6 +12,7 @@ use e10\Utility;
 class CoreCfgScript extends Utility
 {
 	var $script = '';
+	var $scripsUtils = [];
 	var $scriptUpgrade = '';
 
 	var $deviceCfg = NULL;
@@ -28,6 +29,8 @@ class CoreCfgScript extends Utility
 	/** @var \mac\lan\TableDevices */
 	var $tableLanDevices;
 	var $adCfg = NULL;
+
+	var $macBridge = '';
 
 	public function setDevice($deviceRecData, $lanCfg)
 	{
@@ -81,5 +84,17 @@ class CoreCfgScript extends Utility
 		{
 			$dst[] = $r['ipAddress'].$addMask;
 		}
+	}
+
+	public function initScriptFinalized()
+	{
+		if (!$this->initMode)
+			return '';
+		return $this->script.$this->initScriptAfterVerSuffix();
+	}
+
+	protected function initScriptAfterVerSuffix()
+	{
+		return '';
 	}
 }

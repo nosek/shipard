@@ -37,11 +37,15 @@ class TablePlans extends DbTable
 				'title' => $r['title'],
 				'primaryViewType' => intval($r['primaryViewType']),
 				'useViewDetail' => intval($r['useViewDetail']),
+				'useViewCompact' => intval($r['useViewCompact']),
+				'useViewStatesColors' => intval($r['useViewStatesColors']),
+				'useViewTree' => intval($r['useViewTree']),
 				'useWorkOrders' => intval($r['useWorkOrders']),
 				'useCustomer' => intval($r['useCustomer']),
 				'useProjectId' => intval($r['useProjectId']),
 				'usePrice' => intval($r['usePrice']),
 				'useText' => intval($r['useText']),
+				'useTeams' => intval($r['useTeams']),
 				'useTableViewTabsMonths' => intval($r['useTableViewTabsMonths']),
 
 				'useAnnots' => intval($r['useAnnots']),
@@ -228,11 +232,15 @@ class FormPlan extends TableForm
 				$this->openTab ();
 					$this->addColumnInput ('primaryViewType');
 					$this->addColumnInput ('useViewDetail');
+					$this->addColumnInput ('useViewCompact');
+					$this->addColumnInput ('useViewStatesColors');
+					$this->addColumnInput ('useViewTree');
 					$this->addColumnInput ('useWorkOrders');
 					$this->addColumnInput ('useCustomer');
 					$this->addColumnInput ('useProjectId');
 					$this->addColumnInput ('usePrice');
 					$this->addColumnInput ('useText');
+					$this->addColumnInput ('useTeams');
 
 					$this->addColumnInput ('useTableViewTabsMonths');
 

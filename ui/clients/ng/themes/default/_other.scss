@@ -1,56 +1,112 @@
-.card {
-	background-color: var(--cardBackground);
-    border-color: var(--cardBorder);
-}
-
-a.card {
-	text-decoration: none;
-}
-
-.card-body pre {
-	white-space: break-spaces;
-	font-family: sans-serif;
-}
-
-.card-body :last-child {
-	margin-bottom: 0 !important;
-}
-
 /*toggle*/
 .form-check-input:checked {
-	background-color: #{$shipard-primary};
-	border-color: #{$shipard-primary};
+	background-color: var(--shpd-primary-subtle);
+	border-color: var(--shpd-primary-subtle);
 }
 
 .accordion {
 	margin-top: 1rem;
-	border: 1pt solid var(--accordionBorder);
+	border: 1pt solid var(--shpd-universal-border);
 	.accordion-header {
 		padding: 0;
-		background-color: var(--accordionBackground);
+		background-color: var(--shpd-universal-bg);
+		.d-flex {
+			color: var(--shpd-body-color);
+		}
 	}
 	li {
 		background-color: transparent;
 		border: none;
 	}
 	li:first-child {
-		border-top: 1pt solid var(--accordionBorder) !important;
+		border-top: 1pt solid var(--shpd-universal-border) !important;
 	}
 	ol.list-group{
 	border: none !important;
 	}
-  }
-
-.accordion-body {
-	background-color: var(--accordionBackground);
-	padding: 0;
+	.accordion-body {
+		background-color: var(--shpd-universal-bg);
+		padding: 0;
+	}
 }
+
 
 ol.grades li.list-group-item {
 	border-radius: 0;
+	div {
+		color: var(--shpd-body-color);
+	}
 }
 
 ol.grades li.list-group-item:not(:last-child){
-	border-bottom: 1px solid var(--accordionBorder);
+	border-bottom: 1px solid var(--shpd-universal-border);
 }
 
+.tag {
+  display: inline-block;
+  border: 1px solid rgba(0,0,0,.2);
+  border-radius: 2px;
+  padding: 2px 6px 2px 6px;
+  margin: 2px 4px 2px 0px;
+
+	background-color: #999;
+}
+
+.tag.shp-widget-action {
+	cursor: pointer;
+}
+
+.dropdown-menu.show {
+	overflow-y: auto;
+	max-height: 80vh;
+}
+
+a {
+	color: var(--shpd-body-color);
+}
+
+/*rows in receipts*/
+div.rowsOnWeb {
+	span {
+		padding: 1rem;
+	}
+}
+
+/* výkupna */
+
+div a.pricingCategory:not(:last-of-type) {
+	padding-right: 1rem;
+}
+
+/* labels */
+span.label{
+	padding: .15rem;
+	border-radius: 5px;
+	font-size: 90%;
+	white-space: pre;
+}
+
+span.label.label-default{
+	background-color: #{$label-default};
+	color: #{$label-color-lights};
+}
+
+span.label.label-success{
+	background-color: #{$label-success};
+	color: #{$label-color-darks};
+}
+
+span.label.label-info{
+	background-color: #{$label-info};
+	color: #{$label-color-lights};
+}
+
+span.label.label-warning{
+	background-color: #{$label-warning};
+	color: #{$label-color-lights};
+}
+
+span.label.label-danger{
+	background-color: #{$label-danger};
+	color: #{$label-color-darks};
+}

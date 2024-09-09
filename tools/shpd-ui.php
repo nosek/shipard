@@ -257,6 +257,15 @@ class ShpdUIApp
 					//$cmd = "export LC_ALL=en_US.UTF.8 && cd {$this->destPath} && sass $dstFileName $dstCssFileName --style compressed --no-source-map 2>&1";
 					$destCssFileName = $themeDestFolder.'style.css';
 					passthru ("cd $themePath && sass theme.scss --style compressed > $destCssFileName");
+					foreach ($theme['variants'] as $themeVariantId => $themeVariant)
+					{
+						$destCssVariantFileName = $themeDestFolder.$themeVariantId.'.css';
+						echo "      - {$themeVariantId}\n";
+						passthru ("cd $themePath && sass ".$themeVariant['file'].".scss --style compressed > $destCssVariantFileName");
+						$sha384 = hash_file('sha384', $destCssVariantFileName);
+						$themeFullList[$themeId]['variants'][$themeVariantId]['integrity']['sha384'] = $sha384;
+						$themeFullList[$themeId]['variants'][$themeVariantId]['file'] = '/www-root/.ui/ng/themes/'.$themeId.'/'.$themeVariantId.'.css';
+					}
 				}
 				else
 				{
@@ -343,6 +352,35 @@ class ShpdUIApp
 				'ver' => md5_file($finalFileName),
 			]
 		];
+
+		if (!isset($pkg['libs']))
+			return;
+		forEach ($pkg['libs'] as $jsLib)
+		{
+			$finalFileString = '';
+			forEach ($jsLib['srcFiles'] as $file)
+			{
+				$oneFileStr = file_get_contents($srcDir.$file['fileName']);
+				if (isset ($file['minify']) && !$file['minify'])
+					$finalFileString .= $oneFileStr;
+				else
+				{
+					$shrinkedScript = jsShrink($oneFileStr);
+					$finalFileString .= $shrinkedScript;
+				}
+			}
+			$finalFileName = $dstDir.$jsLib['id'].'.js';
+			file_put_contents($finalFileName, $finalFileString);
+			$sha384_ascii = hash_file('SHA384', $finalFileName);
+			$sha384_base64 = base64_encode(hash_file('SHA384', $finalFileName, true));
+			$info[$infoKey]['libs'][] = [
+				$jsLib['id'].'.js' => [
+					'sha384' => ''.$sha384_ascii,
+					'integrity' => 'sha384-'.$sha384_base64,
+					'ver' => md5_file($finalFileName),
+				]
+			];
+		}
 	}
 
 	public function jsWeb ()

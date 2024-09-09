@@ -12,6 +12,12 @@
     {"id": "deviceType", "name": "Typ zařízení", "type": "int", "reference": "mac.lan.deviceTypes", "options": ["saveOnChange"]},
     {"id": "deviceKind", "name": "Druh zařízení", "type": "enumInt",
       "enumCfg": {"cfgItem": "mac.lan.devices.kinds", "cfgValue": "", "cfgText": "name"}},
+
+    {"id": "adLanMode", "name": "Síťový mód", "type": "enumInt",
+      "enumCfg": {"cfgItem": "mac.lan.devices.adLanModes", "cfgValue": "", "cfgText": "fn"}},
+    {"id": "adWifiMode", "name": "WiFi mód", "type": "enumInt",
+      "enumCfg": {"cfgItem": "mac.lan.devices.adWifiModes", "cfgValue": "", "cfgText": "fn"}},
+
 		{"id": "hwMode", "name": "Mód HW", "type": "enumInt", "options": ["saveOnChange"],
 			"enumCfg": {"cfgItem": "mac.lan.devices.hwModes", "cfgValue": "", "cfgText": "fn"}},
 		{"id": "hwServer", "name": "Server", "type": "int", "reference": "mac.lan.devices"},
@@ -28,7 +34,7 @@
     {"id": "property", "name": "Majetek", "type": "int", "reference": "e10pro.property.property", "module": "e10pro.property"},
 
 		{"id": "disableSNMP", "name": "Vypnout sledování SNMP", "type": "logical"},
-		{"id": "disableInstalledSW", "name": "Vypnout sledování nainstalovaných aplikací", "type": "logical"},
+    {"id": "disableDeviceConfig", "name": "Zakázat nastavování zařízení ", "type": "logical"},
     {"id": "alerts", "name": "Hlásit výpadky", "type": "enumInt",
       "enumValues": {"0": "Automaticky", "1": "Ano",  "2": "Ne"}},
 		{"id": "hideFromDR", "name": "Nezobrazovat v racku v dashboardu", "type": "logical"},
@@ -69,6 +75,18 @@
 			]
     },
     {
+      "id": "all3", "class": "mac.lan.libs3.ViewLanDevicesAll",
+      "details": {
+        "default": {"title": "Přehled", "icon": "system/detailDetail", "type": "detail", "class": "mac.lan.ViewDetailDeviceDetail"},
+        "sw": {"title": "SW", "icon": "detailSW", "type": "detail", "class": "mac.lan.ViewDetailDeviceDetailSw"},
+        "info": {"title": "Info", "icon": "system/detailInfo", "type": "detail", "class": "mac.lan.ViewDetailDeviceDetailInfo"},
+        "cfgScripts": {"title": "Nastavení", "icon": "system/detailSettings", "type": "detail", "class": "mac.lan.ViewDetailDeviceDetailCfgScripts"}
+      },
+			"tools": [
+				{"class": "mac.lan.libs.LanControlSetToReloadRunningConfWizard", "icon": "iconRefresh", "text": "Znovu načíst aktuální stav všech zařízení³"}
+			]
+    },
+    {
       "id": "cameras", "class": "mac.lan.ViewDevicesCameras"
     },
 		{
@@ -93,15 +111,20 @@
 	"reports": [
 		{
 			"id": "labelDevice", "name": "Nálepka", "class": "mac.lan.libs.ReportDeviceLabelDevice",
-			"directPrint": 1, "printerClass": "labels"
+			"directPrint": 1, "printerClass": "labels", "disabledCfgItem": "options.experimental.testRasterPrint"
 		},
 		{
 			"id": "labelCable", "name": "Kabel", "class": "mac.lan.libs.ReportDeviceLabelCable",
 			"directPrint": 1, "printerClass": "labels"
 		},
 		{
-			"id": "labelDeviceNew", "name": "Nálepka NEW", "class": "mac.lan.libs.ReportLanDeviceLabelDevice",
+			"id": "labelDeviceNew", "name": "Nálepka", "class": "mac.lan.libs.ReportLanDeviceLabelDevice",
 			"directPrint": 1, "rasterPrint": 1, "printerClass": "labels", "enabledCfgItem": "options.experimental.testRasterPrint"
+		},
+		{
+			"id": "labelDeviceWWifi", "name": "Nálepka s WiFi", "class": "mac.lan.libs.ReportLanDeviceLabelDeviceWWifi",
+			"directPrint": 1, "rasterPrint": 1, "printerClass": "labels", "enabledCfgItem": "options.experimental.testRasterPrint",
+      "queryCols": {"deviceKind" : "14", "adWifiMode": "2"}
 		}
 	],
   "ndx": 1163,

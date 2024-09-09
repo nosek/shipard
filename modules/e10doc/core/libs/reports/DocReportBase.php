@@ -25,6 +25,8 @@ class DocReportBase extends FormReport
 
 	var $testNewPersons = 0;
 
+	var $defaultLanguage = 'cs';
+
 	function init ()
 	{
 		parent::init();
@@ -33,7 +35,7 @@ class DocReportBase extends FormReport
 
 	public function setReportId($baseReportId)
 	{
-		if (str_starts_with($baseReportId, 'reports.default.'))
+		if (str_starts_with($baseReportId, 'reports.default.') || str_starts_with($baseReportId, 'reports.modern.'))
 		{
 			$reportId = $baseReportId;
 		}
@@ -69,6 +71,9 @@ class DocReportBase extends FormReport
 
 		parent::loadData();
 
+		$this->data['options']['docReportsInvoicePaymentInfo'] = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsInvoicePaymentInfo', 0));
+		if ($this->data['options']['docReportsInvoicePaymentInfo'] === 2)
+			$this->data['options']['docReportsInvoicePaymentInfoSigns'] = 1;
 
 		$this->data['options']['docReportsPersonsSigns'] = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsPersonsSigns', 0));
 		$this->data['options']['docReportsHeadLogoRight'] = intval($this->app()->cfgItem ('options.appearanceDocs.docReportsHeadLogoPlace', 1));
@@ -125,17 +130,20 @@ class DocReportBase extends FormReport
 			if ($this->lang == '' && isset($this->data [$columnId]['address']['countryLangSC2']))
 				$this->lang = $this->data [$columnId]['address']['countryLangSC2'];
 
+			if ($this->lang === '')
+				$this->lang = $this->defaultLanguage;
+
 			if (!in_array($this->lang, ['de', 'en', 'it', 'sk', 'cs']))
 				$this->lang = 'en';
 		}
 		else
-			$this->lang = 'cs';
+			$this->lang = $this->defaultLanguage;
 
 		if (isset($this->data [$columnId]['lists']['properties']))
 		{
 			foreach ($this->data [$columnId]['lists']['properties'] as $iii)
 			{
-				if ($iii['group'] != 'ids')
+				if (!$this->personPropertyEnabled($iii))
 					continue;
 				$name = '';
 				if ($iii['property'] == 'taxid') $name = 'DIČ';
@@ -177,9 +185,12 @@ class DocReportBase extends FormReport
 			$this->data ['author']['address'] = $this->data ['author']['lists']['address'][0];
 	}
 
-	function loadData_DocumentOwner ()
+	function loadData_DocumentOwner ($ownerNdx = -1)
 	{
-		$this->ownerNdx = $this->recData ['owner'] ?? 0;
+		if ($ownerNdx !== -1)
+			$this->ownerNdx = $ownerNdx;
+		else
+			$this->ownerNdx = $this->recData ['owner'] ?? 0;
 		if ($this->ownerNdx == 0)
 			$this->ownerNdx = intval($this->app()->cfgItem('options.core.ownerPerson', 0));
 		if ($this->ownerNdx)
@@ -239,6 +250,20 @@ class DocReportBase extends FormReport
 				$this->data ['owner']['logo'][$oa['name']]['rfn'] = 'att/'.$oa['path'].$oa['filename'];
 			}
 		}
+	}
+
+	function personPropertyEnabled($pp)
+	{
+		if ($pp['group'] != 'ids')
+			return FALSE;
+		if ($pp['property'] == 'idcn' && !intval($this->app()->cfgItem ('options.appearanceDocs.docReportsPersons_idcn', 0)))
+			return FALSE;
+		if ($pp['property'] == 'birthdate' && !intval($this->app()->cfgItem ('options.appearanceDocs.docReportsPersons_birthdate', 0)))
+			return FALSE;
+		if ($pp['property'] == 'pid' && !intval($this->app()->cfgItem ('options.appearanceDocs.docReportsPersons_pid', 0)))
+			return FALSE;
+
+		return TRUE;
 	}
 
 	function loadPersonAddress($personNdx, $mainAddress = 0, $addressNdx = 0)
@@ -317,7 +342,8 @@ class DocReportBase extends FormReport
 		}
 		forEach ($this->data [$columnId]['lists']['properties'] as $iii)
 		{
-			if ($iii['group'] != 'ids') continue;
+			if (!$this->personPropertyEnabled($iii))
+				continue;
 			$name = '';
 			if ($iii['property'] == 'taxid') $name = 'DIČ';
 			else if ($iii['property'] == 'oid') $name = 'IČ';

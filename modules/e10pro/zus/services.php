@@ -5,6 +5,7 @@ require_once __SHPD_MODULES_DIR__ . 'e10pro/zus/zus.php';
 use \Shipard\Utils\Utils;
 use \e10\base\libs\UtilsBase;
 use \Shipard\Utils\Str;
+use \Shipard\Utils\Json;
 use \e10pro\zus\zusutils;
 
 /**
@@ -15,6 +16,8 @@ class ModuleServices extends \E10\CLI\ModuleServices
 {
 	public function onAppUpgrade ()
 	{
+		$s [] = ['end' => '2024-05-30', 'sql' => "UPDATE e10pro_zus_oddeleni SET urovenStudia = 1 WHERE urovenStudia = 0"];
+
 		$s [] = ['end' => '2020-12-31', 'sql' => "UPDATE e10pro_zus_hodiny SET stavHlavni = 3 WHERE stav = 4000 AND stavHlavni = 2"];
 
 		$s [] = ['end' => '2021-02-28', 'sql' => "DELETE FROM e10pro_zus_vyukystudenti WHERE studium = 0 OR studium IS NULL"];
@@ -643,6 +646,8 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		{
 			case 'upgrade-skupinove-dochazky': return $this->upgradeSkupinoveDochazky();
 			case 'send-entries-emails': return $this->sendEntriesEmails();
+			case 'archive-entries': return $this->archiveEntries();
+			case 'archive-students': return $this->archiveStudents();
 			case 'repair-fees': return $this->repairFees();
 			case 'repair-invoices': return $this->repairInvoices();
 			case 'import-contacts': return $this->importContacts();
@@ -663,9 +668,92 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$e->sendAll();
 	}
 
+	public function archiveEntries()
+	{
+		$yearParam = $this->app()->arg('year');
+		if (!$yearParam)
+		{
+			echo "Missing `--year` param!\n";
+			return FALSE;
+		}
+
+		/** @var \e10pro\zus\TablePrihlasky */
+		$tablePrihlasky = $this->app()->table('e10pro.zus.prihlasky');
+		$tablePrihlasky->archiveEntries($yearParam);
+		return TRUE;
+	}
+
+	public function archiveStudents()
+	{
+		/** @var \Shipard\Table\DbTable */
+		$tablePersons = $this->app()->table('e10.persons.persons');
+
+		$skolniRok = zusutils::aktualniSkolniRok();
+		$mainGroup = 0;
+		$group = 'e10pro-zus-groups-students';
+		$groupsMap = $this->app()->cfgItem ('e10.persons.groupsToSG', FALSE);
+		if ($groupsMap && isset ($groupsMap [$group]))
+			$mainGroup = $groupsMap [$group];
+
+		$q = [];
+		array_push($q, 'SELECT * FROM [e10_persons_persons] AS persons');
+		array_push ($q, ' WHERE 1');
+		array_push ($q, ' AND [persons].[docState] = %i', 4000);
+		array_push ($q, ' AND EXISTS (SELECT ndx FROM e10_persons_personsgroups WHERE persons.ndx = e10_persons_personsgroups.person and [group] = %i)', $mainGroup);
+		array_push ($q, ' AND NOT EXISTS (',
+				'SELECT student FROM e10pro_zus_studium WHERE persons.ndx = e10pro_zus_studium.student ',
+				' AND e10pro_zus_studium.skolniRok = %s', $skolniRok,
+				' AND e10pro_zus_studium.stavHlavni != %i', 4,
+				')');
+		array_push ($q, ' ORDER BY persons.lastName, persons.firstName, persons.ndx');
+
+		$cnt = 1;
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			echo sprintf('%04d', $cnt).': '.$r['fullName']."\n";
+
+			$this->db()->query('UPDATE [e10_persons_persons] SET docState = %i, ', 9000, 'docStateMain = %i', 5, ' WHERE ndx = %i', $r['ndx']);
+			$tablePersons->docsLog($r['ndx']);
+
+			$cnt++;
+		}
+		return TRUE;
+	}
+
+	public function dataSourceStatsCreate()
+	{
+		$dsStats = new \lib\hosting\DataSourceStats($this);
+		$dsStats->loadFromFile();
+
+		// -- studia
+		$dsStats->data['extModules']['zus']['studies']['created'] = new \DateTime();
+		$dsStats->data['extModules']['zus']['studies']['count']['ALL'] = 0;
+
+
+		$schoolYear = zusutils::aktualniSkolniRok();
+		$q = [];
+		array_push($q, 'SELECT COUNT(*) AS cnt');
+		array_push($q, ' FROM [e10pro_zus_studium] as studium ');
+		array_push($q, ' WHERE [stav] = %i', 1200);
+		array_push($q, ' AND skolniRok = %s', $schoolYear);
+		$cnt = $this->db()->query($q)->fetch();
+		if ($cnt)
+			$dsStats->data['extModules']['zus']['studies']['count']['ALL'] = $cnt['cnt'];
+
+		Json::polish($dsStats->data['extModules']['zus']['studies']);
+
+		$dsStats->saveToFile();
+	}
+
 	public function onCronEver ()
 	{
 		$this->sendEntriesEmails();
+	}
+
+	public function onStats()
+	{
+		$this->dataSourceStatsCreate();
 	}
 
 	public function onCron ($cronType)
@@ -673,8 +761,8 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		switch ($cronType)
 		{
 			case 'ever': $this->onCronEver(); break;
+			case 'stats': $this->onStats(); break;
 		}
 		return TRUE;
 	}
-
 }

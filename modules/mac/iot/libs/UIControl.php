@@ -230,7 +230,7 @@ class UIControl extends \Shipard\UI\ng\TemplateUIControl
     $c = "<div class='d-flex align-items-center mt-1 mb-1'";
     $c .= " id='$id' data-shp-family='iot-light' data-shp-iot-device='$deviceSID'";
     $c .= ">";
-      $c .= "<div class='p-2 align-self-start'>";
+      $c .= "<div class='p-2 _align-self-start'>";
         $c .= "<label class='fs-2' for='{$id}_onoff'>";
         $c .= $this->app()->ui()->icon($icon);
         $c .= "</label>";
@@ -257,7 +257,7 @@ class UIControl extends \Shipard\UI\ng\TemplateUIControl
           }
         }
       $c .= "</div>";
-      $c .= "<div class='ps-3 fs-3 align-self-start'>";
+      $c .= "<div class='_ps-3 fs-3 _align-self-start'>";
         $c .= "<div class='form-check form-switch form-switch-right'>";
           $c .= "<input class='form-check-input shp-iot-primary-switch mac-shp-triggger' data-shp-iot-device='$deviceSID' type='checkbox' role='switch' id='{$id}_onoff' disabled>";
         $c .= "</div>";
@@ -289,7 +289,7 @@ class UIControl extends \Shipard\UI\ng\TemplateUIControl
       $c .= "<div class='d-flex align-items-center mt-1 mb-1'";
       $c .= " id='$id' data-shp-family='iot-light' data-shp-iot-device='$deviceSID'";
       $c .= ">";
-        $c .= "<div class='p-2 align-self-start'>";
+        $c .= "<div class='p-2 _align-self-start'>";
           $c .= "<label class='fs-2' for='{$id}_onoff'>";
           $c .= $this->app()->ui()->icon($icon);
           $c .= "</label>";
@@ -297,7 +297,7 @@ class UIControl extends \Shipard\UI\ng\TemplateUIControl
         $c .= "<div class='_p-2 flex-grow-1 _ms-2'>";
           $c .= "<label class='pb-1 fw-semibold' for='{$id}_onoff'>".Utils::es($title)."</label>";
         $c .= "</div>";
-        $c .= "<div class='ps-3 fs-3 align-self-start'>";
+        $c .= "<div class='_ps-3 fs-3 _align-self-start'>";
           $c .= "<div class='form-check form-switch form-switch-right'>";
             $c .= "<input class='form-check-input shp-iot-primary-switch mac-shp-triggger' data-shp-iot-device='$deviceSID' data-shp-iot-state-id='$propId' type='checkbox' role='switch' id='{$id}_onoff' disabled>";
           $c .= "</div>";
@@ -358,38 +358,41 @@ class UIControl extends \Shipard\UI\ng\TemplateUIControl
           $c .= "<div class='card-header'>";
             $c .= "<div class='d-flex align-items-center mt-1 mb-1'";
             $c .= ">";
-              $c .= "<div class='ps-3 fs-3 align-self-start'>";
+              $c .= "<div class='_p-2 flex-grow-1 _ms-2'>";
+                $c .= "<label class='pb-1 fw-semibold' for='{$baseId}_onoff'>".Utils::es($deviceGroupRecData['shortName'])."</label>";
+              $c .= "</div>";
+
+              $c .= "<div class='_ps-3 fs-3 _align-self-start'>";
                 $c .= "<div class='form-check form-switch form-switch-right'>";
                   $c .= "<input class='form-check-input mac-shp-triggger shp-iot-group-switch' data-shp-iot-device='$devicesInGroupSIDsParam' type='checkbox' role='switch' id='{$baseId}_onoff' disabled>";
                 $c .= "</div>";
               $c .= "</div>";
-              $c .= "<div class='_p-2 flex-grow-1 _ms-2'>";
-                $c .= "<label class='pb-1 fw-semibold' for='{$baseId}_onoff'>".Utils::es($deviceGroupRecData['shortName'])."</label>";
-              $c .= "</div>";
             $c .= "</div>";
           $c .= "</div>"; // --> card-header
 
-          $c .= "<div class='row g-0'>"; //
-            $c .= "<div class='col pt-2' style='max-width: 4rem !important; text-align: center;'>";
-            $c .= $this->app()->ui()->icon('iconBrightness', 'd-block');
-            $c .= "<input type='range' class='_form-range shp-iot-br-range mac-shp-triggger' orient='vertical'";
-            $c .= " data-shp-iot-device='$devicesInGroupSIDsParam' min='0' max='255'";
-            $c .= " id='{$baseId}_br_range'";
-            $c .= " style='--moz-appearance: slider-vertical; appearance: slider-vertical; margin-top: .3rem; width: 2em; height: 89%;'>";
-            $c .= "</div>";
+          $c .= "<div class='card-body'>";
+            $c .= "<div class='row'>"; //
+              $c .= "<div class='col' style='max-width: 4rem !important; text-align: center;'>";
+              $c .= $this->app()->ui()->icon('iconBrightness', 'd-block');
+              $c .= "<input type='range' class='_form-range shp-iot-br-range mac-shp-triggger' orient='vertical'";
+              $c .= " data-shp-iot-device='$devicesInGroupSIDsParam' min='0' max='255'";
+              $c .= " id='{$baseId}_br_range'";
+              $c .= " style='--moz-appearance: slider-vertical; appearance: slider-vertical; margin-top: .3rem; width: 2em; height: 89%;'>";
+              $c .= "</div>";
 
-            $c .= "<div class='col p-2' style='max-width: 4rem !important; text-align: center;'>";
-            $c .= $this->app()->ui()->icon('iconColorTemperature', 'd-block');
-            $c .= "<input type='range' class='_form-range shp-iot-ct-range mac-shp-triggger' orient='vertical'";
-            $c .= " data-shp-iot-device='$devicesInGroupSIDsParam' min='250' max='454'";
-            $c .= " id='{$baseId}_ct_range'";
-            $c .= " style='--moz-appearance: slider-vertical; appearance: slider-vertical; margin-top: .3rem; width: 2em; height: 89%;'>";
-            $c .= "</div>";
+              $c .= "<div class='col' style='max-width: 4rem !important; text-align: center;'>";
+              $c .= $this->app()->ui()->icon('iconColorTemperature', 'd-block');
+              $c .= "<input type='range' class='_form-range shp-iot-ct-range mac-shp-triggger' orient='vertical'";
+              $c .= " data-shp-iot-device='$devicesInGroupSIDsParam' min='250' max='454'";
+              $c .= " id='{$baseId}_ct_range'";
+              $c .= " style='--moz-appearance: slider-vertical; appearance: slider-vertical; margin-top: .3rem; width: 2em; height: 89%;'>";
+              $c .= "</div>";
 
-            $c .= "<div class='col'>";
-            $c .= $devicesInGroupCode;
-            $c .= "</div>";
+              $c .= "<div class='col'>";
+              $c .= $devicesInGroupCode;
+              $c .= "</div>";
 
+            $c .= "</div>";
           $c .= "</div>";
         $c .= "</div>"; // --> card
         continue;
@@ -400,6 +403,88 @@ class UIControl extends \Shipard\UI\ng\TemplateUIControl
 
     return $c;
   }
+
+  public function renderIoTBoxControl(array $params)
+  {
+    $c = '';
+
+    $controlsIds = explode(',', $params['id'] ?? '');
+    if (!count($controlsIds))
+    {
+      return 'Invalid / missing param `id`';
+    }
+
+    $disabledOptions = explode(',', $params['disabledOptions'] ?? '');
+
+    foreach ($controlsIds as $cid)
+    {
+      $parts = explode('/', $cid);
+      if (count($parts) !== 2)
+        continue;
+      $deviceId = $parts[0];
+      $ioPortId = $parts[1];
+
+      $deviceRecData = $this->iotDevicesTable->loadRecData('@friendlyId:'.$deviceId);//$this->app()->loadItem($deviceNdx, 'mac.iot.devices');
+      if (!$deviceRecData)
+      {
+        $c .= '<pre>Invalid device id #'.$deviceId.'</pre>';
+        continue;
+      }
+      $deviceNdx = $deviceRecData['ndx'];
+
+      $deviceCfgRecData = $this->app()->loadItem($deviceNdx, 'mac.iot.devicesCfg');
+      $deviceCfgData = json_decode($deviceCfgRecData['cfgData'], TRUE);
+
+      if (!isset($deviceCfgData['dataModel']['properties'][$ioPortId]))
+      {
+        $c .= '<pre>Invalid ioPort id #'.$ioPortId.'</pre>';
+        //continue;
+      }
+
+      $c .= $this->renderIoTBoxControl_OnOff($deviceNdx, $deviceRecData, $ioPortId, $deviceCfgData['dataModel']['properties'][$ioPortId], $disabledOptions, $params);
+    }
+
+    return $c;
+  }
+
+  public function renderIoTBoxControl_OnOff($deviceNdx, $deviceRecData, $dmItemId, $dmItem, array $disabledOptions, $params)
+  {
+    $deviceRegData = $this->registerIotDevice($deviceRecData);
+    $deviceSID = $deviceRegData['sid'];
+
+    $id = $this->registerTopicMainElement($deviceRecData['deviceTopic']);
+
+    $icon = $this->iotDevicesTable->tableIcon($deviceRecData);
+    $title = $deviceRecData['uiName'] === '' ? $deviceRecData['fullName'] : $deviceRecData['uiName'];
+    if (isset($params['title']))
+      $title = $params['title'];
+
+    $c = "<div class='d-flex align-items-center mt-1 mb-1'";
+    $c .= " id='$id' data-shp-family='iot-light' data-shp-iot-device='$deviceSID'";
+    $c .= ">";
+      $c .= "<div class='p-2 _align-self-start'>";
+        $c .= "<label class='fs-2' for='{$id}_onoff'>";
+        $c .= $this->app()->ui()->icon($icon);
+        $c .= "</label>";
+      $c .= "</div>";
+      $c .= "<div class='_p-2 flex-grow-1 _ms-2'>";
+        $c .= "<label class='pb-1 fw-semibold' for='{$id}_onoff'>".Utils::es($title)."</label>";
+      $c .= "</div>";
+      $c .= "<div class='_ps-3 fs-3 _align-self-start'>";
+        $c .= "<div class='form-check form-switch form-switch-right'>";
+          //$c .= "<input class='form-check-input shp-iot-primary-switch mac-shp-triggger' data-shp-iot-device='$deviceSID' type='checkbox' role='switch' id='{$id}_onoff' disabled>";
+          $c .= "<input class='form-check-input shp-iot-primary-switch mac-shp-triggger'".
+                " data-shp-iot-device='$deviceSID' data-shp-iot-state-id='$dmItemId'".
+                " data-shp-value-on='{$dmItem['value-on']}' data-shp-value-off='{$dmItem['value-off']}'".
+                " type='checkbox' role='switch' id='{$id}_onoff' disabled>";
+
+        $c .= "</div>";
+      $c .= "</div>";
+    $c .= "</div>";
+
+    return $c;
+  }
+
 
   public function renderIoTSensor(array $params)
   {
@@ -582,6 +667,7 @@ class UIControl extends \Shipard\UI\ng\TemplateUIControl
       'iotSensor' => $this->renderIoTSensor($params),
       'controlButton' => $this->renderIoTControlButton($params),
       'camPicture' => $this->renderCamPicture($params),
+      'iotBoxControl' => $this->renderIotBoxControl($params),
       default => ''
     };
 

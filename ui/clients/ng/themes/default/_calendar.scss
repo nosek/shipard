@@ -1,0 +1,202 @@
+table.shp-cal-big {
+  	table-layout: fixed;
+	width: 100%;
+	height: 100%;
+
+	>thead>tr {
+		height: 2rem;
+		>th.month {width: 2rem;}
+	}
+
+	>tbody>tr>td {
+		overflow: hidden;
+		vertical-align: top;
+    	text-overflow: clip;
+    	white-space: nowrap;
+		//background-color: #f5f5f5;
+		border: 1px solid var(--universalBorder); padding: 2px;
+    &.week {
+			width: 2%;
+    }
+		&.day {
+			width: 14%;
+			span.title {
+				left: 2px; top: 1px;
+			}
+			div.events {
+				overflow-y: auto;
+				overflow-x: hidden;
+				padding-bottom: 2ex;
+        white-space: nowrap;
+				font-size: 85%;
+				.tag-event {
+					white-space: pre;
+					padding: 1px 3px 1px 3px;
+					a {
+						text-decoration: none;
+					}
+				};
+				span.tag {
+					border: none;
+					border-radius: 5px;
+					color: #212529;
+				}
+			}
+		}
+		&.day:focus {
+			outline: 0;
+			background-color: #fdff6b;
+		}
+		&.week {width: 2%; border: none;text-align: right;background: transparent; padding: 3px;}
+/*		&.inactive {
+			background-color: #e5e5e5;
+		}*/
+		&.wk {
+			width: 14%;
+			span.title {
+				position: absolute;
+				left: 2px; top: 1px;
+			}
+			div.events {
+				height: 100%;
+				overflow-y: auto;
+				overflow-x: hidden;
+				font-size: 92%;
+				.tag-event {
+					color: #212529;
+					border: none;
+					border-radius: 5px;
+					max-height: 5em;
+					display: block;
+					overflow: hidden;
+					width: 100%;
+					padding: 1px 3px 1px 3px;
+					a {
+						text-decoration: none;
+					}
+				}
+			}
+		}
+	}
+
+	tbody>tr>td.inactive {
+		background-color: var(--calendarInactive);
+	}
+
+	tbody>tr>td.today {
+		background-color: #{$calendar-today};
+	}
+}
+
+table.shp-cal-big.wks-6 {
+  tbody>tr {height: calc((100% - 2rem) / 6); max-height: calc((100% - 2rem) / 6);}
+}
+table.shp-cal-big.wks-5 {
+  tbody>tr {height: calc((100% - 2rem) / 5); max-height: calc((100% - 2rem) / 5);}
+}
+table.shp-cal-big.wks-4 {
+  tbody>tr {height: calc((100% - 2rem) / 4); max-height: calc((100% - 2rem) / 4);}
+}
+
+table.shp-cal-small {
+	width: 100%;
+	height: 100%;
+
+	>tbody>tr>td {
+		vertical-align: top;
+		//background-color: #f5f5f5;
+		border: 1px solid var(--universalBorder); padding: 1px;
+		&.day {
+			width: 13.5%;
+			div.events {
+				font-size: 85%;
+				position: relative;
+				bottom: 1px;
+				right: 1px;
+				display: inline-block;
+				span.tag {
+					padding: 1px 2px;
+					margin: 0px 1px;
+					border: 2px solid #d2322d;
+					cursor: pointer;
+					float: left;
+					color: #212529;
+				}
+			}
+		}
+		&.day:focus {
+			outline: 0;
+			background-color: #fdff6b;
+		}
+		&.week {
+			vertical-align: bottom;
+			width: 2em;
+			border: none;
+			text-align: right;
+			background: transparent;
+			padding: 1px;
+			font-size: 85%;
+			opacity: .6;
+		}
+		/*&.inactive {
+			background-color: #e5e5e5;
+			font-size:85%;
+		}*/
+	}
+	>tbody>tr.monthName {
+		td {
+			background: transparent;
+			border: none;
+			text-align: center;
+		}
+	}
+}
+
+table.shp-cal-year {
+	width: 100%;
+	height: 100%;
+	font-size: 90%;
+	>tbody>tr>td {
+		vertical-align: top;
+		padding: 5px 20px;
+	}
+
+	tbody>tr>td.inactive {
+		background-color: var(--calendarInactive);
+	}
+
+	tbody>tr>td.today {
+		background-color: #{$calendar-today};
+	}
+}
+
+@media only screen and (max-width: 700px) {
+	table.shp-cal-year {
+		>tbody>tr>td {
+			display: block;
+		}
+	}
+}
+
+@media only screen and (min-width: 701px) {
+	table.shp-cal-year {
+		>tbody>tr>td {
+			width: 33%;
+		}
+	}
+}
+
+div.popover-body {
+	background-color: var(--popoverBg);
+	border-radius: 8px;
+
+	span.tag-event {
+		border: none;
+		color: #212529;
+		border-radius: 5px;
+	}
+}
+
+div.popover-arrow::after {
+	border-left-color: var(--popoverBg) !important;
+}

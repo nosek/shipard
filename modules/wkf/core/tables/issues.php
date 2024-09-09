@@ -95,6 +95,28 @@ class TableIssues extends DbTable
 		if (isset($recData['issueId']) && $recData['issueId'] === '' && isset($recData['ndx']) && $recData['ndx'] !== 0)
 			$recData['issueId'] = str_replace(' ', '.', utils::nf(100000+$recData['ndx']));
 
+		$section = $this->app()->cfgItem ('wkf.sections.all.'.$recData['section'], NULL);
+
+		if ($section && isset($section['issuesKinds']))
+		{
+			$enableIssueKind = \e10\searchArray($section['issuesKinds'], 'ndx', $recData['issueKind']);
+			if (!$enableIssueKind)
+			{
+				$recData['issueKind'] = $section['issuesKinds'][0]['ndx'] ?? 0;
+				$issueKindCfg = $this->app()->cfgItem ('wkf.issues.kinds.'.$recData['issueKind'], NULL);
+				$recData['issueType'] = $issueKindCfg['issueType'];
+			}
+		}
+
+		$issueKindCfg = $this->app()->cfgItem ('wkf.issues.kinds.'.$recData['issueKind'], NULL);
+		if ($recData['issueType'] != $issueKindCfg['issueType'])
+		{
+			$allIssuesKinds = $this->app()->cfgItem ('wkf.issues.kinds', []);
+			$defaultIssueKind = \e10\searchArray($allIssuesKinds, 'issueType', $recData['issueType']);
+			if ($defaultIssueKind)
+				$recData['issueKind'] = $defaultIssueKind['ndx'];
+		}
+
 		parent::checkBeforeSave ($recData, $ownerData);
 	}
 
@@ -123,6 +145,26 @@ class TableIssues extends DbTable
 
 		if (!isset($recData ['onTop']))
 			$recData ['onTop'] = 0;
+	}
+
+	protected function checkSpecialDocState($phase, $specialDocState, &$saveData)
+	{
+		if (!isset($saveData['saveParams']))
+			return FALSE;
+		if (!isset($saveData['recData']['ndx']) || !$saveData['recData']['ndx'])
+			return FALSE;
+		$refreshDDMAttNdx = intval($saveData['saveParams']['data-save-refresh-ddm-attndx'] ?? 0);
+
+		if ($phase === 2 && $refreshDDMAttNdx)
+		{
+			$e = new \lib\core\attachments\Extract($this->app);
+			$e->setAttNdx($refreshDDMAttNdx);
+			$e->run();
+
+			return TRUE;
+		}
+
+		return TRUE;
 	}
 
 	public function documentStates ($recData)
@@ -343,6 +385,23 @@ class TableIssues extends DbTable
 			return TRUE;
 		}
 
+		if ($columnId === 'issueType')
+		{
+			$section = $this->app()->cfgItem ('wkf.sections.all.'.$form->recData['section'], NULL);
+
+			if (!$section || !isset($section['issuesKinds']))
+				return FALSE;
+
+			foreach ($section['issuesKinds'] as $eik)
+			{
+				$issueKindCfg = $this->app()->cfgItem ('wkf.issues.kinds.'.$eik['ndx'], NULL);
+				if ($issueKindCfg['issueType'] == $cfgKey)
+					return TRUE;
+			}
+
+			return FALSE;
+		}
+
 		if ($columnId === 'status')
 		{
 			$section = $this->topSection($form->recData['section']);
@@ -418,6 +477,7 @@ class TableIssues extends DbTable
 
 		if (isset($params['diary']))
 		{
+			$enabledIssuesKinds = [];
 			foreach ($issuesKinds as $ikNdx => $ik)
 			{
 				if ($ik['systemKind'] != 1 && $ik['systemKind'] != 7)
@@ -437,6 +497,10 @@ class TableIssues extends DbTable
 				continue;
 			$buttonGroups[$issueKind['issueType']][$issueKindNdx] = $issueKind;
 		}
+
+		$btnActionClass = 'btn';
+		if (isset($params['btnActionClass']))
+			$btnActionClass = $params['btnActionClass'];
 
 		foreach ($buttonGroups as $issueTypeNdx => $issueKinds)
 		{
@@ -462,7 +526,7 @@ class TableIssues extends DbTable
 				$txtText = '';
 				$addButton = [
 					'action' => 'new', 'data-table' => 'wkf.core.issues', 'icon' => $icon,
-					'text' => $txtText, 'title' => $txtTitle, 'type' => 'button', 'actionClass' => 'btn',
+					'text' => $txtText, 'title' => $txtTitle, 'type' => 'button', 'actionClass' => $btnActionClass,
 					'class' => 'e10-param-addButton', 'btnClass' => 'btn-success', 'dropRight' => 1,
 					'data-addParams' => $addParams,
 				];
@@ -521,12 +585,23 @@ class TableIssues extends DbTable
 					if (isset($params['section']) && $issueKind['issueType'] !== self::mtNote)
 						$addParams .= '&__section=' . $params['section'];
 
+					if (isset($params['onTop']))
+						$addParams .= '&__onTop=' . $params['onTop'];
+
 					$icon = ($issueKind['icon'] !== '') ? $issueKind['icon'] : $issueType['icon'];
-					$txtTitle = $issueKind['fn'];
-					$txtText = '';
+					if (isset($params['btnWithTexts']))
+					{
+						$txtTitle = 'Přidat';
+						$txtText = $issueKind['fn'];
+					}
+					else
+					{
+						$txtTitle = $issueKind['fn'];
+						$txtText = '';
+					}
 					$addButton = [
 						'action' => 'new', 'data-table' => 'wkf.core.issues', 'icon' => $icon,
-						'text' => $txtText, 'title' => $txtTitle, 'type' => 'button', 'actionClass' => 'btn',
+						'text' => $txtText, 'title' => $txtTitle, 'type' => 'button', 'actionClass' => $btnActionClass,
 						'class' => 'e10-param-addButton', 'btnClass' => 'btn-success',
 						'data-addParams' => $addParams,
 					];

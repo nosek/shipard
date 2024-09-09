@@ -31,22 +31,28 @@ class TableDocKinds extends DbTable
 				'useInvoicingPeriodicity' => $r['useInvoicingPeriodicity'],
 				'disableRows' => $r ['disableRows'], 'priceOnHead' => $r ['priceOnHead'],
 				'vds' => $r ['vds'],
+				'disableCustomer' => $r ['disableCustomer'],
 				'useDescription' => $r ['useDescription'],
 				'usePersonsList' => $r ['usePersonsList'],
 				'useDateIssue' => $r ['useDateIssue'], 'labelDateIssue' => $r ['labelDateIssue'],
 				'useDateContract' => $r ['useDateContract'], 'labelDateContract' => $r ['labelDateContract'],
 				'useDateBegin' => $r ['useDateBegin'], 'labelDateBegin' => $r ['labelDateBegin'],
+				'useDateClosed' => $r ['useDateClosed'], 'labelDateClosed' => $r ['labelDateClosed'],
+				'useReasonClosed' => $r ['useReasonClosed'], 'labelReasonClosed' => $r ['labelReasonClosed'],
 				'useDateDeadlineRequested' => $r ['useDateDeadlineRequested'], 'labelDateDeadlineRequested' => $r ['labelDateDeadlineRequested'],
 				'useDateDeadlineConfirmed' => $r ['useDateDeadlineConfirmed'], 'labelDateDeadlineConfirmed' => $r ['labelDateDeadlineConfirmed'],
+				'useUsersPeriods' => $r ['useUsersPeriods'],
 				'useRefId1' => $r ['useRefId1'], 'labelRefId1' => $r ['labelRefId1'],
 				'useRefId2' => $r ['useRefId2'], 'labelRefId2' => $r ['labelRefId2'],
 				'useIntTitle' => $r ['useIntTitle'],
 				'useRetentionGuarantees' => $r ['useRetentionGuarantees'],
 				'useAddress' => $r ['useAddress'], 'invoicesInDetail' => $r ['invoicesInDetail'],
-				'viewerPrimaryTitle' => $r ['viewerPrimaryTitle'],
+				'viewerPrimaryTitle' => $r ['viewerPrimaryTitle'], 'viewerLabelTitle' => $r ['viewerLabelTitle'],
 				'useMembers' => $r ['useMembers'],
+				'usePlaces' => $r ['usePlaces'],
 				'useHeadSymbol1' => $r ['useHeadSymbol1'],
 				'useOwnerWorkOrder' => $r ['useOwnerWorkOrder'],
+				'useFollowUpWorkOrder' => $r ['useFollowUpWorkOrder'],
 				'useRowValidFromTo' => $r ['useRowValidFromTo'],
 				'useRowDateDeadlineRequested' => $r ['useRowDateDeadlineRequested'], 'labelRowDateDeadlineRequested' => $r ['labelRowDateDeadlineRequested'],
 				'useRowDateDeadlineConfirmed' => $r ['useRowDateDeadlineConfirmed'], 'labelRowDateDeadlineConfirmed' => $r ['labelRowDateDeadlineConfirmed'],
@@ -62,6 +68,10 @@ class TableDocKinds extends DbTable
 				$dk['labelDateContract'] = 'Datum podpisu smlouvy';
 			if ($dk['labelDateBegin'] === '')
 				$dk['labelDateBegin'] = 'Datum zahájení';
+			if ($dk['labelDateClosed'] === '')
+				$dk['labelDateClosed'] = 'Datum ukončení';
+			if ($dk['labelReasonClosed'] === '')
+				$dk['labelReasonClosed'] = 'Důvod ukončení';
 			if ($dk['labelDateDeadlineRequested'] === '')
 				$dk['labelDateDeadlineRequested'] = 'Požadovaný termín';
 			if ($dk['labelDateDeadlineConfirmed'] === '')
@@ -97,12 +107,17 @@ class TableDocKinds extends DbTable
 			'ndx' => 0, 'fullName' => '', 'shortName' => '',
 			'workOrderType' => 0, 'workOrderFrequency' => 0, 'useInvoicingPeriodicity' => 0,
 			'disableRows' => 0, 'priceOnHead' => 0,
+			'disableCustomer' => 0,
 			'viewerPrimaryTitle' => 0,
+			'viewerLabelTitle' => 0,
 			'useDescription' => 0,
 			'usePersonsList' => 0,
 			'useDateIssue' => 1, 'labelDateIssue' => 'Datum vystavení',
+			'useUsersPeriods' => 0,
 			'useDateContract' => 0, 'labelDateContract' => '',
 			'useDateBegin' => 0, 'labelDateBegin' => '',
+			'useDateClosed' => 0, 'labelDateClosed' => '',
+			'useReasonClosed' => 0, 'labelReasonClosed' => '',
 			'useDateDeadlineRequested' => 0, 'labelDateDeadlineRequested' => '',
 			'useDateDeadlineConfirmed' => 1, 'labelDateDeadlineConfirmed' => 'Potvrzený termín',
 			'useRefId1' => 0, 'labelRefId1' => '',
@@ -222,15 +237,20 @@ class FormDocKind extends TableForm
 					$this->addColumnInput ('workOrderFrequency');
 					if ($this->recData['workOrderFrequency'] == 2)
 						$this->addColumnInput ('useInvoicingPeriodicity');
+					$this->addColumnInput ('disableCustomer');
 					$this->addColumnInput ('priceOnHead');
 					$this->addColumnInput ('useDescription');
 					$this->addColumnInput ('useAddress');
 					$this->addColumnInput ('usePersonsList');
 					$this->addColumnInput ('invoicesInDetail');
 					$this->addColumnInput ('viewerPrimaryTitle');
+					$this->addColumnInput ('viewerLabelTitle');
 					$this->addColumnInput ('useMembers');
+					$this->addColumnInput ('usePlaces');
+					$this->addColumnInput ('useUsersPeriods');
 					$this->addColumnInput ('useHeadSymbol1');
 					$this->addColumnInput ('useOwnerWorkOrder');
+					$this->addColumnInput ('useFollowUpWorkOrder');
 					$this->addColumnInput ('order');
 					$this->addList ('doclinks', '', TableForm::loAddToFormLayout);
 				$this->closeTab ();
@@ -273,6 +293,12 @@ class FormDocKind extends TableForm
 							$this->addColumnInput ('useRetentionGuarantees', TableForm::coColW5);
 						$this->closeRow ();
 					$this->layoutClose ();
+					$this->addSeparator(self::coH4);
+
+					$this->addColumnInput ('useDateClosed');
+					$this->addColumnInput ('labelDateClosed');
+					$this->addColumnInput ('useReasonClosed');
+					$this->addColumnInput ('labelReasonClosed');
 
 					$this->addSeparator(self::coH2);
 					$this->addStatic(['text' => 'Řádky zakázky', 'class' => 'h2 pl1']);

@@ -11,16 +11,21 @@
     {"id": "itemState", "name": "Stav", "type": "enumInt",
 			"enumCfg": {"cfgItem": "plans.itemStates", "cfgValue": "", "cfgText": "sn"}},
 
+		{"id": "ownerItem", "name": "Nadřazená položka plánu", "type": "int", "reference": "plans.core.items"},
+
     {"id": "personCustomer", "name": "Zákazník", "type": "int", "reference": "e10.persons.persons"},
 
     {"id": "workOrder", "name": "Zakázka", "type": "int", "reference": "e10mnf.core.workOrders"},
     {"id": "workOrderParent", "name": "Nadřazená zakázka", "type": "int", "reference": "e10mnf.core.workOrders"},
 
     {"id": "projectId", "name": "ID projektu", "type": "string", "len": 20},
+		{"id": "team", "name": "Tým", "type": "int", "reference": "plans.core.teams"},
 
-		{"id": "datePlanBegin", "name": "Datum zahájení plánování", "type": "date"},
+		{"id": "datePlanBegin", "name": "Datum zahájení", "type": "date"},
 		{"id": "dateDeadline", "name": "Termín", "type": "date"},
 		{"id": "dateClosed", "name": "Datum uzavření", "type": "date"},
+
+		{"id": "author", "name": "Autor", "type": "int", "reference": "e10.persons.persons"},
 
 		{"id": "price", "name": "Cena", "type": "money"},
 		{"id": "currency", "name": "Měna", "type": "int", "reference": "e10.world.currencies"},
@@ -44,6 +49,14 @@
 		},
 		{
       "id": "grid", "class": "plans.core.libs.ViewItemsGrid",
+			"detail": "plans.core.ViewDetailItem"
+		},
+		{
+      "id": "gridTree", "class": "plans.core.libs.ViewItemsGridTree",
+			"detail": "plans.core.ViewDetailItem"
+		},
+		{
+      "id": "gantt", "class": "plans.core.libs.ViewItemsGantt",
 			"detail": "plans.core.ViewDetailItem"
 		}
 	],

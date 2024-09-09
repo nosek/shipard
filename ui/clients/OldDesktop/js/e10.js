@@ -153,6 +153,26 @@ function elementAttributes (e, prefix)
 	return $.param(data);
 }
 
+function elementAttributesArray (e, prefix)
+{
+	var data = {};
+
+	var iel = e.get(0);
+	for (var i = 0, attrs = iel.attributes, l = attrs.length; i < l; i++)
+	{
+		var attrName = attrs.item(i).nodeName;
+		if (attrName.substring(0, prefix.length) !== prefix)
+			continue;
+		var val = attrs.item(i).nodeValue;
+		data[attrName] = val;
+	}
+
+	if ($.isEmptyObject(data))
+		return null;
+
+	return data;
+}
+
 function dfMaximizeMainElement (aElementId)
 {
 	$("html,body").css ({"overflow": "hidden"});
@@ -1098,6 +1118,21 @@ function e10jsinit ()
 
 	initEventer();
 	initMQTT ();
+
+	if (g_useMonaco)
+	{
+		let monacoLoader = $('#monaco-loader');
+		if (!monacoLoader.length)
+		{
+			$('head').append("<script id='monaco-loader'>var require = { paths: { 'vs': '"+httpApiRootPath+"/www-root/sc/libs/monaco-editor-0.47/min/vs' } };</script>");
+
+			setTimeout (function () {
+				$('head').append("<script type='text/javascript' src='"+httpApiRootPath+"/www-root/sc/libs/monaco-editor-0.47/min/vs/loader.js'></script>");
+				$('head').append("<script type='text/javascript' src='"+httpApiRootPath+"/www-root/sc/libs/monaco-editor-0.47/min/vs/editor/editor.main.nls.js'></script>");
+				$('head').append("<script type='text/javascript' src='"+httpApiRootPath+"/www-root/sc/libs/monaco-editor-0.47/min/vs/editor/editor.main.js'></script>");
+			}, 500);
+		}
+	}
 }
 
 function initEventer()
@@ -1517,6 +1552,9 @@ function e10viewerDoComboClick (e, event)
 			var formId = searchObjectId (target, 'form');
 			var form = $('#'+formId);
 			e10doSizeHints (form);
+
+			if (target.hasClass('e10-ino-saveOnChange'))
+				e10FormNeedSave(target, -1);
 		}
 		else
 		{
@@ -3491,6 +3529,9 @@ function e10FormSaveBegin (element, formId)
 	if (element.attr ('data-fid') || formId)
 	{
 		var fid = (formId) ? formId : element.attr ('data-fid');
+		if (fid === 'AUTO')
+			fid = searchParentAttr (element, "data-formid");
+
 		var saveBtn = $('#'+fid+'Save');
 
 		if (saveBtn.attr ('data-insave') === '1')
@@ -4031,6 +4072,11 @@ function df2saveForm (srcEl, successFunction)
 		noClose = 1;
 
   var id = srcEl.attr ("data-form");
+	if (id === 'AUTO')
+	{
+		var fe = searchParentAttrElement(srcEl.parent(), "data-formid");
+		id = fe.attr('id');
+	}
 
 	var e = $("#" + id);
 
@@ -4042,6 +4088,11 @@ function df2saveForm (srcEl, successFunction)
 
   var formData = df2collectEditFormData (e, $.myFormsData [id]);
 	formData ['setDocState'] = docState;
+
+	saveParams = elementAttributesArray (srcEl, 'data-save-');
+	if (saveParams)
+		formData ['saveParams'] = saveParams;
+
 	formData.postData = e10DocumentData();
 
 	var table = e.attr ("data-table");
@@ -4198,7 +4249,7 @@ function df2collectEditFormData (form, data)
 	var thisInputValue = null;
 	var mainFid = form.attr('id');
 
-  var formElements = form.find (':input, div.e10-inputDocLink');
+  var formElements = form.find (':input, div.e10-inputDocLink, div.e10-monaco-editor');
   for (var i = 0; i < formElements.length; i++)
   {
     var thisInput = $(formElements [i]);
@@ -4383,7 +4434,10 @@ function df2collectEditFormData (form, data)
 		else
 		if (thisInput.hasClass ("e10-inputCode"))
 		{
-			thisInputValue = thisInput.data ('cm').getValue ();
+			if (g_useMonaco)
+				thisInputValue = thisInput[0]._me.getValue ();
+			else
+				thisInputValue = thisInput.data ('cm').getValue ();
 		}
 		else
 			thisInputValue = thisInput.val ();
@@ -4833,7 +4887,7 @@ function df2FormsSetData (id, data)
 
   var form = $("#" + id);
   $.myFormsData [id] = data;//$.extend ({}, data);
-	var formElements = form.find (':input, div.e10-inputDocLink');
+	var formElements = form.find (':input, div.e10-inputDocLink, div.e10-monaco-editor');
 	var readOnly = (form.attr ('data-readonly') !== undefined);
 
   for (var i = 0; i < formElements.length; i++)
@@ -5092,18 +5146,47 @@ function df2FormsSetData (id, data)
 		else
 		if (thisInput.hasClass ("e10-inputCode"))
 		{
-			var cm = thisInput.data ('cm');
-			if (cm === undefined)
+			if (g_useMonaco)
 			{
-				cm = CodeMirror.fromTextArea(thisInput[0], {tabSize: 2, lineNumbers: true, styleActiveLine: true});
-				var cmWidth = form.width() - 1;
-				cmWidth -= form.find('div.e10-form-maintabs-menu').width();
-				cm.setSize(cmWidth, form.parent().parent().height() - $('#'+id+'Buttons').height() - 4);
-				cm.on("change",function (cmEditor,cmChangeObject){e10FormNeedSave (thisInput, 0);});
-				thisInput.data('cm', cm);
+				if (thisInput[0]._me === undefined)
+				{
+					var opts = {
+						scrollBeyondLastLine: false,
+						minimap: {
+							enabled: false
+						},
+						automaticLayout: true
+					};
+					const clang = thisInput.attr('data-clng');
+					if (clang)
+						opts.language = clang;
+					const readonly = thisInput.attr('readonly');
+						if (readonly === 'readonly')
+							opts.readOnly = true;
+
+					var me = monaco.editor.create(thisInput[0], opts);
+
+					me.getModel().onDidChangeContent(function (event) {e10FormNeedSave (thisInput, 0);});
+					thisInput[0]._me = me;
+				}
+				if (thisInputValue !== undefined && thisInputValue !== null)
+					thisInput[0]._me.setValue (thisInputValue);
 			}
-			if (thisInputValue !== undefined && thisInputValue !== null)
-				cm.setValue (thisInputValue);
+			else
+			{
+				var cm = thisInput.data ('cm');
+				if (cm === undefined)
+				{
+					cm = CodeMirror.fromTextArea(thisInput[0], {tabSize: 2, lineNumbers: true, styleActiveLine: true});
+					var cmWidth = form.width() - 1;
+					cmWidth -= form.find('div.e10-form-maintabs-menu').width();
+					cm.setSize(cmWidth, form.parent().parent().height() - $('#'+id+'Buttons').height() - 4);
+					cm.on("change",function (cmEditor,cmChangeObject){e10FormNeedSave (thisInput, 0);});
+					thisInput.data('cm', cm);
+				}
+				if (thisInputValue !== undefined && thisInputValue !== null)
+					cm.setValue (thisInputValue);
+			}
 		}
 		else {
             thisInput.val(thisInputValue);
@@ -6833,15 +6916,16 @@ function e10WizardNext (input)
 // ---- cameras
 
 var g_camerasBarTimer = 0;
-function camerasReload ()
+function camerasReload (first)
 {
 	if (g_appWindowsCamerasPictures === undefined || g_appWindowsCamerasPictures.servers === undefined)
 		return;
-
+	var needReload = 0;
 	var pictsWidth = 380;
 	var boxElement = $("#mainBrowserRightBarTop>div.camPicts");
 	if (boxElement.length)
 		pictsWidth = (boxElement.innerWidth() | 0) - 22;
+	//pictsWidth = 960;
 	for (var si in g_appWindowsCamerasPictures.servers)
 	{
 		var srv = g_appWindowsCamerasPictures.servers[si];
@@ -6854,12 +6938,30 @@ function camerasReload ()
 
 				var rightPicture = $('#e10-cam-' + ii + '-right');
 				if (rightPicture.length && rightPicture.is('img'))
+				{
+					if (first === 1)
+					{
+						rightPicture.load(function(){
+							$(this).attr ('data-load-in-progress', '0');
+						});
+					}
+
 					rightPicture.attr ("src", picFileName).parent().attr ("data-pict", origPicFileName);
+
+					if (rightPicture.attr ('data-load-in-progress') === '1')
+					{
+						needReload = 1;
+						continue;
+					}
+					rightPicture.attr('data-load-in-progress', '1');
+				}
 				else
 					rightPicture.parent().attr ("data-pict", origPicFileName);
 			}
-
-			g_camerasBarTimer = setTimeout (camerasReload, 10000);
+			if (needReload)
+				g_camerasBarTimer = setTimeout (camerasReload, 1000);
+			else
+				g_camerasBarTimer = setTimeout (camerasReload, 5000);
 		});
 	}
 }

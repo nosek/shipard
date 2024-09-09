@@ -8,7 +8,7 @@ use \e10doc\core\libs\E10Utils;
  * Class Detail
  * @package e10doc\core\dc
  */
-class Detail extends \e10\DocumentCard
+class Detail extends \Shipard\Base\DocumentCard
 {
 	protected $linkedAttachments = [];
 	protected $docTypes, $currencies, $balances, $usedNdxs;
@@ -64,6 +64,17 @@ class Detail extends \e10\DocumentCard
 
 	public function createContentHeader ()
 	{
+		$testBetterDiary = intval($this->app()->cfgItem ('options.experimental.testBetterDiary', 0));
+		if ($testBetterDiary)
+		{
+			$diaryButtons = $this->diaryButtons();
+			if ($diaryButtons)
+			{
+				$this->header = $this->table->createHeader($this->recData, \Shipard\Table\DbTable::chmViewer);
+				$this->header['info'][] = ['class' => 'e10-error', 'value' => $diaryButtons];
+			}
+		}
+
 		$recData = $this->recData;
 
 		$this->docType = $this->app->cfgItem ('e10.docs.types.' . $recData['docType']);
@@ -301,13 +312,15 @@ class Detail extends \e10\DocumentCard
 		/** @var \wkf\core\TableIssues $tableIssues */
 		$tableIssues = $this->app()->table ('wkf.core.issues');
 
-		$rows = $this->db()->query (
-			'SELECT * FROM [wkf_core_issues] WHERE (tableNdx = %i', 1078, ' AND recNdx = %i', $this->recData['ndx'], ') ',
-			' OR ',
-			'EXISTS (SELECT ndx FROM [e10_base_doclinks] AS l WHERE linkId = %s', 'e10docs-inbox', ' AND srcTableId = %s', 'e10doc.core.heads',
-			' AND srcRecId = %i', $this->recData['ndx'], ' AND l.dstRecId = wkf_core_issues.ndx)',
-			' ORDER BY dateCreate DESC, ndx DESC'
-		);
+		$q = [];
+		array_push($q, '(SELECT * FROM [wkf_core_issues]');
+		array_push($q, ' WHERE (tableNdx = %i', 1078, ' AND recNdx = %i', $this->recData['ndx'], '))');
+		array_push($q, ' UNION ');
+		array_push($q, '(SELECT * FROM [wkf_core_issues]');
+		array_push($q, ' WHERE EXISTS (SELECT ndx FROM [e10_base_doclinks] AS l WHERE linkId = %s', 'e10docs-inbox', ' AND srcTableId = %s', 'e10doc.core.heads',
+										' AND srcRecId = %i', $this->recData['ndx'], ' AND l.dstRecId = wkf_core_issues.ndx))');
+		array_push($q, ' ORDER BY dateCreate DESC, ndx DESC');
+		$rows = $this->db()->query ($q);
 
 		foreach ($rows as $r)
 		{
@@ -350,6 +363,10 @@ class Detail extends \e10\DocumentCard
 
 	public function linkedDocuments_Balance (&$docsFrom, &$docsTo, $symbol1, $symbol2, $person)
 	{
+		$testNewBankDocDetail = $this->app()->cfgItem ('options.experimental.testNewBankDocDetail', 0);
+		if ($testNewBankDocDetail)
+			return;
+
 		if ($this->app()->model()->module ('e10doc.balance') === FALSE)
 			return;
 		if ($symbol1 == '')
@@ -430,7 +447,13 @@ class Detail extends \e10\DocumentCard
 				}
 			}
 
-			//$rowItem['text'][] = ['text' => 'AHOJ!'];
+			if (isset($rowItem['rowItemCodesDataErrors']))
+			{
+				foreach ($rowItem['rowItemCodesDataErrors'] as $errLbl)
+					$rowItem['text'][] = $errLbl;
+			}
+
+			//$rowItem['text'][] = ['text' => json_encode($rowItem)];
 
 			$list[] = $rowItem;
 			$totalPriceAll += $r['rPriceAll'];
@@ -459,6 +482,28 @@ class Detail extends \e10\DocumentCard
 			return ['pane' => 'e10-pane e10-pane-table', 'type' => 'table', 'title' => ['icon' => 'system/iconList', 'text' => 'Řádky dokladu'], 'header' => $h, 'table' => $list];
 		}
 		return FALSE;
+	}
+
+	function createWasteReport($recData)
+	{
+		if ($this->app()->model()->table ('e10pro.reports.waste_cz.returnRows') === FALSE)
+			return;
+
+		$cy = intval(Utils::createDateTime($this->recData['dateAccounting'] ?? NULL)->format('Y'));
+		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$cy, NULL);
+		if (!$wasteSettings)
+			return;
+
+		$docType = $this->recData['docType'] ?? '';
+		if (!isset($wasteSettings['docModes'][$docType]))
+			return;
+
+		$wce = new \e10pro\reports\waste_cz\libs\WasteCheckEngine($this->app);
+		$wce->setDocument($recData['ndx']);
+		$wce->checkDocument();
+
+		if ($wce->checkWRContent)
+			$this->addContent ('body', $wce->checkWRContent);
 	}
 
 	public function createContentBody ()
@@ -502,6 +547,8 @@ class Detail extends \e10\DocumentCard
 		}
 
 		$this->addContent ('body', $this->docsRows ());
+
+		$this->createWasteReport($this->recData);
 
 		/*
 		if ($this->recData['docType'] === 'mnf')
@@ -551,7 +598,7 @@ class Detail extends \e10\DocumentCard
 		$this->addContent('body',
 			[
 				'pane' => 'e10-pane e10-pane-table', 'type' => 'table',
-				'title' => ['icon' => 'icon-money', 'text' => 'Odpočet záloh'], 'header' => $h, 'table' => $list
+				'title' => ['icon' => 'system/iconMoney', 'text' => 'Odpočet záloh'], 'header' => $h, 'table' => $list
 			]
 		);
 	}
@@ -575,9 +622,12 @@ class Detail extends \e10\DocumentCard
 			$o->setDocument($this->recData);
 			$o->create();
 
-			foreach ($o->content['body'] as $cnts)
+			if (isset($o->content['body']))
 			{
-				$this->addContent('body', $cnts);
+				foreach ($o->content['body'] as $cnts)
+				{
+					$this->addContent('body', $cnts);
+				}
 			}
 		}
 	}

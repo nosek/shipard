@@ -44,7 +44,7 @@ class TableEventsDo extends DbTable
 				$dp = $properties[$recData['iotDeviceProperty']] ?? NULL;
 				if ($dp)
 				{
-					if ($dp['data-type'] === 'binary' || $dp['data-type'] === 'enum')
+					if ($dp['data-type'] === 'binary' || $dp['data-type'] === 'enum' || $dp['data-type'] === 'h-bridge')
 						$recData['iotDevicePropertyValue'] = $recData['iotDevicePropertyValueEnum'];
 				}
 			}
@@ -274,6 +274,8 @@ class TableEventsDo extends DbTable
 			$dest[] = ['text' => $eventRow['iotDeviceProperty'], 'class' => 'label label-warning'];
 			$dest[] = ['text' => ' = ', 'class' => 'label label-default'];
 			$dest[] = ['text' => $eventRow['iotDevicePropertyValue'], 'class' => 'label label-danger'];
+			if ($eventRow['startDelay'])
+				$dest[] = ['text' => Utils::nf($eventRow['startDelay'], 0).' ms', 'class' => 'label label-info', 'icon' => 'user/hourglass', 'title' => 'Zpoždění'];
 		}
 		elseif ($eventRow['eventType'] === 'incDeviceProperty')
 		{
@@ -441,7 +443,7 @@ class FormEventDo extends TableForm
 						$dp = $properties[$this->recData['iotDeviceProperty']] ?? NULL;
 						if ($dp)
 						{
-							if ($dp['data-type'] === 'binary' || $dp['data-type'] === 'enum')
+							if ($dp['data-type'] === 'binary' || $dp['data-type'] === 'enum' || $dp['data-type'] === 'h-bridge')
 								$this->addColumnInput ('iotDevicePropertyValueEnum');
 							else
 								$this->addColumnInput ('iotDevicePropertyValue');
@@ -468,6 +470,8 @@ class FormEventDo extends TableForm
 						$this->addColumnInput ('mqttTopicPayloadValue');
 					}
 
+					$this->addSeparator(self::coH4);
+					$this->addColumnInput ('startDelay');
 					$this->addSeparator(self::coH4);
 					$this->addColumnInput ('rowOrder');
 

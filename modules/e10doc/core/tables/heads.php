@@ -136,6 +136,37 @@ class TableHeads extends DbTable
 	{
 	}
 
+	protected function checkSpecialDocState($phase, $specialDocState, &$saveData)
+	{
+		if (!isset($saveData['saveParams']))
+			return FALSE;
+
+		if (!isset($saveData['recData']['ndx']) || !$saveData['recData']['ndx'])
+			return FALSE;
+
+		$importAttNdx = intval($saveData['saveParams']['data-save-import-attndx'] ?? 0);
+		$importIssueNdx = intval($saveData['saveParams']['data-save-import-issuendx'] ?? 0);
+
+		if ($phase === 1 && $importIssueNdx && $saveData ['recData']['importedFromIssue'] == 0)
+		{
+			$this->checkInboxDocument($importIssueNdx, $saveData['recData']);
+			return TRUE;
+		}
+
+		if ($phase === 2 && $importAttNdx && $saveData ['recData']['importedFromAtt'] == 0)
+		{
+			$e = new \e10doc\core\libs\DocFromAttachment($this->app());
+			$e->init();
+			$e->setAttNdx($importAttNdx);
+			$e->replaceDocumentNdx = $saveData['recData']['ndx'];
+			$e->reset($saveData['recData']['ndx']);
+			$this->db()->query('UPDATE [e10doc_core_heads] SET [importedFromAtt] = %i', $importAttNdx, ' WHERE [ndx] = %i', $saveData['recData']['ndx']);
+			return TRUE;
+		}
+
+		return TRUE;
+	}
+
 	public function documentCard ($recData, $objectType)
 	{
 		$o = NULL;
@@ -158,6 +189,9 @@ class TableHeads extends DbTable
 			return 2;
 
 		if ($this->app()->hasRole ('all'))
+			return 2;
+
+		if ($this->app()->ngg)
 			return 2;
 
 		$allRoles = $this->app()->cfgItem ('e10.persons.roles');
@@ -447,8 +481,13 @@ class TableHeads extends DbTable
 			$recData ['dateTaxDuty'] = $recData ['dateTax'];
 
 		// -- personBalance / payment terminal / cash on delivery
-		$recData ['personBalance'] = $recData ['person'];
-		if ($recData['paymentMethod'] == 2)
+		if (!($paymentMethod['askPersonBalance'] ?? 0))
+			$recData ['askPersonBalance'] = 0;
+		if ($paymentMethod['personForBalance'] ?? 0)
+			$recData ['personBalance'] = $paymentMethod['personForBalance'];
+		elseif (!$recData ['askPersonBalance'])
+			$recData ['personBalance'] = $recData ['person'];
+		if ($recData['paymentMethod'] == 2 || ($paymentMethod['card'] ?? 0))
 		{ // payment terminal
 			if ($recData['docType'] === 'invno' || $recData ['docType'] === 'cashreg' || ($recData ['docType'] === 'cash' && $recData['cashBoxDir'] == 1))
 			{
@@ -948,6 +987,8 @@ class TableHeads extends DbTable
 				$recData['title'] = $srcIssueRecData['subject'];
 		}
 
+		$recData['importedFromIssue'] = $issueNdx;
+
 		// -- person
 		if (!isset($recData['person']) || !$recData['person'])
 		{
@@ -1087,9 +1128,16 @@ class TableHeads extends DbTable
 							$newRow ['rowOrder'] = intval($saveOptions['rowOrder']);
 						if (!isset($newRow ['rowOrder']) || !$newRow ['rowOrder'])
 							$newRow ['rowOrder'] = $lastRow ['rowOrder'] + 100;
+
+						if ($saveData ['recData']['taxPercentDateType'] == 3)
+							$newRow ['dateVATRate'] = $lastRow ['dateVATRate'] ?? $saveData ['recData']['dateTax'];
 					}
 					else
+					{
 						$newRow ['rowOrder'] = ($cntLines + 1) * 100;
+						if ($saveData ['recData']['taxPercentDateType'] == 3)
+							$newRow ['dateVATRate'] = $saveData ['recData']['dateTax'];
+					}
 					$saveData ['lists']['rows'][] = $newRow;
 					if (isset($saveOptions['rowOrder']))
 						$saveResult ['modifiedRow'] = intval($saveOptions['rowNumber']);
@@ -1115,7 +1163,7 @@ class TableHeads extends DbTable
 		$recData ['fiscalYear'] = 0;
 		$recData ['fiscalMonth'] = 0;
 		$recData ['taxManual'] = 0;
-		unset ($recData ['activateTimeFirst'], $recData ['activateDateFirst'], $recData ['activateTimeLast']);
+		unset ($recData ['activateTimeFirst'], $recData ['activateDateFirst'], $recData ['activateTimeLast'], $recData ['activateCnt']);
 
 		$recData ['dateIssue'] = utils::today();
 		$recData ['dateAccounting'] = utils::today();
@@ -1133,6 +1181,9 @@ class TableHeads extends DbTable
 		$recData ['rosReg'] = 0;
 		$recData ['rosState'] = 0;
 		$recData ['rosRecord'] = 0;
+
+		$recData ['importedFromIssue'] = 0;
+		$recData ['importedFromAtt'] = 0;
 
 		return $recData;
 	}
@@ -1292,11 +1343,17 @@ class TableHeads extends DbTable
 
 	public function doWaste (&$recData)
 	{
-		if ($recData['docType'] !== 'purchase' && $recData['docType'] !== 'invno')
+		$cy = intval(Utils::createDateTime($recData['dateAccounting'] ?? NULL)->format('Y'));
+		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$cy, NULL);
+		if (!$wasteSettings)
+			return;
+
+		$docType = $recData['docType'] ?? '';
+		if (!isset($wasteSettings['docModes'][$docType]))
 			return;
 
 		$wre = new \e10pro\reports\waste_cz\libs\WasteReturnEngine($this->app);
-		$wre->year = intval(Utils::createDateTime($recData['dateAccounting'])->format('Y'));
+		$wre->year = $cy;
 		$wre->resetDocument($recData['ndx']);
 	}
 
@@ -1763,6 +1820,15 @@ class TableHeads extends DbTable
 			}
 		}
 
+		$usedCodesKinds = [];
+		$usedCodesKindRows = $this->db()->query('SELECT * FROM e10_witems_itemCodes WHERE [item] = %i', $rowRecData['item']);
+		foreach ($usedCodesKindRows as $ucr)
+		{
+			if (!in_array($ucr['codeKind'], $usedCodesKinds))
+				$usedCodesKinds[] = $ucr['codeKind'];
+		}
+		//$rowDestData ['rowItemCodesDataUsedKinds'] = $usedCodesKinds;
+
 		$rowDir = E10Utils::docRowDir ($this->app(), $rowRecData, $headRecData);
 
 		$q = [];
@@ -1820,6 +1886,18 @@ class TableHeads extends DbTable
 
 			$codes[$ckNdx] = $irc;
 		}
+
+		foreach ($usedCodesKinds as $usesCodeKind)
+		{
+			if (!isset($codes[$usesCodeKind]))
+			{
+				if (!isset($rowDestData ['rowItemCodesDataErrors']))
+					$rowDestData ['rowItemCodesDataErrors'] = [];
+
+				$rowDestData ['rowItemCodesDataErrors'][] = ['text' => 'Chybí '.$codesKinds[$usesCodeKind]['fn'], 'class' => 'label label-danger', 'icon' => 'system/iconWarning'];
+			}
+		}
+
 		$rowDestData ['rowItemCodesData'] = $codes;
 	}
 
@@ -2317,8 +2395,7 @@ class TableHeads extends DbTable
 				return $itemRecData['priceSellBase'];
 			if ($itemRecData['priceSellTotal'] != 0.0)
 			{
-				error_log("__2__");
-				$taxDate = e10utils::headsTaxDate ($headRecData);
+				$taxDate = e10utils::headsTaxDate ($headRecData, $rowRecData);
 				$taxPercents = e10utils::taxPercent ($this->app(), $rowRecData['taxCode'], $taxDate);
 				$price = $itemRecData['priceSellTotal'];
 				$k = round (($taxPercents / ($taxPercents + 100)), 4);
@@ -2333,7 +2410,7 @@ class TableHeads extends DbTable
 				return $itemRecData['priceSellTotal'];
 			if ($itemRecData['priceSellBase'] != 0.0)
 			{
-				$taxDate = e10utils::headsTaxDate ($headRecData);
+				$taxDate = e10utils::headsTaxDate ($headRecData, $rowRecData);
 				$taxPercents = e10utils::taxPercent ($this->app(), $rowRecData['taxCode'], $taxDate);
 				$price = $itemRecData['priceSellBase'];
 				$total = utils::round (($price * ((100 + $taxPercents) / 100)), 2, 0);
@@ -3145,7 +3222,11 @@ class ViewHeads extends TableView
 
 			if (isset($qv['rows']['text']) && $qv['rows']['text'] != '')
 			{
-				array_push($q, ' AND [rows].[text] LIKE %s', '%'.$qv['rows']['text'].'%');
+				array_push($q, ' AND (');
+				array_push($q, ' [rows].[text] LIKE %s', '%'.$qv['rows']['text'].'%');
+				if ($this->docType === 'bank')
+					array_push($q, ' OR [rows].[bankAccount] LIKE %s', '%'.$qv['rows']['text'].'%');
+				array_push($q, ')');
 			}
 
 			e10utils::amountQuery ($q, '[rows].[priceAll]', $qv['rows']['amount'], $qv['rows']['amountDiff']);
@@ -3417,6 +3498,7 @@ class FormHeads extends TableForm
 	var $useAttInfoPanel = 0;
 
 	var $vatRegs = NULL;
+	var $addInboxListDone = 0;
 
 	function openForm ($layoutType = TableForm::ltForm)
 	{
@@ -3490,7 +3572,8 @@ class FormHeads extends TableForm
 
 		$this->layoutOpen (TableForm::ltGrid);
 			$this->addColumnInput ("title", TableForm::coColW12);
-			$this->addList ('doclinks', '', TableForm::loAddToFormLayout|TableForm::coColW12);
+			if (!$this->addInboxListDone)
+				$this->addList ('inbox', '', TableForm::loAddToFormLayout|TableForm::coColW12);
 
 			if ($sendDocsAttachments)
 			{
@@ -4125,6 +4208,14 @@ class FormHeads extends TableForm
 			return $cp;
 		}
 
+		if ($srcTableId === 'e10doc.core.heads' && $srcColumnId === 'bankAccount')
+		{
+			$cp = [
+				'personNdx' => strval ($allRecData ['recData']['person'])
+			];
+
+			return $cp;
+		}
 
 		return parent::comboParams ($srcTableId, $srcColumnId, $allRecData, $recData);
 	}
@@ -4176,6 +4267,24 @@ class FormHeads extends TableForm
 			}
 		}
 		return parent::validNewDocumentState($newDocState, $saveData);
+	}
+
+	protected function wasteSettings()
+	{
+		$cy = intval(Utils::createDateTime($this->recData['dateAccounting'] ?? NULL)->format('Y'));
+		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$cy, NULL);
+		return $wasteSettings;
+	}
+
+	protected function wasteDocMode()
+	{
+		$cy = intval(Utils::createDateTime($this->recData['dateAccounting'] ?? NULL)->format('Y'));
+		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$cy, NULL);
+		$docType = $this->recData['docType'] ?? '';
+		if (!isset($wasteSettings['docModes'][$docType]) || !$wasteSettings['docModes'][$docType])
+			return 0;
+
+		return $wasteSettings['docModes'][$docType];
 	}
 } // class FormHeads
 

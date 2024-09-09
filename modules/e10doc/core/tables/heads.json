@@ -11,6 +11,10 @@
     {"id": "docNumber", "name": "Číslo dokladu", "type": "string", "len": 20, "options": ["ascii"]},
     {"id": "docId", "name": "Ev. číslo dokladu", "type": "string", "len": 40},
     {"id": "docOrderNumber", "name": "Pořadové číslo", "type": "int"},
+
+    {"id": "importedFromIssue", "name": "Importováno z došlé pošty", "type": "int", "reference": "wkof.core.issues"},
+    {"id": "importedFromAtt", "name": "Importováno z přílohy", "type": "int", "reference": "e10.base.attachments"},
+
     {"id": "title", "name": "Text dokladu", "type": "string", "len": 120},
 
     {"id": "owner", "name": "Vlastní Osoba", "type": "int", "reference": "e10.persons.persons"},
@@ -37,7 +41,8 @@
 
     {"id": "personVATIN", "name": "DIČ osoby", "type": "string", "len": 14},
 
-    {"id": "bankAccount", "name": "Bankovní účet", "type": "string", "len": 40},
+    {"id": "bankAccount", "name": "Bankovní účet", "type": "string", "len": 40,
+      "comboViewer": "combo", "comboTable": "e10.persons.personsBA"},
     {"id": "myBankAccount", "name": "Vlastní bankovní spojení", "type": "int", "reference": "e10doc.base.bankaccounts"},
 
 		{"id": "centre", "name": "Středisko", "type": "int", "reference": "e10doc.base.centres"},
@@ -61,7 +66,8 @@
     {"id": "cashPersonName", "name": "Jméno příjemce", "type": "string", "len": 100},
     {"id": "cashPersonID", "name": "OP příjemce", "type": "string", "len": 30},
 	  {"id": "personHandover", "name": "Převzal", "type": "int", "reference": "e10.persons.persons", "options": ["saveOnChange"]},
-		{"id": "personBalance", "name": "Osoba pro saldokonto", "type": "int", "reference": "e10.persons.persons"},
+		{"id": "personBalance", "name": "Osoba pro saldokonto", "type": "int", "label": "Plátce", "reference": "e10.persons.persons"},
+		{"id": "askPersonBalance", "name": "Nastavit Plátce", "type": "logical", "options": ["saveOnChange"]},
 
     {"id": "warehouse", "name": "Sklad", "type": "int", "reference": "e10doc.base.warehouses"},
     {"id": "numWareHouseDoc", "name": "Číslo dokladu zásob", "type": "string", "len": 20},
@@ -77,6 +83,8 @@
     {"id": "initState", "name": "Počáteční stav", "type": "logical"},
     {"id": "correctiveDoc", "name": "Opravný doklad", "type": "logical"},
     {"id": "collectingDoc", "name": "Sběrný doklad", "type": "logical", "options": ["saveOnChange"]},
+
+    {"id": "addToWasteReport", "name": "Zařadit do Hlášení o odpadech", "type": "logical"},
 
     {"id": "dateIssue", "name": "Datum vystavení", "type": "date"},
     {"id": "dateDue", "name": "Datum splatnosti", "type": "date"},
@@ -100,8 +108,8 @@
 			"enumValues": {"1": "z hlavičky", "2": "z řádků"}, "options": ["saveOnChange"]},
     {"id": "taxType", "name": "Typ daně", "type": "enumInt",
 			"enumValues": {"0": "tuzemsko", "1": "intrakomunitární", "2": "zahraničí"},  "options": ["saveOnChange"]},
-    {"id": "taxPercentDateType", "name": "Který datum určuje procenta DPH", "type": "enumInt",
-			"enumValues": {"0": "DUZP", "1": "datum vystavení"}},
+    {"id": "taxPercentDateType", "name": "Který datum určuje procenta DPH", "type": "enumInt", "options": ["saveOnChange"],
+			"enumValues": {"0": "DUZP", "1": "datum vystavení", "2": "DPPD", "3": "Vlastní nastavení na řádcích dokladu"}},
 		{"id": "taxManual", "name": "Ruční výpočet DPH", "type": "logical", "options": ["saveOnChange"]},
 
     {"id": "currency", "name": "Měna", "type": "enumString", "len": 3, "options": ["saveOnChange"],
@@ -170,6 +178,7 @@
 			"propertiesCfgList2": "e10.docs.properties"
 		},
 		{"id": "doclinks", "class": "e10.base.ListDocLinks", "name": "Vazby"},
+		{"id": "inbox", "class": "e10.base.ListDocLinks", "name": "Došlá pošta", "saveOnChange": 1},
 		{"id": "sendAtts", "class": "e10.base.ListDocLinks", "name": "Přílohy k odeslání"},
 		{"id": "clsf", "class": "e10.base.ListClassification", "name": "Zatřídění"},
 	  {"id": "address", "class": "e10.persons.ListAddress", "name": "Adresy"}

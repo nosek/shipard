@@ -41,12 +41,18 @@
 	"input/counter": {
 		"name": "Počitadlo impulsů", "sensor": 1
 	},
+	"input/capBtn": {
+		"name": "Čidlo - Kapacitní tlačítko", "sensor": 1
+	},
 
 	"sensor/meteo-dht": {
 		"name": "Meteo čidlo DHT22", "sensor": 1
 	},
 	"sensor/meteo-bme280": {
 		"name": "Meteo čidlo BME280", "sensor": 1
+	},
+	"sensor/meteo-bmp280": {
+		"name": "Meteo čidlo BMP280", "sensor": 1
 	},
 	"sensor/meteo-bh1750": {
 		"name": "Měřič osvětlení BH1750", "sensor": 1, "dataType": "numeric"
@@ -58,6 +64,9 @@
 		"name": "Detektor pohybu LD2410", "sensor": 1
 	},
 
+	"display/epaper": {
+		"name": "Displej E-Ink"
+	},
 	"display/nextion": {
 		"name": "Displej Nextion"
 	},

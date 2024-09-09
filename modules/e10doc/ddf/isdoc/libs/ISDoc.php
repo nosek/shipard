@@ -45,10 +45,6 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 			$this->fileContent = str_replace('</isdoc:', '</', $this->fileContent);
 		}
 
-		$tst = strstr($this->fileContent, '<?xml');
-		if (!$tst)
-			return;
-
 		$tst = strstr($this->fileContent, '<Invoice');
 		if (!$tst)
 			return;
@@ -70,10 +66,26 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 
 		$c = [];
 
+		// -- preview
+		$ci = [
+			'name' => 'Náhled',
+			'icon' => 'system/iconPreview',
+			'content' => ['type' => 'text', 'subtype' => 'rawhtml', 'text' => $this->previewCode()]
+		];
+		$c[] = $ci;
+
+		// -- PDF
+		$ci = [
+			'name' => 'PDF',
+			'icon' => 'system/iconFilePdf',
+			'content' => $this->previewAtt(),
+		];
+		$c[] = $ci;
+
 		// -- xml
 		$ci = [
-			'name' => 'XML',
-			'icon' => 'icon-file-code-o',
+			'name' => 'ISDOC',
+			'icon' => 'user/fileText',
 			'content' => ['type' => 'text', 'subtype' => 'code', 'text' => $this->ddfRecData['srcData']]
 		];
 		$c[] = $ci;
@@ -81,19 +93,18 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 		// -- simplifiedData
 		$ci = [
 			'name' => 'JSON',
-			'icon' => 'icon-file-code-o',
+			'icon' => 'user/fileText',
 			'content' => ['type' => 'text', 'subtype' => 'code', 'text' => json::lint($this->srcImpData)]
 		];
 		$c[] = $ci;
 
 		// -- impData
 		$ci = [
-			'name' => 'IMP',
-			'icon' => 'icon-file-code-o',
+			'name' => 'Shipard',
+			'icon' => 'user/fileText',
 			'content' => ['type' => 'text', 'subtype' => 'code', 'text' => json::lint($this->impData)]
 		];
 		$c[] = $ci;
-
 
 		return $c;
 	}
@@ -104,6 +115,7 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 
 		$this->importHead();
 		$this->importRows();
+		$this->addRowsFromSettings();
 
 		$this->impData = ['head' => $this->docHead, 'rows' => $this->docRows];
 	}
@@ -140,6 +152,23 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 			$this->docHead['dateIssue'] = $this->date($this->srcImpData['IssueDate']);
 		if (isset($this->srcImpData['TaxPointDate']))
 			$this->docHead['dateTax'] = $this->date($this->srcImpData['TaxPointDate']);
+
+
+		$vatRegs = $this->app()->cfgItem('e10doc.base.taxRegs', NULL);
+		if ($vatRegs)
+			$this->docHead['vatReg'] = key($vatRegs);
+
+		$this->tableDocsHeads->findAndSetFiscalPeriod ($this->docHead);
+
+		if (isset($this->srcImpData['ForeignCurrencyCode']))
+			$this->docHead['currency'] = strtolower($this->valueStr($this->srcImpData['ForeignCurrencyCode'], 3));
+		else
+			$this->docHead['currency'] = $this->docHead['homeCurrency'];
+
+		if (isset($this->srcImpData['CurrRate']))
+			$this->docHead['exchangeRate'] = $this->valueNumber($this->srcImpData['CurrRate']);
+		else
+			$this->docHead['exchangeRate'] = 1;
 
 		$this->importPayment();
 	}
@@ -232,6 +261,8 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 
 		$row = [];
 
+		$fc = ($this->docHead['currency'] != $this->docHead['homeCurrency']);
+
 		if (isset($il['Item']['Description']))
 			$row['text'] = $this->valueStr($il['Item']['Description'], 220);
 
@@ -240,28 +271,49 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 		else
 			$row['quantity'] = 1.0;
 
+		$vatPayer = $this->tableDocsHeads->cfgItemTaxPayer ($this->docHead);
 		$priceWithVat = (isset($il['ClassifiedTaxCategory']['VATCalculationMethod'])) ? intval($il['ClassifiedTaxCategory']['VATCalculationMethod']) : 0;
-		if ($priceWithVat)
-		{
-			$row['priceItem'] = $this->valueNumber($il['UnitPriceTaxInclusive']);
-			$row['taxCalc'] = 2;
 
-			if ($testDocRowPriceSource)
+		if ($vatPayer)
+		{
+			if ($priceWithVat)
 			{
-				$row['priceAll'] = $this->valueNumber($il['LineExtensionAmountTaxInclusive']);
-				$row['priceSource'] = 1;
+				$row['priceItem'] = $this->valueNumber($fc ? $il['UnitPriceTaxInclusiveCurr'] : $il['UnitPriceTaxInclusive']);
+				$row['taxCalc'] = 2;
+
+				if ($testDocRowPriceSource)
+				{
+					$row['priceAll'] = $this->valueNumber($fc ? $il['LineExtensionAmountTaxInclusiveCurr'] : $il['LineExtensionAmountTaxInclusive']);
+					$row['priceSource'] = 1;
+				}
+				else
+					$row['priceAll'] = $row['quantity'] * $row['priceItem'];//$this->valueNumber($il['LineExtensionAmount']);
+			}
+			else
+			{
+				$row['priceItem'] = $this->valueNumber($il['UnitPrice']);
+				$row['taxCalc'] = 1;
+
+				if ($testDocRowPriceSource)
+				{
+					$row['priceAll'] = $this->valueNumber($fc ? $il['LineExtensionAmountCurr'] : $il['LineExtensionAmount']);
+					$row['priceSource'] = 1;
+				}
+				else
+					$row['priceAll'] = $row['quantity'] * $row['priceItem'];//$this->valueNumber($il['LineExtensionAmount']);
 			}
 		}
 		else
 		{
-			$row['priceItem'] = $this->valueNumber($il['UnitPrice']);
-			$row['taxCalc'] = 1;
+			$row['priceItem'] = $fc ? $this->valueNumber($il['UnitPriceTaxInclusiveCurr']) : $this->valueNumber($il['UnitPriceTaxInclusive']);
 
 			if ($testDocRowPriceSource)
 			{
-				$row['priceAll'] = $this->valueNumber($il['LineExtensionAmount']);
+				$row['priceAll'] = $fc ? $this->valueNumber($il['LineExtensionAmountTaxInclusiveCurr']) : $this->valueNumber($il['LineExtensionAmountTaxInclusive']);
 				$row['priceSource'] = 1;
 			}
+			else
+				$row['priceAll'] = $row['quantity'] * $row['priceItem'];
 		}
 
 		if ($negativePrices && $row['priceItem'] > 0.0)
@@ -291,7 +343,10 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 		$this->searchItem($itemInfo, $il, $row);
 		$this->checkItem($il, $row);
 
+		$row['!itemInfo'] = $itemInfo;
+
 		$this->applyRowSettings($row);
+		$this->applyDocsImportSettings($row);
 
 		if (count($row))
 			$this->docRows[] = $row;
@@ -299,9 +354,16 @@ class ISDoc extends \e10doc\ddf\core\libs\Core
 
 	function checkPersons()
 	{
+		if (isset($this->srcImpData['AccountingSupplierParty']['Party']['PartyName']['Name']))
+			$this->importProtocol['person']['src']['fullName'] = $this->srcImpData['AccountingSupplierParty']['Party']['PartyName']['Name'];
 		if (isset($this->srcImpData['AccountingSupplierParty']['Party']['PartyIdentification']['ID']))
 		{
 			$oid = $this->srcImpData['AccountingSupplierParty']['Party']['PartyIdentification']['ID'];
+
+			$this->importProtocol['person']['src']['oid'] = $oid;
+			if (isset($this->srcImpData['AccountingSupplierParty']['Party']['PartyTaxScheme']['CompanyID']))
+				$this->importProtocol['person']['src']['vatId'] = $this->srcImpData['AccountingSupplierParty']['Party']['PartyTaxScheme']['CompanyID'];
+
 			$personNdx = $this->searchPerson('ids', 'oid', $oid);
 			if ($personNdx)
 			{

@@ -82,7 +82,7 @@ class UtilsBase
 		return $c;
 	}
 
-	static function loadAttachments ($app, $ids, $tableId = FALSE)
+	static function loadAttachments ($app, $ids, $tableId = FALSE, $oneAttachmentNdx = 0)
 	{
 		static $imgFileTypes = array ('pdf', 'jpg', 'jpeg', 'webp', 'png', 'gif', 'svg');
 
@@ -92,8 +92,18 @@ class UtilsBase
 
 		if ($tableId)
 		{
-			$sql = "SELECT * FROM [e10_attachments_files] where [recid] IN %in AND tableid = %s AND [deleted] = 0 ORDER BY defaultImage DESC, [order], name";
-			$query = $app->db->query ($sql, $ids, $tableId);
+			$q = [];
+			array_push($q, 'SELECT * FROM [e10_attachments_files]');
+			array_push($q, ' WHERE 1');
+			array_push($q, ' AND [recid] IN %in', $ids);
+			array_push($q, ' AND tableid = %s', $tableId);
+			if ($oneAttachmentNdx)
+				array_push($q, ' AND [ndx] = %i', $oneAttachmentNdx);
+			else
+				array_push($q, ' AND [deleted] = 0');
+			array_push($q, ' ORDER BY defaultImage DESC, [order], name');
+
+			$query = $app->db->query ($q);
 			foreach ($query as $row)
 			{
 				$img = $row->toArray ();
@@ -132,6 +142,8 @@ class UtilsBase
 			$query = $app->db->query ($sql, $ids);
 			foreach ($query as $row)
 			{
+				if ($oneAttachmentNdx && $row['ndx'] !== $oneAttachmentNdx)
+					continue;
 				$img = $row->toArray ();
 				$img['folder'] = 'att/';
 				$img['url'] = self::getAttachmentUrl ($app, $row);
@@ -237,6 +249,54 @@ class UtilsBase
 			$f = $row->toArray();
 			$files [] = $f;
 		}
+		return $files;
+	}
+
+	static function loadAllRecAttachments ($app, $recTableId, $recNdx)
+	{
+		$files = [];
+
+		// -- primary atts
+		$q = [];
+		array_push ($q, 'SELECT * FROM [e10_attachments_files]');
+		array_push ($q, ' WHERE [tableid] = %s', $recTableId, ' AND [recid] = %i', $recNdx);
+		array_push ($q, ' AND [deleted] = %i', 0);
+		array_push ($q, ' ORDER BY [order], name');
+		$query = $app->db->query ($q);
+		foreach ($query as $row)
+		{
+			$f = $row->toArray();
+			$files [] = $f;
+		}
+
+		// -- atts via inbox
+		$docLinkId = 'e10doc-slr-imports-inbox';
+    $q = [];
+		array_push($q, 'SELECT * FROM [e10_base_doclinks]');
+    array_push($q, ' WHERE linkId = %s', $docLinkId);
+		array_push($q, ' AND srcTableId = %s', $recTableId);
+		array_push($q, ' AND srcRecId = %i', $recNdx);
+		$rows = $app->db()->query ($q);
+
+		$issuesPks = [];
+		foreach ($rows as $r)
+			$issuesPks[] = $r['dstRecId'];
+
+		if (count($issuesPks))
+		{
+			$q = [];
+			array_push ($q, 'SELECT * FROM [e10_attachments_files]');
+			array_push ($q, ' WHERE [tableid] = %s', 'wkf.core.issues', ' AND [recid] IN %in', $issuesPks);
+			array_push ($q, ' AND [deleted] = %i', 0);
+			array_push ($q, ' ORDER BY [order], name');
+			$query = $app->db->query ($q);
+			foreach ($query as $row)
+			{
+				$f = $row->toArray();
+				$files [] = $f;
+			}
+		}
+
 		return $files;
 	}
 
@@ -418,19 +478,13 @@ class UtilsBase
 		if ($app->cfgItem ('develMode', 0) !== 0)
 			return;
 
-		if ($fromName == '')
-			$fromName = $fromAdress;
-		if ($toName == '')
-			$toName = $toAdress;
-		$subjectEncoded = "=?utf-8?B?".base64_encode ($subject)."?=";
-		$header = "MIME-Version: 1.0\n";
-		if ($html)
-			$header .= "Content-Type: text/html; charset=utf-8\n";
-		else
-			$header .= "Content-Type: text/plain; charset=utf-8\n";
-		$header .= "From: =?UTF-8?B?".base64_encode($fromName)."?=<".$fromAdress.">\n";
-		//$header .= "To: =?UTF-8?B?".base64_encode($toName)."?=<".$toAdress.">\n";
-		return mail ($toAdress, $subjectEncoded, $message, $header);
+		$msg = new \Shipard\Report\MailMessage($app);
+		$msg->setFrom ($fromName, $fromAdress);
+		$msg->setTo($toAdress);
+		$msg->setSubject($subject);
+		$msg->setBody($message, $html);
+
+		$msg->sendMail();
 	}
 
 	static function getPropertiesTable ($app, $toTableId, $toRecId)

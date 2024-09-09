@@ -160,6 +160,7 @@ class PersonNew extends TableForm
 						}
 					}
 					$this->addColumnInput ('id');
+					$this->addColumnInput ('personalId');
 
 					if ($this->recData['company'] == 1)
 					{
@@ -174,8 +175,8 @@ class PersonNew extends TableForm
 							$this->addSeparator(self::coH4);
 						}
 						$this->addColumnInput ('optSendDocsAttsUnited');
-						$this->addColumnInput ('disableRegsChecks');
 					}
+					$this->addColumnInput ('disableRegsChecks');
 				$this->closeTab ();
 
 				if ($this->readOnly)

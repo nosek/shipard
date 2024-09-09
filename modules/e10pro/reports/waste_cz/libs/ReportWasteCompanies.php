@@ -4,6 +4,7 @@ namespace e10pro\reports\waste_cz\libs;
 
 
 use \Shipard\Utils\Utils;
+use \Shipard\Utils\World;
 use \e10pro\reports\waste_cz\libs\WasteReturnEngine;
 
 /**
@@ -18,6 +19,13 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
   var $sendStatus = '';
   var $showUnits = 0;
   var $codeKindNdx = 0;
+  var $useZipCode = 0;
+  var $limitDistance = 0;
+  var $limitKG = 0;
+  var $officeLat = 0.0;
+  var $officeLon = 0.0;
+
+  var $thisCountryNdx = 60;
 
 	public function init ()
 	{
@@ -35,6 +43,14 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 
     if ($this->subReportId === 'report')
       $this->addParam('switch', 'showUnits', ['title' => 'Jednotka', 'switch' => ['1' => 'Tuny', '0' => 'kg'], 'radioBtn' => 1, 'defaultValue' => '1']);
+
+
+    if ($this->subReportId === 'citizensCities2')
+    {
+      $this->addParam('switch', 'useZipCode', ['title' => 'PSČ', 'switch' => ['0' => 'Ne', '1' => 'Ano'], 'radioBtn' => 1, 'defaultValue' => '0']);
+      $this->addParam('switch', 'limitDistance', ['title' => 'Omezit vzdálenost', 'switch' => ['0' => 'Ne', '10' => '10 km', '20' => '20 km', '30' => '30 km', '40' => '40 km', '50' => '50 km', '60' => '60 km', '70' => '70 km', '80' => '80 km', '90' => '90 km', '100' => '100 km'], 'defaultValue' => '0']);
+      $this->addParam('switch', 'limitKG', ['title' => 'Limit', 'switch' => ['0' => 'Ne', '100' => '100 kg', '250' => '250 kg', '500' => '500 kg', '1000' => '1 tuna', '5000' => '5 tun'], 'defaultValue' => '0']);
+    }
 
 		parent::init();
 
@@ -74,6 +90,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 			case 'companiesOut': $this->createContent_CompaniesOut (); break;
 			case 'citizensSum': $this->createContent_CitizensSum (); break;
 			case 'citizensCities': $this->createContent_CitizensCities (); break;
+      case 'citizensCities2': $this->createContent_CitizensCities2 (); break;
 			case 'report': $this->createContent_Report (); break;
 		}
 	}
@@ -153,9 +170,9 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
   public function createContent_Companies($dir)
   {
     if ($dir == WasteReturnEngine::rowDirIn)
-      $linkId = 'waste-suppliers-'.$this->calendarYear;
+      $linkId = 'waste-suppliers-'.$this->calendarYear.'-'.$this->codeKindNdx;
     else
-      $linkId = 'waste-cust-'.$this->calendarYear;
+      $linkId = 'waste-cust-'.$this->calendarYear.'-'.$this->codeKindNdx;
 
 		/** @var \wkf\core\TableIssues */
 		$tableIssues = $this->app()->table ('wkf.core.issues');
@@ -344,9 +361,9 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
       { // city
         $nomencCityRecData = $this->app()->loadItem($r['nomencCity'], 'e10.base.nomencItems');
         $data[$wcId]['id1'] = [
-          ['text' => 'ORP: '.substr($nomencCityRecData['itemId'], 2), 'class' => ''],
+          ['text' => 'ORP: '.substr($nomencCityRecData['itemId'] ?? '--', 2), 'class' => ''],
         ];
-        $data[$wcId]['id1'][0]['suffix'] = $nomencCityRecData['fullName'];
+        $data[$wcId]['id1'][0]['suffix'] = $nomencCityRecData['fullName'] ?? '--';
       }
 
       $lastPerson = $r['person'];
@@ -683,12 +700,114 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 		$this->setInfo('title', 'Odběr odpadů od občanů za obce');
   }
 
+  public function createContent_CitizensCities2()
+  {
+    $this->useZipCode = intval($this->reportParams ['useZipCode']['value'] ?? '0');
+    $this->limitDistance = intval($this->reportParams ['limitDistance']['value'] ?? '0');
+    $this->limitKG = intval($this->reportParams ['limitKG']['value'] ?? '0');
+
+    $q = [];
+    array_push ($q, 'SELECT [rows].wasteCodeNomenc, SUM([rows].quantityKG) as quantityKG,');
+    array_push ($q, ' nomencItems.fullName, nomencItems.itemId,');
+    array_push ($q, ' addrs.adrCity, addrs.adrZipCode, addrs.adrLocLat, addrs.adrLocLon, addrs.adrLocState, addrs.adrCountry,');
+    array_push ($q, ' ownerOffices.adrLocLat AS ownerAdrLocLat, ownerOffices.adrLocLon AS ownerAdrLocLon');
+		array_push ($q, ' FROM e10pro_reports_waste_cz_returnRows AS [rows]');
+    array_push ($q, ' LEFT JOIN [e10_base_nomencItems] AS nomencItems ON [rows].wasteCodeNomenc = nomencItems.ndx');
+    array_push ($q, ' LEFT JOIN [e10_persons_personsContacts] AS addrs ON [rows].personOffice = addrs.ndx');
+    array_push ($q, ' LEFT JOIN [e10doc_core_heads] AS heads ON [rows].document = heads.ndx');
+    array_push ($q, ' LEFT JOIN [e10_persons_personsContacts] AS ownerOffices ON [heads].ownerOffice = ownerOffices.ndx');
+		array_push ($q, ' WHERE 1');
+    array_push ($q, ' AND [rows].[wasteCodeKind] = %i', $this->codeKindNdx);
+		array_push ($q, ' AND [rows].personType = %i', 1);
+    array_push ($q, ' AND [rows].[dir] = %i', 0);
+    if ($this->periodBegin)
+      array_push ($q, ' AND [rows].[dateAccounting] >= %d', $this->periodBegin);
+    if ($this->periodEnd)
+      array_push ($q, ' AND [rows].[dateAccounting] <= %d', $this->periodEnd);
+
+    if ($this->useZipCode)
+		  array_push ($q, ' GROUP BY addrs.adrCity, addrs.adrZipCode, wasteCodeNomenc');
+    else
+      array_push ($q, ' GROUP BY addrs.adrCountry, addrs.adrCity, wasteCodeNomenc');
+
+    array_push ($q, ' ORDER BY addrs.adrCountry, addrs.adrCity, wasteCodeNomenc');
+
+		$rows = $this->app->db()->query ($q);
+    $header = ['#' => '#', 'city' => 'Obec', 'zip' => 'PSČ', 'dist' => ' Vzdál. KM'];
+
+		$data = [];
+		forEach ($rows as $r)
+		{
+      $this->officeLat = $r['ownerAdrLocLat'];
+      $this->officeLon = $r['ownerAdrLocLon'];
+
+      if ($this->useZipCode)
+        $cityId = $r['adrCountry'].'_'.$r['adrCity'].'_'.$r['adrZipCode'];
+      else
+        $cityId = $r['adrCountry'].'_'.$r['adrCity'];
+
+      $cityName = $r['adrCity'];
+
+      $distance = 0;
+      if ($r['adrLocState'] === 1)
+      {
+        $distance = round($this->computeDistance($r['adrLocLat'], $r['adrLocLon'], $this->officeLat, $this->officeLon) / 1000, 1);
+      }
+
+      $country = World::country($this->app(), $r['adrCountry']);
+      if ($this->thisCountryNdx !== $r['adrCountry'])
+      {
+        $cityId = '__COUNTRY__'.$r['adrCountry'];
+        if ($country)
+          $cityName = 'CELÝ STÁT: '.$country['t'];
+        else
+          $cityName = '=== NENÍ ZADÁN STÁT ===';
+
+        $distance = 0;
+      }
+      else
+      if ($this->limitDistance && $distance > $this->limitDistance)
+      {
+        if (!$this->limitKG || $r['quantityKG'] < $this->limitKG)
+        {
+          $cityId = '__OTHER__';
+          $cityName = 'OSTATNÍ';
+        }
+      }
+
+      if ($r['adrCity'] == '')
+      {
+        $cityId = '__OTHER__';
+        $cityName = 'OSTATNÍ';
+      }
+
+      if (!isset($data[$cityId]))
+        $data[$cityId] = ['city' => $cityName, 'zip' => $r['adrZipCode'], 'dist' => $distance];
+
+      $wid = $r['itemId'];
+      if (!isset($header[$wid]))
+        $header[$wid] = '+'.$r['itemId'].': '.$r['fullName'];
+
+      if (!isset($data[$cityId][$wid]))
+        $data[$cityId][$wid] = $r['quantityKG'];
+      else
+        $data[$cityId][$wid] += $r['quantityKG'];
+		}
+
+    if (!$this->useZipCode)
+      unset($header['zip']);
+
+		$this->addContent (['type' => 'table', 'header' => $header, 'table' => $data, 'main' => TRUE]);
+
+		$this->setInfo('title', 'Odběr odpadů od občanů za obce');
+  }
+
   function loadSendedReports (&$data, $dir)
 	{
     if ($dir == WasteReturnEngine::rowDirIn)
-      $linkId = 'waste-suppliers-'.$this->calendarYear;
+      $linkId = 'waste-suppliers-'.$this->calendarYear.'-'.$this->codeKindNdx;
     else
-      $linkId = 'waste-cust-'.$this->calendarYear;
+      $linkId = 'waste-cust-'.$this->calendarYear.'-'.$this->codeKindNdx;
 
 		/** @var \wkf\core\TableIssues */
 		$tableIssues = $this->app()->table ('wkf.core.issues');
@@ -710,7 +829,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 		foreach ($rows as $r)
 		{
 			$item = [
-					'icon' => 'system/iconPaperPlane', 'text' => utils::datef($r['dateCreate']),
+					'icon' => 'system/iconPaperPlane', 'text' => utils::datef($r['dateCreate'], '%D%t'),
           'class' => 'pull-right',
           'type' => 'button',
           'title' => $r['subject'],
@@ -728,6 +847,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
     $d[] = ['id' => 'companiesOut', 'icon' => 'system/iconDelivery', 'title' => 'Firmy Výdej'];
     $d[] = ['id' => 'citizensSum', 'icon' => 'system/personHuman', 'title' => 'Občané'];
     $d[] = ['id' => 'citizensCities', 'icon' => 'system/iconMapMarker', 'title' => 'Občané podle obcí'];
+    $d[] = ['id' => 'citizensCities2', 'icon' => 'system/iconMapMarker', 'title' => 'Občané podle obcí 2'];
     $d[] = ['id' => 'report', 'icon' => 'system/iconFile', 'title' => 'Hlášení'];
 
 		return $d;
@@ -744,6 +864,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
         'data-param-period-begin' => $this->periodBegin->format('Y-m-d'),
         'data-param-period-end' => $this->periodEnd->format('Y-m-d'),
         'data-param-calendar-year' => strval($this->calendarYear),
+        'data-param-code-kind' => strval($this->codeKindNdx),
         'data-table' => 'e10.persons.persons', 'data-pk' => '0',
         'class' => 'btn-primary'
       ];
@@ -820,5 +941,15 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
       $enum[$ackNdx]  = $ackDef['reportSwitchTitle'];
     }
     return $enum;
+  }
+
+  function computeDistance($lat1, $lng1, $lat2, $lng2, $radius = 6378137)
+  {
+    static $x = M_PI / 180;
+    $lat1 *= $x; $lng1 *= $x;
+    $lat2 *= $x; $lng2 *= $x;
+    $distance = 2 * asin(sqrt(pow(sin(($lat1 - $lat2) / 2), 2) + cos($lat1) * cos($lat2) * pow(sin(($lng1 - $lng2) / 2), 2)));
+
+    return $distance * $radius;
   }
 }

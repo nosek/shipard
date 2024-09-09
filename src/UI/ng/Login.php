@@ -23,21 +23,16 @@ class Login extends \Shipard\UI\ng\AppPageBlank
 
 		if ($this->mode === 'set-workplace')
 		{
-			$workplaceId = $this->app->requestPath(3);
-			$this->app->setCookie ('_shp_gwid', $workplaceId, time() + 10 * 365 * 86400);
-
-			$redirTo = $this->app->urlProtocol . $_SERVER['HTTP_HOST']. $this->app->urlRoot . '/ui/login';
-			$lpid = 4;
-			while ($this->app->requestPath($lpid) !== '')
-				$redirTo .= '/'.$this->app->requestPath($lpid++);
-
+			$workplaceId = $this->uiRouter->urlPart(2);//$this->app->requestPath(3);
+			$this->uiRouter->setCookie ('_shp_gwid', $workplaceId, time() + 10 * 365 * 86400);
+			$redirTo = $this->app->urlProtocol . $_SERVER['HTTP_HOST']. $this->uiRouter->uiRoot . '/user/login';
 			header ('Location: '.$redirTo);
 			die();
 		}
 
 		$headers = Utils::getAllHeaders();
 
-		$workplaceGID = $this->app->testCookie ('_shp_gwid');
+		$workplaceGID = $this->uiRouter->testCookie ('_shp_gwid');
 		if ($workplaceGID !== '')
 			$this->workplace = $this->app->searchWorkplaceByGID($workplaceGID);
 
@@ -191,9 +186,9 @@ class Login extends \Shipard\UI\ng\AppPageBlank
 	{
 		$c = '';
 
-		$c .= "<div class='container d-flex justify-content-center align-items-center flex-row flex-wrap: wrap;' style='height: 100vh;'>";
+		$c .= "<div id='shp-app-window' class='container d-flex justify-content-center align-items-center flex-row flex-wrap: wrap;' style='height: 100vh;'>";
 		$c .= "<div class='shp-workplace-login-users'>";
-		if ($this->app->testGetParam ("from", NULL) != NULL)
+		if ($this->app->testGetParam ('from') != '')
 			$c .= "<div class='alert alert-danger flex-grow-1 w-100'>Chybně zadaný PIN</div>";
 
 		foreach ($this->users as $user)
@@ -205,7 +200,7 @@ class Login extends \Shipard\UI\ng\AppPageBlank
 			$c .= '</button>';
 		}
 
-		$c .= "<form class='e10-mui-login-form' name='e10-mui-login-form' method='POST' action='{$this->app->urlRoot}/user/login-check/ui' style='display: none;'>";
+		$c .= "<form class='e10-mui-login-form' name='e10-mui-login-form' method='POST' action='{$this->uiRouter->uiRoot}auth/pin' style='display: none;'>";
 			$c .= "<input type='hidden' name='login' id='e10-login-user'>";
 			$c .= "<input type='hidden' name='pin' id='e10-login-pin'>";
 			$referer = $this->loginReferer();

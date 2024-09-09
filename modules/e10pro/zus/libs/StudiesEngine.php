@@ -32,7 +32,7 @@ class StudiesEngine extends Utility
     array_push($q, ' WHERE 1');
     array_push($q, ' AND [smazano] = %i', 0);
     array_push($q, ' AND [stavHlavni] < %i', 4);
-    array_push($q, ' AND [skolniRok] = %s', '2022');
+    array_push($q, ' AND [skolniRok] = %s', '2023');
 
     $cnt = 1;
     $rows = $this->db()->query($q);
@@ -83,14 +83,30 @@ class StudiesEngine extends Utility
         continue;
       }
 
+      $exist = $this->db()->query('SELECT * FROM [e10pro_zus_studium] WHERE [cisloStudia] = %i', $r ['cisloStudia'],
+                                  ' AND [skolniRok] = %s', strval($r ['skolniRok'] + 1))->fetch();
+
+      if ($exist)
+      {
+        if ($this->debug)
+          echo "; INFO - studium EXISTUJE\n";
+        continue;
+      }
+
       if ($this->doIt)
       {
+        $svpOddeleni = $r ['svpOddeleni'];
+        $oddeleni = $this->app->cfgItem ("e10pro.zus.oddeleni.".$r ['svpOddeleni'], NULL);
+        if ($oddeleni && ($oddeleni['navazneOddeleni'] ?? 0))
+          $svpOddeleni = $oddeleni['navazneOddeleni'];
+
         $item = [
           'student' => $r ['student'], 'ucitel' => $r ['ucitel'],
           'typVysvedceni' => $dalsiRocnikCfg['typVysvedceni'],
           'skolniRok' => strval($r ['skolniRok'] + 1),
           'poradoveCislo' => $r ['cisloStudia'],
-          'svp' => $r ['svp'], 'svpObor' => $r ['svpObor'], 'svpOddeleni' => $r ['svpOddeleni'],
+          'svp' => $r ['svp'], 'svpObor' => $r ['svpObor'],
+          'svpOddeleni' => $svpOddeleni,
           'rocnik' => $dalsiRocnikCfg['id'],
           'stupen' => $dalsiRocnikCfg['stupen'],
           'urovenStudia' => $r ['urovenStudia'],
@@ -106,7 +122,8 @@ class StudiesEngine extends Utility
           'oznaceniStudia' => $r ['oznaceniStudia'],
           'pobocka' => $r ['pobocka'],
           'misto' => $r ['misto'],
-          'stavHlavni' => 1, 'stav' => 1200,
+          //'stavHlavni' => 1, 'stav' => 1200,
+          'stavHlavni' => 0, 'stav' => 1000,
           'datumNastupuDoSkoly' => $r ['datumNastupuDoSkoly'],
           'datumUkonceniSkoly' => $r ['datumUkonceniSkoly'],
         ];
@@ -219,7 +236,7 @@ class StudiesEngine extends Utility
 		$this->rocniky = $this->app()->cfgItem ('e10pro.zus.rocniky');
     $this->tableStudium = $this->app()->table('e10pro.zus.studium');
 
-    $this->schoolYearId = '2023';
+    $this->schoolYearId = '2024';
     $this->schoolYearCfg = $this->app()->cfgItem ('e10pro.zus.roky.'.$this->schoolYearId);
 
     $this->generateFromPastYear();

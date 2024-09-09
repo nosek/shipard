@@ -219,7 +219,7 @@ class zusutils
 		$docTypes = $app->cfgItem ('e10.docs.types');
 
 		$q[] = 'SELECT heads.dateAccounting as date, journal.docHead as docHead, journal.side, heads.docType as docType,';
-		array_push($q, ' heads.docNumber, heads.ndx as headNdx, journal.symbol2 as symbol2, journal.request as predpis, journal.payment as vyrovnani');
+		array_push($q, ' heads.docNumber, heads.ndx as headNdx, heads.dateDue as docDateDue, journal.symbol2 as symbol2, journal.request as predpis, journal.payment as vyrovnani');
 		array_push($q, ' FROM e10doc_balance_journal AS journal');
 		array_push($q, ' LEFT JOIN e10doc_core_heads as heads ON journal.docHead = heads.ndx');
 		array_push($q, ' WHERE journal.type = 1000 AND journal.symbol1 = %s', $cisloStudia);
@@ -242,6 +242,7 @@ class zusutils
 		$predpisy = [];
 		$heads = [];
 		$minDate = utils::today();
+		$docDateDue = NULL;
 		$rows = $app->db()->query ($q);
 		foreach ($rows as $r)
 		{
@@ -288,6 +289,7 @@ class zusutils
 			$heads[] = $r['headNdx'];
 			if ($r['date'] < $minDate)
 				$minDate = $r['date'];
+			$docDateDue = $r['docDateDue'];
 		}
 		if ($style == 0)
 		{
@@ -299,7 +301,7 @@ class zusutils
 
 		$res = [
 				'docPredpisy' => $predpisy, 'celkKUhrade' => $celkemKUhrade, 'docUhrady' => $uhrady, 'celkUhrazeno' => $celkemUhrazeno,
-				'heads' => $heads, 'minDate' => $minDate, 'totals' => $totals
+				'heads' => $heads, 'minDate' => $minDate, 'docDateDue' => $docDateDue, 'totals' => $totals
 		];
 
 		return $res;
@@ -351,6 +353,9 @@ class zusutils
 				return FALSE;
 
 			if ($form->recData ['svpObor'] != $cfgItem ['obor'] && $cfgItem ['obor'] != 0)
+				return FALSE;
+
+			if (isset($form->recData ['urovenStudia']) && $form->recData ['urovenStudia'] != $cfgItem ['urovenStudia'] && $cfgItem ['urovenStudia'] != 0)
 				return FALSE;
 
 			return TRUE;
@@ -446,7 +451,9 @@ class ViewStudents extends \e10\persons\ViewPersonsBase
 			'withoutEmail' => ['title' => 'Bez e-mailu', 'id' => 'withoutEmail'],
 			'badContacts' => ['title' => 'Vadné kontakty', 'id' => 'badContacts'],
 			'withoutContacts' => ['title' => 'Bez kontaktů', 'id' => 'withoutContacts'],
+			'withoutMainAddress' => ['title' => 'Bez bydliště', 'id' => 'withoutMainAddress'],
 			'badAddress' => ['title' => 'Vadné adresy', 'id' => 'badAddress'],
+			'withoutStudium' => ['title' => 'Bez studia', 'id' => 'withoutStudium'],
 		];
 		$paramsOthers = new \E10\Params ($this->app());
 		$paramsOthers->addParam ('checkboxes', 'query.others', ['items' => $chbxOthers]);
@@ -527,6 +534,15 @@ class ViewStudents extends \e10\persons\ViewPersonsBase
 				')');
 		}
 
+		if (isset ($qv['others']['withoutStudium']))
+		{
+			$skolniRok = zusutils::aktualniSkolniRok();
+			array_push ($q, ' AND NOT EXISTS (',
+					'SELECT student FROM e10pro_zus_studium WHERE persons.ndx = e10pro_zus_studium.student ',
+					' AND e10pro_zus_studium.skolniRok = %s', $skolniRok,
+					' AND e10pro_zus_studium.stavHlavni != %i', 4,
+					')');
+		}
 
 		$testNewPersons = intval($this->app()->cfgItem ('options.persons.testNewPersons', 0));
 		if ($testNewPersons)
@@ -557,6 +573,14 @@ class ViewStudents extends \e10\persons\ViewPersonsBase
 														'AND docState = 4000 AND adrStreet = %s', '', ' AND adrCity = %s', '',
 														'GROUP BY person HAVING count(*) > 0');
 				array_push ($q, ' ) AS [persBadAddress] )');
+			}
+
+			$withoutMainAddress = isset ($qv['others']['withoutMainAddress']);
+			if ($withoutMainAddress)
+			{
+				array_push ($q, ' AND NOT EXISTS (SELECT ndx FROM e10_persons_personsContacts WHERE persons.ndx = person ');
+				array_push ($q, ' AND e10_persons_personsContacts.flagAddress = 1 AND e10_persons_personsContacts.flagMainAddress = 1');
+				array_push ($q, ')');
 			}
 		}
 	}
@@ -1460,6 +1484,7 @@ class reportTeachPlan extends \E10\GlobalReport
 		array_push($q, ' LEFT JOIN e10pro_zus_oddeleni AS oddeleni ON heads.svpOddeleni = oddeleni.ndx');
 		array_push($q, ' LEFT JOIN e10pro_zus_rocniky as years ON heads.year = years.ndx');
 		array_push($q, ' WHERE heads.eduprogram = %i', $this->reportParams ['eduprogram']['value']);
+		array_push($q, ' AND heads.docState = %i', 4000);
 
 		if ($this->reportParams ['obor']['value'] != 0)
 			array_push ($q, " AND heads.[svpObor] = %i", $this->reportParams ['obor']['value']);
@@ -2155,10 +2180,18 @@ class GenerovaniFakturSkolneEngine extends \E10\Utility
 	function setPeriod ($today, $pololeti)
 	{
 		$todayYear = intval($today->format ('Y'));
+		$todayMonth = intval($today->format ('m'));
 		$this->dateIssue = Utils::today();
-		$this->dateDue = Utils::today();
-		$this->dateDue->add (new \DateInterval('P30D'));
-
+		if ($pololeti == 1 && $todayMonth === 7)
+		{
+			$dd = sprintf('%04d-%02d-%02d', $todayYear, 8, 26);
+			$this->dateDue = Utils::createDateTime($dd);
+		}
+		else
+		{
+			$this->dateDue = Utils::today();
+			$this->dateDue->add (new \DateInterval('P30D'));
+		}
 		switch ($pololeti)
 		{
 			case 1:
@@ -2321,7 +2354,7 @@ class GenerovaniFakturSkolneWizard extends Wizard
 		$today = new \DateTime();
 		//$todayYear = intval($today->format ('Y'));
 		$todayMonth = intval($today->format ('m'));
-		if (($todayMonth > 8) && ($todayMonth <= 12))
+		if (($todayMonth > 6) && ($todayMonth <= 12))
 			$this->recData['pololeti'] = '1';
 		else
 			$this->recData['pololeti'] = '2';

@@ -41,6 +41,27 @@ class TableHodiny extends DbTable
 		parent::checkAfterSave2($recData);
 	}
 
+	public function checkNewRec (&$recData)
+	{
+		parent::checkNewRec ($recData);
+
+		if (isset($recData['vyuka']) && isset($recData['datum']))
+		{
+			$vyuka = $this->app()->loadItem($recData['vyuka'], 'e10pro.zus.vyuky');
+			if ($vyuka['typ'] === 1)
+			{ // individualni
+				$eex = $this->db()->query('SELECT * FROM [e10pro_zus_omluvenky] WHERE 1',
+																	' AND [student] = %i', $vyuka['student'],
+																	' AND [datumOd] <= %d', $recData['datum'],
+																	' AND [datumDo] >= %d', $recData['datum'],
+																	' AND [docState] = %i', 4000
+						)->fetch();
+				if ($eex)
+					$recData['pritomnost'] = 2;
+			}
+		}
+	}
+
 	public function createHeader ($recData, $options)
 	{
 		$hdr = [];
@@ -241,6 +262,10 @@ class FormHodina extends TableForm
 			$tabs ['tabs'][] = ['text' => 'Docházka', 'icon' => 'system/iconUser'];
 		$tabs ['tabs'][] = ['text' => 'Nastavení', 'icon' => 'system/formSettings'];
 		$tabs ['tabs'][] = ['text' => 'Přílohy', 'icon' => 'system/formAttachments'];
+
+		if ($this->app()->hasRole('root'))
+			$tabs ['tabs'][] = ['text' => 'Historie', 'icon' => 'system/formHistory'];
+
 		$this->openTabs ($tabs, TRUE);
 
 		$this->openTab (TableForm::ltNone);
@@ -293,6 +318,14 @@ class FormHodina extends TableForm
 			$this->addAttachmentsViewer();
 		$this->closeTab ();
 
+		if ($this->app()->hasRole('root'))
+		{
+			$this->openTab(self::ltNone);
+				$params = ['tableid' => $this->tableId(),'recid' => $this->recData['ndx']];
+				$this->addViewerWidget('e10.base.docslog', 'e10.base.libs.ViewDocsLogDocHistory', $params);
+			$this->closeTab();
+		}
+
 		$this->closeTabs ();
 
 		$this->closeForm ();
@@ -344,7 +377,17 @@ class FormHodina extends TableForm
 				$studenti = $this->table->db()->query ($q);
 				foreach ($studenti as $r)
 				{
-					$list->data [] = ['student' => $r['studentNdx'], 'studium' => $r['studium'], 'pritomnost' => 1];
+					$np = 1;
+
+					$eex = $this->table->db()->query('SELECT * FROM [e10pro_zus_omluvenky] WHERE 1',
+																					' AND [student] = %i', $r['studentNdx'],
+																					' AND [datumOd] <= %d', $this->recData['datum'],
+																					' AND [datumDo] >= %d', $this->recData['datum'],
+																					' AND [docState] = %i', 4000
+																		)->fetch();
+					if ($eex)
+						$np = 2;
+					$list->data [] = ['student' => $r['studentNdx'], 'studium' => $r['studium'], 'pritomnost' => $np];
 				}
 			}
 		}
