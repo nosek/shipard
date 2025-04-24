@@ -1,7 +1,7 @@
 <?php
 
 define ('__E10_VERSION_ID__', 64);
-define ('__E10_VERSION__', '203.1');
+define ('__E10_VERSION__', '205.0');
 
 if (!defined ('__SHPD_MODULES_DIR__'))
 	define ('__SHPD_MODULES_DIR__', __SHPD_ROOT_DIR__.'/modules/');
@@ -83,6 +83,12 @@ function __autoload_shipard__ ($class_name)
 				//error_log ('LOAD-TABLE-TO-LOWER: ' . $class_name);
 				return;
 			}
+		}
+		$fn3 = __SHPD_MODULES_DIR__.implode ('/', $elements).'/tables/' . substr ($ccn, 5) . '.php';
+		if (is_file ($fn3))
+		{
+			include_once($fn3);
+			return;
 		}
 
 		error_log ('file not found: ' . $fn1 . ' (required for table ' . $class_name . ')');

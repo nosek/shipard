@@ -39,7 +39,7 @@ class ReportWasteOnePerson extends \e10doc\core\libs\reports\DocReportBase
 		{
 			$this->periodEnd = Utils::createDateTime($value);
 		}
-		elseif ($param === 'data-param-calendar-year')
+		elseif ($param === 'data-param-calendar-year' && intval($value))
 		{
 			$this->calendarYear = intval($value);
 			$this->data['calendarYear'] = strval ($this->calendarYear);
@@ -106,10 +106,23 @@ class ReportWasteOnePerson extends \e10doc\core\libs\reports\DocReportBase
 		$this->data['reportTitle'] = $this->codeKindDef['reportPersonTitle'] ?? '';
 		$this->data['reportNote'] = $this->codeKindDef['reportPersonOutCodeNote'] ?? '';
 
-		if ($this->dir === WasteReturnEngine::rowDirIn)
-			$this->outboxLinkId = 'waste-suppliers-'.$this->calendarYear.'-'.$this->codeKindNdx;
-		else
-			$this->outboxLinkId = 'waste-cust-'.$this->calendarYear.'-'.$this->codeKindNdx;
+    if ($this->calendarYear)
+    {
+      if ($this->dir == WasteReturnEngine::rowDirIn)
+				$this->outboxLinkId = 'waste-suppliers-'.$this->calendarYear.'-'.$this->codeKindNdx;
+      else
+				$this->outboxLinkId = 'waste-cust-'.$this->calendarYear.'-'.$this->codeKindNdx;
+    }
+    else
+    {
+			$dpb = Utils::createDateTime($this->periodBegin);
+			$dpe = Utils::createDateTime($this->periodEnd);
+      if ($this->dir == WasteReturnEngine::rowDirIn)
+				$this->outboxLinkId = 'waste-suppliers-'.$dpb->format('Ymd').'_'.$dpe->format('Ymd').'-'.$this->codeKindNdx;
+      else
+				$this->outboxLinkId = 'waste-cust-'.$dpb->format('Ymd').'_'.$dpe->format('Ymd').'-'.$this->codeKindNdx;
+    }
+
 
 		$tablePersons = $this->app->table ('e10.persons.persons');
 
@@ -213,7 +226,7 @@ class ReportWasteOnePerson extends \e10doc\core\libs\reports\DocReportBase
 				$id_icp_theirs = $nomencCityRecData['itemId'];
 				$id_icp_theirs_text = [
 					['text' => 'ORP: '.substr($nomencCityRecData['itemId'], 2), 'class' => ''],
-					['text' => $nomencCityRecData['fullName'], 'class' => 'e10-small break']
+					['text' => $nomencCityRecData['fullName'] ?? '---', 'class' => 'e10-small break']
 				];
 			}
 
@@ -258,7 +271,7 @@ class ReportWasteOnePerson extends \e10doc\core\libs\reports\DocReportBase
 			[
 				'type' => 'table', 'title' => $periodTitle,
 				'table' => \e10\sortByOneKey($this->sumData, 'code'), 'header' => $headerSum,
-				'params' => ['precision' => 3]
+				'params' => ['precision' => 6]
 			]
 		];
 
@@ -267,7 +280,7 @@ class ReportWasteOnePerson extends \e10doc\core\libs\reports\DocReportBase
 			[
 				'type' => 'table', 'title' => 'Položkový soupis',
 				'table' => \e10\sortByOneKey($this->itemsData, 'o'), 'header' => $headerItems,
-				'params' => ['precision' => 3, 'tableClass' => 'rowsSmall']]
+				'params' => ['precision' => 6, 'tableClass' => 'rowsSmall']]
 		];
 	}
 }

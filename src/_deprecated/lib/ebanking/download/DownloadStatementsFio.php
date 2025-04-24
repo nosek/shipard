@@ -39,9 +39,9 @@ class DownloadStatementsFio extends \lib\ebanking\download\DownloadStatements
 
 	protected function downloadOneStatement ()
 	{
-		// https://www.fio.cz/ib_api/rest/by-id/API-TOKEN/YEAR/STATEMENT-ORDER-NUMBER/transactions.pdf
-		$url = 'https://www.fio.cz/ib_api/rest/by-id/'.$this->bankAccountRec['apiToken'].'/'.
-			$this->nextStatementYear.'/'.$this->nextStatementNumber.'/'.'transactions';
+		// https://fioapi.fio.cz/v1/rest/by-id/API-TOKEN/YEAR/STATEMENT-ORDER-NUMBER/transactions.pdf
+		$url = 'https://fioapi.fio.cz/v1/rest/by-id/'.$this->bankAccountRec['apiToken'].'/'.
+		$this->nextStatementYear.'/'.$this->nextStatementNumber.'/'.'transactions';
 
 		$tmpFileName = __APP_DIR__.'/tmp/'.'vypis-B'.$this->bankAccountCfg['id'].'-'.$this->nextStatementYear.'-'.$this->nextStatementNumber.'-'.time();
 
@@ -49,7 +49,7 @@ class DownloadStatementsFio extends \lib\ebanking\download\DownloadStatements
 		$filePdf = $tmpFileName . '.pdf';
 		if ($this->app()->debug)
 			echo "Download PDF statement - contact FIO API: ".$urlPdf."\n";
-		$data = file_get_contents($urlPdf);
+		$data = @file_get_contents($urlPdf);
 		$responseHeaders = $http_response_header ?? [];
 		if ($this->app()->debug)
 		{
@@ -58,12 +58,17 @@ class DownloadStatementsFio extends \lib\ebanking\download\DownloadStatements
 		}
 
 		if ($data === FALSE)
+		{
+			//$dsId = $this->app->cfgItem ('dsid', 0);
+			//$tokenId = substr ($this->bankAccountRec['apiToken'], 0, 6).'...'.substr ($this->bankAccountRec['apiToken'], -6);
+			//error_log ("FIO.downloadOneStatement.pdf failed; dsid: `$dsId`; toke: `$tokenId`");
 			return;
+		}
 		file_put_contents($filePdf, $data);
 
 		sleep(33); // minimal pause between requests is 30 seconds
 
-		$testImportFioJson = $this->app()->cfgItem ('options.experimental.testImportFioJson', 0);
+		$testImportFioJson = $this->app()->cfgItem ('options.experimental.testImportFioJson', 1);
 		if ($testImportFioJson)
 		{
 			$urlData = $url . '.json';
@@ -74,9 +79,14 @@ class DownloadStatementsFio extends \lib\ebanking\download\DownloadStatements
 			$urlData = $url . '.gpc';
 			$fileData = $tmpFileName . '.gpc';
 		}
-		$data = file_get_contents($urlData);
+		$data = @file_get_contents($urlData);
 		if ($data === FALSE)
+		{
+			//$dsId = $this->app->cfgItem ('dsid', 0);
+			//$tokenId = substr ($this->bankAccountRec['apiToken'], 0, 6).'...'.substr ($this->bankAccountRec['apiToken'], -6);
+			//error_log ("FIO.downloadOneStatement.data failed; dsid: `$dsId`; token: `$tokenId`");
 			return;
+		}
 		file_put_contents($fileData, $data);
 
 		$this->statementTextData = $data;

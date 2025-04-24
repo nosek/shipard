@@ -2,11 +2,13 @@
 
 namespace mac\iot;
 
-use \Shipard\Form\TableForm, \Shipard\Table\DbTable, \e10\TableView, \e10\utils, \e10\TableViewDetail, \mac\data\libs\SensorHelper;
+use \Shipard\Form\TableForm, \Shipard\Table\DbTable, \Shipard\Viewer\TableView, \e10\utils, \Shipard\Viewer\TableViewDetail, \mac\data\libs\SensorHelper;
+use \Shipard\Viewer\TableViewPanel;
+use \e10\base\libs\UtilsBase;
 
 
 /**
- * Class TableDevices
+ * class TableDevices
  */
 class TableDevices extends DbTable
 {
@@ -249,6 +251,8 @@ class ViewDevices extends TableView
 {
 	//var ?\mac\iot\libs\IotDevicesUtils $iotDevicesUtils = NULL;
 
+	var $devicesInfo = [];
+
 	public function init ()
 	{
 		parent::init();
@@ -258,6 +262,8 @@ class ViewDevices extends TableView
 		$this->enableDetailSearch = TRUE;
 
 		$this->setMainQueries ();
+
+		$this->setPanels (TableView::sptQuery);
 	}
 
 	public function renderRow ($item)
@@ -283,7 +289,8 @@ class ViewDevices extends TableView
 		if ($dkLabel)
 			$t2[] = $dkLabel;
 
-		$t2[] = ['text' => $item['friendlyId'], 'class' => 'label label-default'];
+		if ($item['friendlyId'] !== $item['fullName'])
+			$t2[] = ['text' => $item['friendlyId'], 'class' => 'label label-default'];
 		if ($item['friendlyId'] !== $item['hwId'])
 			$t2[] = ['text' => $item['hwId'], 'class' => 'label label-default'];
 
@@ -292,11 +299,13 @@ class ViewDevices extends TableView
 
 		$listItem ['t2'] = $t2;
 
+		/*
 		$listItem ['t3'] = [];
 		if ($item['uiName'] !== '')
 			$listItem ['t3'][] = ['text' => $item['uiName'], 'class' => ''];
 
 		$listItem ['t3'][] = ['text' => $item['deviceTopic'], 'class' => 'e10-off'];
+		*/
 
 		return $listItem;
 	}
@@ -322,8 +331,160 @@ class ViewDevices extends TableView
 			array_push ($q, ')');
 		}
 
+		// -- special queries
+		$qv = $this->queryValues ();
+
+		if (isset ($qv['lans']))
+			array_push ($q, ' AND iotDevices.[lan] IN %in', array_keys($qv['lans']));
+
+		if (isset ($qv['devTypes']))
+			array_push ($q, ' AND iotDevices.[deviceType] IN %in', array_keys($qv['devTypes']));
+
+		if (isset ($qv['devVendors']))
+			array_push ($q, ' AND iotDevices.[deviceVendor] IN %in', array_keys($qv['devVendors']));
+
+		if (isset ($qv['devKinds']))
+			array_push ($q, ' AND iotDevices.[deviceKind] IN %in', array_keys($qv['devKinds']));
+
+		$infoNone = isset ($qv['problems']['infoNone']);
+		$infoOld1h = isset ($qv['problems']['infoOld1h']);
+		$infoOld1d = isset ($qv['problems']['infoOld1d']);
+		if ($infoNone || $infoOld1h || $infoOld1d)
+		{
+			array_push ($q, ' AND (0');
+			if ($infoOld1h)
+			{
+				$dateLimit = new \DateTime('1 hour ago');
+				array_push ($q, ' OR (EXISTS (SELECT ndx FROM mac_iot_devicesInfo WHERE iotDevices.ndx = device AND mac_iot_devicesInfo.dateUpdate < %t))', $dateLimit);
+			}
+			if ($infoOld1d)
+			{
+				$dateLimit = new \DateTime('1 day ago');
+				array_push ($q, ' OR (EXISTS (SELECT ndx FROM mac_iot_devicesInfo WHERE iotDevices.ndx = device AND mac_iot_devicesInfo.dateUpdate < %t))', $dateLimit);
+			}
+			if ($infoNone)
+			{
+				array_push ($q, ' OR (NOT EXISTS (SELECT ndx FROM mac_iot_devicesInfo WHERE iotDevices.ndx = device))');
+			}
+			array_push ($q, ')');
+		}
+
 		$this->queryMain ($q, 'iotDevices.', ['[fullName]', '[ndx]']);
 		$this->runQuery ($q);
+	}
+
+	function selectRows2()
+	{
+		if (!count ($this->pks))
+			return;
+
+		$q = [];
+		array_push($q, 'SELECT * FROM [mac_iot_devicesInfo] WHERE [device] IN %in', $this->pks);
+		foreach ($this->db()->query($q) as $r)
+		{
+			$this->devicesInfo[$r['device']] = $r->toArray();
+		}
+	}
+
+	function decorateRow (&$item)
+	{
+		$item['i2'] = ['text' => '', 'title' => 'Informace nejsou k dispozici', 'icon' => 'system/iconWarning', 'class' => 'e10-error'];
+
+		if (!isset ($this->devicesInfo [$item ['pk']]))
+			return;
+
+		$now = new \DateTime();
+
+		$labels = [];
+
+		$deviceInfo = $this->devicesInfo [$item ['pk']];
+		if ($deviceInfo['fwVersion'] != '')
+		{
+			$fwlabel = ['text' => $deviceInfo ['fwVersion'], 'prefix' => 'fw', 'class' => 'label label-default'];
+			//if ($deviceInfo['devType'] != '')
+			//	$fwlabel['suffix'] = $deviceInfo['devType'];
+			$labels[] = $fwlabel;
+		}
+		if ($deviceInfo['osVersion'] != '')
+			$labels[] = ['text' => $deviceInfo ['osVersion'], 'prefix' => 'os', 'class' => 'label label-default'];
+
+		if ($deviceInfo['pwrBatteryLevel'] != 0 || $deviceInfo['pwrBatteryVoltage'] != 0)
+		{
+			$bl = ['text' => $deviceInfo ['pwrBatteryLevel'].'%', 'icon' => 'user/battery', 'class' => 'label label-info'];
+			if ($deviceInfo['pwrBatteryVoltage'] != 0)
+				$bl['suffix'] = $deviceInfo['pwrBatteryVoltage'].'V';
+			$labels[] = $bl;
+		}
+
+		if ($deviceInfo['uptime'] != 0)
+		{
+			$labels[] = ['text' => Utils::secondsToTime($deviceInfo['uptime'], $deviceInfo['uptime'] < 100), 'prefix' => 'upt', 'class' => 'label label-default'];
+		}
+
+		if ($deviceInfo['signalLevel'] != 0)
+		{
+			$labels[] = ['text' => $deviceInfo['signalLevel'], 'icon' => 'user/wifi', 'class' => 'label label-default'];
+		}
+
+		if (count($labels))
+			$item ['t3'] = $labels;
+
+		if ($deviceInfo['dateUpdate'] != NULL)
+		{
+			$item['i2'] = ['text' => Utils::dateDiffShort($deviceInfo ['dateUpdate'], $now), 'title' => 'Poslední aktualizace: '.Utils::datef($deviceInfo ['dateUpdate'], '%k %T'), 'icon' => 'user/checkSquare', 'class' => 'label label-default'];
+			$age = Utils::dateDiffMinutes($deviceInfo ['dateUpdate'], $now);
+			if ($age < 120)
+				$item['i2']['class'] = 'label label-success';
+			elseif ($age < 1440)
+				$item['i2']['class'] = 'label label-warning';
+			else
+				$item['i2']['class'] = 'label label-danger';
+		}
+	}
+
+	public function createPanelContentQry (TableViewPanel $panel)
+	{
+		$qry = [];
+
+		// -- tags
+		UtilsBase::addClassificationParamsToPanel($this->table, $panel, $qry);
+
+		// -- lans
+		$lans = $this->db()->query ('SELECT ndx, fullName FROM mac_lan_lans WHERE docStateMain != 4')->fetchPairs ('ndx', 'fullName');
+		$lans['0'] = 'Žádná síť';
+		$this->qryPanelAddCheckBoxes($panel, $qry, $lans, 'lans', 'Sítě');
+
+		// -- types
+		$devicesTypes = $this->app()->cfgItem('mac.iot.devices.types');
+		$this->qryPanelAddCheckBoxes($panel, $qry, $devicesTypes, 'devTypes', 'Typy zařízení', 'fn');
+
+		// -- vendors
+		$vendors = [];
+		foreach ($devicesTypes as $deviceTypeId => $deviceType)
+		{
+			$vt = $this->app()->cfgItem('mac.iot.devices.vendors.'.$deviceTypeId, NULL);
+			if (!$vt)
+				continue;
+			$vendors = array_merge($vendors, $vt);
+		}
+		$this->qryPanelAddCheckBoxes($panel, $qry, $vendors, 'devVendors', 'Výrobci', 'fn');
+
+		// -- kinds
+		$devicesKinds = $this->app()->cfgItem('mac.iot.devices.kinds');
+		$this->qryPanelAddCheckBoxes($panel, $qry, $devicesKinds, 'devKinds', 'Druhy zařízení', 'fn');
+		//"enumCfg": {"cfgItem": "mac.iot.devices.kinds", "cfgValue": "", "cfgText": "fn"}},
+
+		// -- problems
+		$chbxProblems = [
+			'infoNone' => ['title' => 'Chybějící informace', 'id' => 'infoWithout'],
+			'infoOld1h' => ['title' => 'Zastaralé informace > 1h', 'id' => 'infoOld1h'],
+			'infoOld1d' => ['title' => 'Zastaralé informace > 1 den', 'id' => 'infoOld1d'],
+		];
+		$paramsProblems = new \E10\Params ($this->app());
+		$paramsProblems->addParam ('checkboxes', 'query.problems', ['items' => $chbxProblems]);
+		$qry[] = ['id' => 'problems', 'style' => 'params', 'title' => 'Problémy', 'params' => $paramsProblems];
+
+		$panel->addContent(['type' => 'query', 'query' => $qry]);
 	}
 }
 
@@ -410,6 +571,18 @@ class ViewDetailDevice extends TableViewDetail
 			$this->addDocumentCard('mac.iot.libs.dc.IoTDeviceIoTBox');
 	}
 }
+
+/**
+ * Class ViewDetailDevicePwr
+ */
+class ViewDetailDevicePwr extends TableViewDetail
+{
+	public function createDetailContent ()
+	{
+		$this->addDocumentCard('mac.iot.libs.dc.IoTDevicePwr');
+	}
+}
+
 
 /**
  * Class ViewDetailDeviceCfgScripts

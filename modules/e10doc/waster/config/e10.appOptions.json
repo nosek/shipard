@@ -2,6 +2,19 @@
 	"docsWasterSettings": {
 		"name": "Nastavení odpadů", "order": 29300, "group": "waster",
 		"type": "viewer", "table": "e10doc.waster.wasteSettings", "viewer": "default"
+	},
+	"wasterOrigins": {
+		"name": "Původy odpadů", "order": 29600, "group": "waster",
+		"type": "viewer", "table": "e10doc.base.wasteOrigins", "viewer": "default"
+	},
+	"waster": {
+		"name": "Evidence odpadů", "order": 1000, "group": "waster",
+		"icon": "system/actionRecycle",
+		"type": "cfgFile",
+		"options":
+			[
+				{"cfgKey": "useWaster", "cfgName": "Evidovat odpady", "options": {"0": "Ne", "1": "Ano"}}
+			]
 	}
 }
 

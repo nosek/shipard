@@ -2,7 +2,7 @@
   "id": "mac.iot",
   "name": "Monitoring And Control - IoT",
   "tables": [
-		"devices", "devicesIOPorts", "devicesCfg", "devicesGroups", "devicesGroupsItems",
+		"devices", "devicesIOPorts", "devicesCfg", "devicesGroups", "devicesGroupsItems", "devicesInfo", "devicesInfoPwr",
 		"eventsOn", "eventsDo",
 		"setups", "setupsStates",
 		"params",
@@ -16,8 +16,8 @@
 		"scenariosSchedule", "scenariosActions",
 		"users"
   ],
-  "modules": ["mac/base"],
-
+	"extensions": ["wkf"],
+  "modules": ["mac/base", "wkf/msgs"],
   "config": [
 	  {"id": "+mac.iot.ioPortValueStyle", "file": "mac.iot.ioPortValueStyle.json"},
 	  {"id": "+mac.iot.values.types", "file": "mac.iot.values.types.json"},

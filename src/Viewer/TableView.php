@@ -59,6 +59,8 @@ class TableView extends \Shipard\Base\BaseObject
 
 	var $usePanelLeft = FALSE;
 	var $usePanelRight = 0;
+	var $panelRightClass = '';
+	var $detailInPanelRight = 0;
 	var $panelLeft = NULL;
 	var $panelRight = NULL;
 
@@ -409,6 +411,9 @@ class TableView extends \Shipard\Base\BaseObject
 					"data-addparams='{$this->addParams ()}' data-queryparams='{$this->queryParams()}' data-lineswidth='{$this->linesWidth}' ".
 					"data-toolbar='{$this->toolbarElementId}' data-mode='{$this->mode}' data-type='{$this->type}'";
 
+		if ($this->detailInPanelRight)
+			$c .= " data-detail-in-panel-right='".intval($this->detailInPanelRight)."'";
+
 		if ($this->inlineSourceElement)
 		{
 			foreach ($this->inlineSourceElement as $key => $value)
@@ -605,15 +610,29 @@ class TableView extends \Shipard\Base\BaseObject
 		if ($this->usePanelRight === 3)
 			$panelClass .= ' floating close';
 
+		if ($this->panelRightClass !== '')
+			$panelClass .= ' '.$this->panelRightClass;
+
 		$c .= "<div class='$panelClass' id='{$this->vid}PanelRight'>";
 
 		if ($this->usePanelRight === 3)
-			$c .= "<div class='tlbr e10-reportPanel-toggle'><i class='fa fa-bars'></i></div><div class='params'>";
+		{
+			$c .= "<div class='tlbr e10-reportPanel-toggle'><i class='fa fa-bars'></i></div>";
+			$c .= "<div class='params'>";
+		}
 
 		$c .= $this->panelRight->createCode();
 
 		if ($this->usePanelRight === 3)
 			$c .= '</div>';
+
+		if ($this->detailInPanelRight)
+		{
+			if ($this->usePanelRight === 3)
+				$c .= "<div class='detail'></div>";
+			else
+				$c .= "<div class='detail' style='position: absolute; top: 0;'></div>";
+		}
 
 		$c .= '</div>';
 
@@ -1037,12 +1056,13 @@ class TableView extends \Shipard\Base\BaseObject
 				{
 					$placeholder = ($this->disableIncrementalSearch) ? 'hledat ⏎' : 'hledat';
 
-					$h .= "<td class='fulltext $fulltextClass' style='$style'>" .
-							"<span class='df2-background-button df2-action-trigger df2-fulltext-clear' data-action='fulltextsearchclear' id='{$this->vid}Progress' data-run='0'>".$this->app()->ui()->icon('system/actionInputClear')."</span>";
+					$h .= "<td class='fulltext $fulltextClass' style='$style'>";
 					$h .= "<input name='fullTextSearch' type='text' class='fulltext e10-viewer-search' autocomplete='off' placeholder='".utils::es($placeholder)."' value=''";
 					if ($this->disableIncrementalSearch)
 						$h .= " data-onenter='1'";
-					$h .= '/></td>';
+					$h .= '/>';
+					$h .= "<span class='df2-background-button df2-action-trigger df2-fulltext-clear' data-action='fulltextsearchclear' id='{$this->vid}Progress' data-run='0'>".$this->app()->ui()->icon('system/actionInputClear')."</span>";
+					$h .= '</td>';
 				}
 				if (isset ($this->topParams))
 				{
@@ -1533,7 +1553,7 @@ class TableView extends \Shipard\Base\BaseObject
 				foreach ($details as $id => $detail)
 				{
 					$c .= "<li data-detail='$id'$firstClass>";
-					$c .= $this->app()->ui()->icon ($detail['icon'], '', 'div');
+					$c .= $this->app()->ui()->icon ($detail['icon'] ?? 'system/iconFile', '', 'div');
 					$c .= \E10\es ($detail['title']);
 					$c .= '</li>';
 					$firstClass = "";
@@ -1875,10 +1895,23 @@ class TableView extends \Shipard\Base\BaseObject
 		if ($this->gridEditable)
 			$this->gridTableHeaderCode .= '<th class="e10-icon"></th>';
 
-		foreach ($this->gridStruct as $cn => $ch)
+		foreach ($this->gridStruct as $cn => $chdr)
 		{
 			$this->gridColClasses [$cn] = '';
-			if ($ch === '')
+			$ch = '';
+			if (is_string($chdr))
+				$ch = $chdr;
+			elseif (is_array($chdr) && isset($chdr['text']))
+				$ch = strval($chdr['text']);
+			elseif (is_array($chdr) && isset($chdr[0]['text']))
+			{
+				$ch = strval($chdr[0]['text']);
+				if (isset($chdr[0]['colClass']))
+					$this->gridColClasses [$cn] = $chdr[0]['colClass'];
+			}
+			else
+				$ch = strval($chdr);
+			if ($ch == '')
 				$ct = '';
 			else
 			if ($ch [0] == '+')
@@ -1906,9 +1939,17 @@ class TableView extends \Shipard\Base\BaseObject
 				$ct = $ch;
 				$this->gridColClasses [$cn] = 'number';
 			}
+			else if (isset($ch[0]) && $ch[0] == '|')
+			{
+				$ct = substr ($ch, 1);
+				$this->gridColClasses [$cn] = 'center';
+			}
 			else
 				$ct = $ch;
-			$this->gridTableHeaderCode .= "<th class='{$this->gridColClasses [$cn]}'>".$this->app()->ui()->composeTextLine($ct).'</th>';
+			if (is_array($chdr))
+				$this->gridTableHeaderCode .= "<th class='{$this->gridColClasses [$cn]}'>".$this->app()->ui()->composeTextLine($chdr).'</th>';
+			else
+				$this->gridTableHeaderCode .= "<th class='{$this->gridColClasses [$cn]}'>".Utils::es($ct).'</th>';
 		}
 		$this->gridTableHeaderCode .= '</tr></thead>';
 	}
@@ -1952,17 +1993,35 @@ class TableView extends \Shipard\Base\BaseObject
 		return '';
 	}
 
-	public function queryMain (&$q, $tablePrefix = '', $order = NULL, $forceArchive = FALSE)
+	public function queryMain (&$q, $tablePrefix = '', $order = NULL, $forceArchive = FALSE, $ntfQueryCol = '')
 	{
 		$mainQuery = $this->mainQueryId ();
 
 		// -- active
 		if ($mainQuery === 'active' || $mainQuery === '')
 		{
-			if ($forceArchive)
-				array_push($q, " AND {$tablePrefix}[docStateMain] != 4");
+			if ($ntfQueryCol !== '')
+			{
+				array_push ($q, ' AND (');
+				if ($forceArchive)
+					array_push($q, " {$tablePrefix}[docStateMain] != 4");
+				else
+					array_push($q, " {$tablePrefix}[docStateMain] < 4");
+				array_push ($q, ' OR ');
+				array_push ($q, ' EXISTS (SELECT ndx FROM e10_base_notifications WHERE state = 0',
+												' AND '.$ntfQueryCol.' = recIdMain',
+												' AND personDest = %i', $this->app()->userNdx(),
+												' AND tableId = %s', $this->table->tableId());
+				array_push ($q, ')');
+				array_push ($q, ')');
+			}
 			else
-				array_push($q, " AND {$tablePrefix}[docStateMain] < 4");
+			{
+				if ($forceArchive)
+					array_push($q, " AND {$tablePrefix}[docStateMain] != 4");
+				else
+					array_push($q, " AND {$tablePrefix}[docStateMain] < 4");
+			}
 		}
 
 		// -- archive
@@ -1979,7 +2038,7 @@ class TableView extends \Shipard\Base\BaseObject
 
 		if ($order !== NULL)
 		{
-			if ($mainQuery === 'all')
+			if ($mainQuery === 'all' || $ntfQueryCol !== '')
 				array_push ($q, ' ORDER BY ', implode(', ', $order), $this->sqlLimit ());
 			else
 				array_push ($q, " ORDER BY {$tablePrefix}[docStateMain], ", implode(', ', $order), $this->sqlLimit ());

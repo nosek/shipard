@@ -1353,6 +1353,29 @@ class ShpdServerApp extends \Shipard\Application\ApplicationCore
 		return TRUE;
 	}
 
+	public function installShpdTools()
+	{
+		if (is_dir('/usr/lib/shipard-devel'))
+		{
+			if (!is_file('/bin/shpd-ds'))
+				symlink('/usr/lib/shipard-devel/tools/shpd-ds.php', '/bin/shpd-ds');
+
+			if (!is_file('/bin/shpd-ds-set-channel'))
+				symlink('/usr/lib/shipard-devel/tools/shpd-ds-set-channel.php', '/bin/shpd-ds-set-channel');
+
+			if (!is_file('/bin/shpd-srv'))
+				symlink('/usr/lib/shipard-devel/tools/shpd-srv.php', '/bin/shpd-srv');
+		}
+		elseif (is_dir('/usr/lib/shipard'))
+		{
+			if (!is_file('/bin/shpd-ds'))
+				symlink('/usr/lib/shipard/tools/shpd-ds.php', '/bin/shpd-ds');
+
+			if (!is_file('/bin/shpd-srv'))
+				symlink('/usr/lib/shipard/tools/shpd-srv.php', '/bin/shpd-srv');
+		}
+	}
+
 	public function msg ($msg)
 	{
 		if (!$this->quiet)
@@ -1421,6 +1444,8 @@ class ShpdServerApp extends \Shipard\Application\ApplicationCore
 			case  "server-get-hosting-info":	return $this->getHostingInfo();
 			case  "server-create-hosting-ds":	return $this->serverCreateHostingDataSources();
 			case	'netdata-alarm':						return $this->netDataAlarm();
+
+			case	'install-shpd-tools':				return $this->installShpdTools();
 		}
 
 		if (!$this->manager->load ())

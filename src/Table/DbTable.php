@@ -802,7 +802,11 @@ class DbTable
 		if (!$vd)
 			$vd = $this->viewDefinition ('default');
 
-		$recData = $this->loadItem ($pk);
+		$recData = NULL;
+		if (isset($vd['ignorePK']))
+			$recData = ['pk' => $pk];
+		else
+			$recData = $this->loadItem ($pk);
 		$disabledDetails = $this->disabledDetails($viewId, $detailId, $recData);
 		if ($disabledDetails !== NULL)
 		{
@@ -835,6 +839,7 @@ class DbTable
 		$detailData = new $className ($this, $viewId);
 		$detailData->detailId = $detailId;
 
+		$detailData->ndx = intval($pk);
 		$detailData->item = $recData;
 		$detailData->ok = 1;
 		if ($disabledDetails !== NULL)
@@ -1045,7 +1050,10 @@ class DbTable
 		$this->applySubColumnsData ($saveData);
 
 		if (isset ($saveData['changedInput']))
+		{
 			$this->checkChangedInput ($saveData['changedInput'], $saveData);
+			$formData->checkChangedInput ($saveData['changedInput'], $saveData);
+		}
 
 		// prepare document state
 		if ($setDocState)
@@ -1647,7 +1655,8 @@ class DbTable
 					$btn['subButtons'][] = [
 						'type' => 'action', 'action' => 'addwizard', 'icon' => 'system/iconEmail', 'title' => 'Odeslat emailem',
 						'data-table' => $this->tableId(), 'data-pk' => $recData['ndx'], 'data-class' => 'Shipard.Report.SendFormReportWizard',
-						'data-addparams' => 'reportClass='.$r ['class'].'&documentTable='.$this->tableId(), 'btnClass' => 'btn-default'
+						'data-addparams' => 'reportClass='.$r ['class'].'&documentTable='.$this->tableId().'&focusedPKPrimary='.$recData['ndx'],
+						'btnClass' => 'btn-default'
 					];
 				}
 				if (utils::param($r, 'dropdown', 0))

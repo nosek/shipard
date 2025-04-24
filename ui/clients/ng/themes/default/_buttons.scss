@@ -123,15 +123,19 @@ button.shpd-close {
 
 
 
-/* shpd buttons (not used yet) - fix border + shadow */
+/* shpd buttons - fix border + shadow */
 .shpd-btn {
-  padding: .3rem 1rem;
+  padding: .4rem 1rem;
   text-align: center;
   text-decoration: none;
   border-radius: 6px;
   font-size: 1rem;
   border: 1px solid var(--shpd-universal-border);
   color: var(--shpd-body-color);
+}
+
+button {
+  line-height: initial !important;
 }
 
 // default buttons
@@ -173,8 +177,8 @@ button.shpd-close {
 
 // default buttons hover
 .shpd-btn-primary:hover {
-  background-color: var(--shpd-primary-gray);
-  border: 1px solid var(--shpd-primary-gray);
+  background-color: var(--shpd-primary-hover);
+  border: 1px solid var(--shpd-primary-hover);
   color: var(--shpd-btn-color-darks);
 }
 .shpd-btn-primary-light:hover {

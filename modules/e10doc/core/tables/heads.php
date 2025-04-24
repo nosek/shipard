@@ -360,12 +360,17 @@ class TableHeads extends DbTable
 		if ($this->app()->model()->table ('e10doc.debs.journal') !== FALSE)
 			$this->doAccounting ($recData);
 
+		if ($this->app()->model()->table ('e10doc.accBal.journal') !== FALSE)
+			$this->doAccBalance ($recData);
+
 		if ($this->app()->model()->table ('e10pro.reports.waste_cz.returnRows') !== FALSE)
 			$this->doWaste ($recData);
 
 		$this->doTaxReports($recData);
 		$this->doRos($recData);
 		$this->doInbox($recData);
+
+		$this->doDocsOps ($recData);
 	}
 
 	public function checkBeforeSave (&$recData, $ownerData = NULL)
@@ -1016,7 +1021,11 @@ class TableHeads extends DbTable
 			$witem = array ();
 			$operation = 0;
 			if (isset ($saveOptions['appendRowItemPK']))
+			{
 				$witem = $this->loadItem ($saveOptions['appendRowItemPK'], 'e10_witems_items');
+				if (isset ($saveOptions['operation']))
+					$operation = intval($saveOptions['operation']);
+			}
 			else
 			if (isset ($saveOptions['appendRowItemBarcode']))
 			{
@@ -1077,6 +1086,8 @@ class TableHeads extends DbTable
 				{
 					$newRow = array ();
 					$newRow ['item'] = $witem['ndx'];
+					if ($operation)
+						$newRow ['operation'] = $operation;
 
 					$newRow ['quantity'] = 1;
 					if ($saveData ['recData']['docType'] === 'purchase')
@@ -1086,11 +1097,12 @@ class TableHeads extends DbTable
 							$needWeight = $saveData ['recData']['weightIn'] - $saveData ['recData']['weightOut'];
 							$needWeight = $needWeight - $saveData ['recData']['weightNet'];
 							if ($needWeight > 1)
-								$newRow ['quantity'] = $needWeight;
+							{
+								if (($newRow ['operation'] ?? 0) != 10400015)
+									$newRow ['quantity'] = $needWeight;
+							}
 						}
 					}
-					if ($operation)
-						$newRow ['operation'] = $operation;
 
 					$this->resetRowItem ($saveData ['recData'], $newRow, $witem, $docType);
 
@@ -1216,6 +1228,13 @@ class TableHeads extends DbTable
 		$tableBalanceJournal->doIt ($recData);
 	}
 
+	public function doAccBalance (&$recData)
+	{
+		$accBalCreator = new \e10doc\accBal\libs\AccBalanceCreator($this->app());
+		$accBalCreator->setDocument($recData['ndx']);
+		$accBalCreator->run();
+	}
+
 	public function doInbox (&$recData)
 	{
 		if ($recData ['docState'] != 4000)
@@ -1339,6 +1358,28 @@ class TableHeads extends DbTable
 
 		$rosEngine = $this->app()->createObject($rosType['engine']);
 		$rosEngine->doDocument ($rosRegNdx, $recData);
+	}
+
+	public function doDocsOps ($recData)
+	{
+		if ($recData['docStateMain'] !== 2)
+			return;
+
+		$docsOps = $this->app()->cfgItem('e10doc.docs.ops', NULL);
+		if (!$docsOps)
+			return;
+
+		foreach ($docsOps as $do)
+		{
+			if (!isset($do['docTypes']) || !in_array($recData['docType'], $do['docTypes']))
+				continue;
+			$doEngine = $this->app()->createObject($do['engine']);
+
+			if ($doEngine)
+			{
+				$doEngine->doDocument ($recData, 1);
+			}
+		}
 	}
 
 	public function doWaste (&$recData)
@@ -1807,6 +1848,8 @@ class TableHeads extends DbTable
 		if (!$personGroups)
 			$personGroups = E10Utils::personGroups($this->app(), $headRecData['person']);
 
+		$docWasteOrigin = $headRecData['wasteOrigin'] ?? 0;
+
 		$addressColumn = 'otherAddress1';
 		$addressNdx = intval($headRecData[$addressColumn] ?? 0);
 		$addressLabels = [];
@@ -1844,6 +1887,9 @@ class TableHeads extends DbTable
 			array_push ($q, ' AND ([codes].[personType] = %i', 2, ' OR [codes].[personType] = %i)', 0);
 		elseif ($personType == 2) // company
 			array_push ($q, ' AND ([codes].[personType] = %i', 1, ' OR [codes].[personType] = %i)', 0);
+
+		// -- waste origin
+		array_push ($q, ' AND ([codes].[wasteOrigin] = %i', $docWasteOrigin, ' OR [codes].[wasteOrigin] = %i)', 0);
 
 		// -- date valid
 		array_push ($q, ' AND ([codes].[validFrom] IS NULL', ' OR [codes].[validFrom] <= %d)', $headRecData['dateAccounting']);
@@ -3118,9 +3164,22 @@ class ViewHeads extends TableView
 			$qry[] = array ('style' => 'params', 'title' => $cg['name'], 'params' => $params);
 		}
 
+		// -- persons
+		$chbxPersonTypes = [
+			'humans' => ['title' => 'Lidé', 'id' => 'humans'], 'companies' => ['title' => 'Společnosti', 'id' => 'companies']
+		];
+		$paramsPersonTypes = new \E10\Params ($this->app());
+		$paramsPersonTypes->addParam ('checkboxes', 'query.personTypes', ['items' => $chbxPersonTypes]);
+		$qry[] = ['id' => 'itemTypes', 'style' => 'params', 'title' => 'Osoby', 'params' => $paramsPersonTypes];
+
+		$this->extendPanelContentQry ($panel, $qry);
+
 		$panel->addContent(array ('type' => 'query', 'query' => $qry));
 	}
 
+	protected function extendPanelContentQry (TableViewPanel $panel, array &$qry)
+	{
+	}
 
 	public function qryCommon (array &$q)
 	{
@@ -3240,6 +3299,17 @@ class ViewHeads extends TableView
 			foreach ($qv['clsf'] as $grpId => $grpItems)
 				array_push ($q, ' AND ([group] = %s', $grpId, ' AND [clsfItem] IN %in', array_keys($grpItems), ')');
 			array_push ($q, ')');
+		}
+
+		// -- person types
+		$humans = isset ($qv['personTypes']['humans']);
+		$companies = isset ($qv['personTypes']['companies']);
+		if ($humans xor $companies)
+		{
+			if ($humans)
+				array_push ($q, ' AND [persons].[company] = 0');
+			else
+				array_push ($q, ' AND [persons].[company] = 1');
 		}
 	}
 
@@ -3455,11 +3525,11 @@ class ViewHeads extends TableView
 		if ($item ['symbol1'] != '' && $item ['symbol1'] !== $item ['docNumber'])
 			$props [] = ['icon' => 'system/iconExchange', 'text' => $item ['symbol1'], 'class' => ''];
 
-		if ($showDate === 'c' && $item['dateIssue']->format('ymd') === $this->today)
+		if ($showDate === 'c' && !Utils::dateIsBlank($item['dateIssue']) && $item['dateIssue']->format('ymd') === $this->today)
 		{
-			$props [] = ['icon' => 'icon-clock-o', 'text' => \E10\df ($item['activateTimeFirst']), 'class' => ''];
+			$props [] = ['icon' => 'user/clock', 'text' => \E10\df ($item['activateTimeFirst']), 'class' => ''];
 			if ($item['activateTimeFirst'] != $item['activateTimeLast'])
-				$props [] = ['icon' => 'icon-pencil', 'text' => \E10\df ($item['activateTimeLast']), 'class' => ''];
+				$props [] = ['icon' => 'user/edit', 'text' => \E10\df ($item['activateTimeLast']), 'class' => ''];
 			$listItem ['t2'] = $props;
 		}
 		else
@@ -3751,6 +3821,10 @@ class FormHeads extends TableForm
 			else
 				$this->recData ['totalCash'] = $this->recData ['toPay'];
 		}
+
+		// -- lp
+		$sumLPPoints = $this->table->db()->query ('SELECT SUM(lpPriceAll) as sumLPPriceAll FROM [e10doc_core_rows] WHERE [document] = %i AND rowType != 1', $this->recData['ndx'])->fetch ();
+		$this->recData ['lpPriceAll'] = $sumLPPoints['sumLPPriceAll'] ?? 0;
   }
 
 	public function calcTaxes ()
@@ -3949,7 +4023,7 @@ class FormHeads extends TableForm
 			if (isset ($this->postData['docActionData.person']))
 				$this->recData['person'] = $this->postData['docActionData.person'];
 			if (isset ($this->postData['docActionData.title']))
-				$this->recData['title'] = $this->postData['docActionData.title'];
+				$this->recData['title'] = Str::upToLen($this->postData['docActionData.title'], 120);
 			if (isset ($this->postData['docActionData.dbCounter']))
 				$this->recData['dbCounter'] = $this->postData['docActionData.dbCounter'];
 			if (isset ($this->postData['docActionData.symbol1']))
@@ -4067,6 +4141,7 @@ class FormHeads extends TableForm
 			}
 			$this->recData['title'] .= ' '.implode (', ', $docNumbers);
 		}
+		$this->recData['title'] = Str::upToLen($this->recData['title'], 120);
 	}
 
 	public function createHeader ()
@@ -4224,10 +4299,11 @@ class FormHeads extends TableForm
 	{
 		if ($srcTableId === 'e10doc.core.heads')
 		{
+			$date = Utils::dateIsBlank($recData['dateAccounting']) ? Utils::today() : Utils::createDateTime ($recData['dateAccounting']);
 			$cp = [
 				'docType' => strval ($recData['docType']),
 				'srcCurrency' => $recData['homeCurrency'], 'dstCurrency' => $recData['currency'],
-				'dateAccounting' => utils::createDateTime ($recData['dateAccounting'])->format('Y-m-d'),
+				'dateAccounting' => $date->format('Y-m-d'),
 				'srcDocNdx' => $recData['ndx'],
 			];
 			return $cp;
@@ -4271,20 +4347,63 @@ class FormHeads extends TableForm
 
 	protected function wasteSettings()
 	{
-		$cy = intval(Utils::createDateTime($this->recData['dateAccounting'] ?? NULL)->format('Y'));
+		$cy = intval(Utils::createDateTime($this->recData['dateAccounting'] ?? Utils::today())->format('Y'));
 		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$cy, NULL);
 		return $wasteSettings;
 	}
 
 	protected function wasteDocMode()
 	{
-		$cy = intval(Utils::createDateTime($this->recData['dateAccounting'] ?? NULL)->format('Y'));
+		$cy = intval(Utils::createDateTime($this->recData['dateAccounting'] ?? Utils::today())->format('Y'));
 		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$cy, NULL);
 		$docType = $this->recData['docType'] ?? '';
-		if (!isset($wasteSettings['docModes'][$docType]) || !$wasteSettings['docModes'][$docType])
+		if (!$wasteSettings || !isset($wasteSettings['docModes'][$docType]) || !$wasteSettings['docModes'][$docType])
 			return 0;
 
 		return $wasteSettings['docModes'][$docType];
+	}
+
+	public function resetWasteOrigin (&$saveData)
+	{
+		$saveData['recData']['wasteOrigin'] = 0;
+
+		$personRecData = $this->app()->loadItem($saveData['recData']['person'], 'e10.persons.persons');
+		if ($personRecData)
+		{
+			$wasteOrigins = $this->app()->cfgItem ('e10doc.base.wasteOrigins', NULL);
+			if (!$wasteOrigins)
+				return;
+
+			unset($wasteOrigins[0]);
+			if ($personRecData['personType'] == 1)
+			{ // human
+				$wo = Utils::searchArray($wasteOrigins, 'useForCitizens', 1);
+				if ($wo)
+					$saveData['recData']['wasteOrigin'] = $wo['ndx'];
+			}
+			elseif ($personRecData['personType'] == 2)
+			{ // company
+				$defaultWONdx = 0;
+				$personGroups = E10Utils::personGroups($this->app(), $saveData['recData']['person']);
+				foreach ($wasteOrigins as $wo)
+				{
+					if (!$wo['useForCompanies'])
+						continue;
+					if (!$defaultWONdx)
+						$defaultWONdx = $wo['ndx'];
+					if (!isset($wo['personsGroups']) || !count($personGroups))
+						continue;
+
+					if (count(array_intersect($personGroups, $wo['personsGroups'])) !== 0)
+					{
+						$saveData['recData']['wasteOrigin'] = $wo['ndx'];
+						break;
+					}
+				}
+				if (!$saveData['recData']['wasteOrigin'])
+					$saveData['recData']['wasteOrigin'] = $defaultWONdx;
+			}
+		}
 	}
 } // class FormHeads
 

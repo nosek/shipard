@@ -1,0 +1,30 @@
+{
+	"id": "e10doc.base.wasteOrigins", "sql": "e10doc_base_wasteOrigins", "name": "Původy odpadů",
+	"columns": [
+		{"id": "ndx", "name": "id", "type": "int_ai"},
+    {"id": "fullName", "name": "Název", "type": "string", "len": 120},
+    {"id": "shortName", "name": "Zkrácený název", "type": "string", "len": 40},
+
+		{"id": "textForReport", "name": "Text pro výstupní sestavy", "type": "string", "len": 180},
+
+		{"id": "useForCompanies", "name": "Používat pro firmy", "type": "logical"},
+		{"id": "useForCitizens", "name": "Používat pro občany", "type": "logical"},
+
+		{"id": "order", "name": "Pořadí", "type": "int"},
+
+		{"id": "docState", "name": "Stav", "type": "int"},
+		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}
+	],
+	"lists": [
+		{"id": "doclinks", "class": "e10.base.ListDocLinks", "name": "Vazby"}
+  ],
+	"views": [
+		{"id": "default", "class": "e10doc.base.ViewWasteOrigins", "detail": "e10doc.base.ViewDetailWasteOrigin"}
+	],
+	"forms": [
+		{"id": "default", "class": "e10doc.base.FormWasteOrigin"}
+	],
+	"states": {"stateColumn": "docState", "mainStateColumn": "docStateMain", "statesCfg": "e10.base.defaultDocStatesArchive"},
+	"options": ["configSource"],
+	"autocomplete": {"columnValue": "ndx", "columnTitle": "title"}
+}

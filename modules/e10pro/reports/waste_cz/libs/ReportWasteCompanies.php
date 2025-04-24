@@ -17,7 +17,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
   var $calendarYear = 0;
   var $persons = [];
   var $sendStatus = '';
-  var $showUnits = 0;
+  var $showUnits = -1;
   var $codeKindNdx = 0;
   var $useZipCode = 0;
   var $limitDistance = 0;
@@ -26,6 +26,9 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
   var $officeLon = 0.0;
 
   var $thisCountryNdx = 60;
+
+  var $partners = [];
+  var $wastes = [];
 
 	public function init ()
 	{
@@ -48,7 +51,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
     if ($this->subReportId === 'citizensCities2')
     {
       $this->addParam('switch', 'useZipCode', ['title' => 'PSČ', 'switch' => ['0' => 'Ne', '1' => 'Ano'], 'radioBtn' => 1, 'defaultValue' => '0']);
-      $this->addParam('switch', 'limitDistance', ['title' => 'Omezit vzdálenost', 'switch' => ['0' => 'Ne', '10' => '10 km', '20' => '20 km', '30' => '30 km', '40' => '40 km', '50' => '50 km', '60' => '60 km', '70' => '70 km', '80' => '80 km', '90' => '90 km', '100' => '100 km'], 'defaultValue' => '0']);
+      $this->addParam('switch', 'limitDistance', ['title' => 'Omezit vzdálenost', 'switch' => ['0' => 'Ne', '10' => '10 km', '15' => '15 km', '20' => '20 km', '30' => '30 km', '40' => '40 km', '50' => '50 km', '60' => '60 km', '70' => '70 km', '80' => '80 km', '90' => '90 km', '100' => '100 km'], 'defaultValue' => '0']);
       $this->addParam('switch', 'limitKG', ['title' => 'Limit', 'switch' => ['0' => 'Ne', '100' => '100 kg', '250' => '250 kg', '500' => '500 kg', '1000' => '1 tuna', '5000' => '5 tun'], 'defaultValue' => '0']);
     }
 
@@ -60,24 +63,32 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
     $this->showUnits = intval($this->reportParams ['showUnits']['value'] ?? '0');
 
     if (!$this->codeKindNdx)
-      $this->codeKindNdx = intval($this->reportParams ['codeKind']['value']);
+      $this->codeKindNdx = intval($this->reportParams ['codeKind']['value'] ?? 1);
 
-    $cpBegin = $this->reportParams ['calendarPeriod']['values'][$this->reportParams ['calendarPeriod']['value']];
-    if (isset($cpBegin['dateBegin']))
-      $this->periodBegin = Utils::createDateTime($cpBegin['dateBegin']);
-    elseif ($cpBegin['calendarYear'] !== 0)
-      $this->periodBegin = Utils::createDateTime(substr($cpBegin['calendarYear'], 1).'-01-01');
+    if (!$this->periodBegin)
+    {
+      $cpBegin = $this->reportParams ['calendarPeriod']['values'][$this->reportParams ['calendarPeriod']['value']];
+      if (isset($cpBegin['dateBegin']))
+        $this->periodBegin = Utils::createDateTime($cpBegin['dateBegin']);
+      elseif ($cpBegin['calendarYear'] !== 0)
+        $this->periodBegin = Utils::createDateTime(substr($cpBegin['calendarYear'], 1).'-01-01');
 
-    if (isset($cpBegin['dateEnd']))
-      $this->periodEnd = Utils::createDateTime($cpBegin['dateEnd']);
-    elseif ($cpBegin['calendarYear'] !== 0)
-      $this->periodEnd = Utils::createDateTime(substr($cpBegin['calendarYear'], 1).'-12-31');
+      if (isset($cpBegin['dateEnd']))
+        $this->periodEnd = Utils::createDateTime($cpBegin['dateEnd']);
+      elseif ($cpBegin['calendarYear'] !== 0)
+        $this->periodEnd = Utils::createDateTime(substr($cpBegin['calendarYear'], 1).'-12-31');
 
-    $this->setInfo('icon', 'reportMonthlyReport');
-    $this->setInfo('param', 'Období', $this->reportParams ['calendarPeriod']['activeTitle']);
+      if (is_string($cpBegin['calendarYear']) && $cpBegin['calendarYear'][0] === 'Y')
+        $this->calendarYear = intval(substr($cpBegin['calendarYear'], 1));
 
-    if (is_string($cpBegin['calendarYear']) && $cpBegin['calendarYear'][0] === 'Y')
-      $this->calendarYear = intval(substr($cpBegin['calendarYear'], 1));
+      $this->setInfo('icon', 'reportMonthlyReport');
+      $this->setInfo('param', 'Období', $this->reportParams ['calendarPeriod']['activeTitle']);
+    }
+    else
+    {
+      $this->periodBegin = Utils::createDateTime($this->periodBegin);
+      $this->periodEnd = Utils::createDateTime($this->periodEnd);
+    }
   }
 
   function createContent ()
@@ -92,6 +103,8 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 			case 'citizensCities': $this->createContent_CitizensCities (); break;
       case 'citizensCities2': $this->createContent_CitizensCities2 (); break;
 			case 'report': $this->createContent_Report (); break;
+			case 'report2': $this->createContent_Report2 (); break;
+			case 'partners': $this->createContent_Partners (); break;
 		}
 	}
 
@@ -169,10 +182,20 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 
   public function createContent_Companies($dir)
   {
-    if ($dir == WasteReturnEngine::rowDirIn)
-      $linkId = 'waste-suppliers-'.$this->calendarYear.'-'.$this->codeKindNdx;
+    if ($this->calendarYear)
+    {
+      if ($dir == WasteReturnEngine::rowDirIn)
+        $linkId = 'waste-suppliers-'.$this->calendarYear.'-'.$this->codeKindNdx;
+      else
+        $linkId = 'waste-cust-'.$this->calendarYear.'-'.$this->codeKindNdx;
+    }
     else
-      $linkId = 'waste-cust-'.$this->calendarYear.'-'.$this->codeKindNdx;
+    {
+      if ($dir == WasteReturnEngine::rowDirIn)
+        $linkId = 'waste-suppliers-'.$this->periodBegin->format('Ymd').'_'.$this->periodEnd->format('Ymd').'-'.$this->codeKindNdx;
+      else
+        $linkId = 'waste-cust-'.$this->periodBegin->format('Ymd').'_'.$this->periodEnd->format('Ymd').'-'.$this->codeKindNdx;
+    }
 
 		/** @var \wkf\core\TableIssues */
 		$tableIssues = $this->app()->table ('wkf.core.issues');
@@ -259,7 +282,9 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
           'btnClass' => 'btn btn-xs btn-success pull-right',
           'data-class' => 'e10pro.reports.waste_cz.libs.SetOfficeWizard',
           'table' => 'e10.persons.persons',
-          'data-addparams' => 'personNdx='.$r['person'].'&dir='.$r['dir'],
+          'data-addparams' => 'personNdx='.$r['person'].'&dir='.$r['dir'].'&periodBegin='.$this->periodBegin->format('Y-m-d').
+                              '&periodEnd='.$this->periodEnd->format('Y-m-d').
+                              '&calendarYear='.$this->calendarYear,
           //'data-srcobjecttype' => 'form-to-save', 'data-srcobjectid' => $this->fid,
         ];
 
@@ -343,6 +368,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
               ['text' => 'IČZ: ', 'class' => ''],
               ['text' => $r['id2'], 'class' => ''],
             ];
+            $data[$wcId]['icz'] = $r['id2'];
           }
           if ($r['id1'] && $r['id1'] !== '')
           {
@@ -354,6 +380,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
                 'suffix' => $r['adrStreet'].', '.$r['adrCity'],
               ],
             ];
+            $data[$wcId]['icp'] = $r['id1'];
           }
         }
       }
@@ -364,6 +391,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
           ['text' => 'ORP: '.substr($nomencCityRecData['itemId'] ?? '--', 2), 'class' => ''],
         ];
         $data[$wcId]['id1'][0]['suffix'] = $nomencCityRecData['fullName'] ?? '--';
+        $data[$wcId]['orp'] = $nomencCityRecData['itemId'] ?? '0';
       }
 
       $lastPerson = $r['person'];
@@ -388,65 +416,79 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 
   public function createContent_Report()
   {
+    $handlingCodes = $this->app()->cfgItem('e10doc.waster.handlingCodes', []);
+
     $data = [];
+
+    $this->createContent_Report_Load_WasteOps(WasteReturnEngine::rowDirIn, $data); // in ops
     $this->createContent_Report_Load(2, $data); // companies
     $this->createContent_Report_Load(1, $data); // humans
+    $this->createContent_Report_Load_WasteOps(WasteReturnEngine::rowDirOut, $data); // out ops
 
-    $data = \e10\sortByOneKey($data, 'order');
-
-    $t = [];
     $sum = [
       'wc' => ['in' => 0.0, 'out' => 0.0],
       'total' => ['in' => 0.0, 'out' => 0.0],
     ];
-    $lastWasteCode = '___';
-    foreach ($data as $row)
-    {
-      if ($row['wasteCode'] !== $lastWasteCode)
-      {
-        if ($lastWasteCode !== '___')
-        {
-          $sumRow = [
-            'wasteCode' => 'CELKEM', 'quantityIn' => $sum['wc']['in'], 'quantityOut' => $sum['wc']['out'],
-            '_options' => ['class' => 'subtotal',]
-          ];
-          $t[] = $sumRow;
 
-          $sum['wc']['in'] = 0.0;
-          $sum['wc']['out'] = 0.0;
+    $t = [];
+    foreach ($data as $gid => $groupRows)
+    {
+      $header = [
+        'wasteCode' => ['text' => $groupRows['wasteCode'], 'suffix' => $groupRows['wasteName']],
+        '_options' => [
+          'colSpan' => ['wasteCode' => 13],
+          'class' => 'subheader',
+        ]
+      ];
+      $header['_options']['beforeSeparator'] = 'separator';
+      $t[] = $header;
+
+      $sum ['wc'] = ['in' => 0.0, 'out' => 0.0];
+      $rows = \e10\sortByOneKey($groupRows['rows'], 'order');
+      foreach ($rows as $row)
+      {
+        if (isset($row['quantityIn']))
+        {
+          $sum['total']['in'] += $row['quantityIn'];
+          $sum['wc']['in'] += $row['quantityIn'];
+        }
+        if (isset($row['quantityOut']))
+        {
+          $sum['total']['out'] += $row['quantityOut'];
+          $sum['wc']['out'] += $row['quantityOut'];
         }
 
-        $header = [
-          'wasteCode' => $row['wasteCode'].': '.$row['wasteName'],
-          '_options' => [
-            'colSpan' => ['wasteCode' => 6],
-            'class' => 'subheader',
-          ]
-        ];
-        $header['_options']['beforeSeparator'] = 'separator';
-        $t[] = $header;
+        if (($row['rs'] ?? 0) === 1)
+        {
+          $hcCfg = $handlingCodes[$row['hc']] ?? NULL;
+          if ($hcCfg)
+          {
+            $row['oid'] = $hcCfg['sn'];
+            $row['_options']['colSpan']['oid'] = 9;
+            $row['_options']['class'] = 'e10-row-this';
+          }
+        }
+
+        if (isset($row['partnerId']))
+        {
+          $partner = $this->partners[$row['partnerId']] ?? NULL;
+          if ($partner)
+            $row['pid'] = $partner['number'];
+        }
+
+        $t[] = $row;
       }
 
-      if (isset($row['quantityIn']))
-      {
-        $sum['total']['in'] += $row['quantityIn'];
-        $sum['wc']['in'] += $row['quantityIn'];
-      }
-      if (isset($row['quantityOut']))
-      {
-        $sum['total']['out'] += $row['quantityOut'];
-        $sum['wc']['out'] += $row['quantityOut'];
-      }
+      $sumRow = [
+        'wasteCode' => 'CELKEM',
+        'quantityIn' => $sum['wc']['in'], 'quantityOut' => $sum['wc']['out'],
+        '_options' => ['class' => 'e10-bold e10-row-minus',]
+      ];
+      if (round($sumRow['quantityIn'] - $sumRow['quantityOut'], 3) < 0.01)
+        $sumRow['_options']['class'] = 'e10-bold e10-row-plus';
 
-
-      $t [] = $row;
-      $lastWasteCode = $row['wasteCode'];
+      $t[] = $sumRow;
     }
-    $sumRow = [
-      'wasteCode' => 'CELKEM', 'quantityIn' => $sum['wc']['in'], 'quantityOut' => $sum['wc']['out'],
-      '_options' => ['class' => 'subtotal',]
-    ];
-    $t[] = $sumRow;
 
     $sumRow = [
       'wasteCode' => 'CELKEM', 'quantityIn' => $sum['total']['in'], 'quantityOut' => $sum['total']['out'],
@@ -456,16 +498,155 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 
 		$h = [
       'wasteCode' => 'Kód odp.',
+      'hc' => 'EK',
       'quantityIn' => ' Příjem '.(($this->showUnits === 1) ? '[t]' : '[kg]'),
       'quantityOut' => ' Výdej '.(($this->showUnits === 1) ? '[t]' : '[kg]'),
+      'pid' => ' pid',
       'oid' => 'IČ',
-      'pn' => 'Firma',
+      'pn' => 'Název partnera',
       'id1' => 'IČP',
       'id2' => 'IČZ',
       'id3' => 'IČOB',
+      'id4' => 'IČZUJ',
       'street' => 'Ulice',
       'city' => 'Město',
       'zipCode' => 'PSČ',
+    ];
+		$this->addContent (
+      [
+        'type' => 'table', 'header' => $h, 'table' => $t, 'main' => TRUE,
+        'params' => ['tableClass' => 'e10-print-small default', 'precision' => ($this->showUnits === 1) ? 6 : 2]
+      ]);
+
+    $this->setInfo('title', 'Roční hlášení o produkci a nakládání s odpady');
+    $this->paperOrientation = 'landscape';
+
+    $this->wastes = $data;
+  }
+
+  public function createContent_Report2()
+  {
+    $handlingCodes = $this->app()->cfgItem('e10doc.waster.handlingCodes', []);
+
+    $data = [];
+    $this->createContent_Report_Load_WasteSums($data);
+
+    $t = [];
+    $sum = [
+      'wc' => ['in' => 0.0, 'out' => 0.0],
+      'total' => ['in' => 0.0, 'out' => 0.0],
+    ];
+
+    foreach ($data as $groupId => $group)
+    {
+      $header = [
+        'hc' => ['text' => $group['wasteCode'], 'suffix' => $group['wasteName']],
+        '_options' => [
+          'colSpan' => ['hc' => 4],
+          'class' => 'subheader',
+        ]
+      ];
+      $header['_options']['beforeSeparator'] = 'separator';
+      $t[] = $header;
+
+      $groupSum = [
+        'quantityIn' => 0.0,
+        'quantityOut' => 0.0,
+      ];
+
+      $endYearInfo = ['sumIn' => 0.0, 'sumEnd' => 0.0, 'statesIn' => []];
+
+
+      $qState = 0.0;
+      foreach ($group['rows'] as $groupRow)
+      {
+        $groupSum['quantityIn'] += $groupRow['quantityIn'] ?? 0.0;
+        $groupSum['quantityOut'] += $groupRow['quantityOut'] ?? 0.0;
+
+        $qState += $groupRow['quantityIn'] ?? 0.0;
+        $qState -= $groupRow['quantityOut'] ?? 0.0;
+
+        $item = $groupRow;
+        $item['qs'] = $qState;
+
+        $hcCfg = $handlingCodes[$groupRow['hc']] ?? NULL;
+        if ($hcCfg)
+        {
+          if (isset($hcCfg['endYearCode']))
+          {
+            $eyc = $hcCfg['endYearCode'];
+            if (!isset($endYearInfo['statesIn'][$eyc]))
+            {
+              $endYearInfo['statesIn'][$eyc] = 0.0;
+              $endYearInfo['srcCodes'][$eyc] = $groupRow['hc'];
+            }
+            $endYearInfo['statesIn'][$eyc] += $groupRow['quantityIn'];
+            $endYearInfo['sumIn'] += $groupRow['quantityIn'];
+          }
+          if (isset($hcCfg['isEndState']))
+          {
+            $endYearInfo['sumEnd'] += $groupRow['quantityOut'];
+          }
+
+          $item['hc'] = $hcCfg['sn'];
+        }
+
+        $t [] = $item;
+      }
+
+      $res = $groupSum['quantityIn'] - $groupSum['quantityOut'];
+      $sumRow = [
+        'hc' => 'CELKEM:',
+        'quantityIn' => $groupSum['quantityIn'],
+        'quantityOut' => $groupSum['quantityOut'],
+        'qs' => $qState,
+        '_options' => ['class' => 'subtotal',]
+      ];
+
+      $t[] = $sumRow;
+
+      // -- endYearInfo
+      if (count($endYearInfo['statesIn']) > 0 && abs($qState) > 0.01)
+      {
+        $endState = round($qState + $endYearInfo['sumEnd'], 2);
+        $endStateOut = $endState;//$qState;
+        foreach ($endYearInfo['statesIn'] as $eyc => $eyq)
+        {
+          if ($endYearInfo['sumIn'] == 0.0)
+            continue;
+          $item = [
+            'hc' => [['text' => $endYearInfo['srcCodes'][$eyc].' → '.$eyc, 'prefix' => 'Zůstatek', 'class' => '']],
+            'qs' => 0.0,
+            '_options' => ['class' => 'e10-row-this', 'colSpan' => ['hc' => 2]],
+          ];
+
+          $ratio = $endYearInfo['statesIn'][$eyc] / $endYearInfo['sumIn'];
+          $quantityOut = round($endState * $ratio, 2);
+          $endStateOut -= $quantityOut;
+          if ($endStateOut < 0.0)
+          {
+            $diff = $endStateOut;
+            $quantityOut = round($quantityOut + $diff, 2);
+            $endStateOut = 0.0;
+          }
+          $item['hc'][] = ['text' => "{$endYearInfo['statesIn'][$eyc]} / {$endYearInfo['sumIn']} = $ratio", 'class' => 'label label-default'];
+          $item['hc'][] = ['text' => "{$endState} * $ratio = $quantityOut", 'class' => 'label label-default'];
+
+          $item['quantityOut'] = $quantityOut;
+          $item['qs'] = $endStateOut;
+
+          $t [] = $item;
+        }
+      }
+    }
+
+
+		$h = [
+      //'#' => '#',
+      'hc' => 'Evidenční kód nakládání',
+      'quantityIn' => ' Příjem '.(($this->showUnits === 1) ? '[t]' : '[kg]'),
+      'quantityOut' => ' Výdej '.(($this->showUnits === 1) ? '[t]' : '[kg]'),
+      'qs' => ' Zůstatek '.(($this->showUnits === 1) ? '[t]' : '[kg]'),
     ];
 		$this->addContent (
       [
@@ -477,13 +658,48 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
     $this->paperOrientation = 'landscape';
   }
 
+  public function createContent_Partners()
+  {
+    $data = [];
+
+    $this->createContent_Report_Load_WasteOps(WasteReturnEngine::rowDirIn, $data); // in ops
+    $this->createContent_Report_Load(2, $data); // companies
+    $this->createContent_Report_Load(1, $data); // humans
+    $this->createContent_Report_Load_WasteOps(WasteReturnEngine::rowDirOut, $data); // out ops
+
+    $this->setInfo('title', 'Partneři');
+    $this->paperOrientation = 'landscape';
+
+		$h = [
+      //'#' => '#',
+      'number' => ' PID',
+      'name' => 'Název',
+      'ico' => ' IČO',
+      'icp' => ' IČP',
+      'icob' => 'IČOB',
+      'icz' => 'IČZ',
+      'orp' => ' ORP',
+      'iczuj' => 'IČZUJ',
+      'ulice' => 'Ulice',
+      'cisloPopisne' => 'Čís.p.',
+      'cisloOrientacni' => 'Čís.o.',
+      'obec' => 'Obec',
+      'psc' => 'PSČ',
+    ];
+		$this->addContent (
+      [
+        'type' => 'table', 'header' => $h, 'table' => $this->partners, 'main' => TRUE,
+        'params' => ['tableClass' => 'e10-print-small default']
+      ]);
+  }
+
   public function createContent_Report_Load($personType, &$data)
   {
     $q = [];
 
     if ($personType === 2) // companies
     {
-      array_push ($q, 'SELECT [rows].person, [rows].personOffice, [rows].wasteCodeNomenc, [rows].[dir], [rows].[addressMode], [rows].[nomencCity],');
+      array_push ($q, 'SELECT [rows].person, [rows].personOffice, [rows].wasteCodeNomenc, [rows].wasteHandlingCode, [rows].[dir], [rows].[addressMode], [rows].[nomencCity],');
       array_push ($q, ' SUM([rows].quantityKG) as quantityKG,');
       array_push ($q, ' nomencItems.fullName, nomencItems.itemId,');
       array_push ($q, ' persons.fullName AS personFullName,');
@@ -495,7 +711,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
     }
     else
     { // citizens
-      array_push ($q, 'SELECT [rows].wasteCodeNomenc, [rows].[dir],');
+      array_push ($q, 'SELECT [rows].wasteCodeNomenc, [rows].[dir], [rows].wasteHandlingCode, [rows].natCityId, ');
       array_push ($q, ' SUM([rows].quantityKG) as quantityKG,');
       array_push ($q, ' nomencItems.fullName, nomencItems.itemId');
       array_push ($q, ' FROM e10pro_reports_waste_cz_returnRows AS [rows]');
@@ -505,6 +721,8 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 		array_push ($q, ' WHERE 1');
 		array_push ($q, ' AND [rows].personType = %i', $personType);
 
+    array_push ($q, ' AND [rows].[wasteCodeKind] = %i', $this->codeKindNdx);
+
     if ($this->periodBegin)
       array_push ($q, ' AND [rows].[dateAccounting] >= %d', $this->periodBegin);
     if ($this->periodEnd)
@@ -512,12 +730,12 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 
     if ($personType === 2)
     { // companies
-		  array_push ($q, ' GROUP BY wasteCodeNomenc, [rows].person, [rows].addressMode, [rows].personOffice, [rows].nomencCity, [rows].[dir]');
+		  array_push ($q, ' GROUP BY wasteCodeNomenc, [rows].person, [rows].addressMode, [rows].personOffice, [rows].nomencCity, [rows].[dir], [rows].wasteHandlingCode');
       array_push ($q, ' ORDER BY [rows].wasteCodeNomenc, persons.fullName');
     }
     else
     { // citizens
-      array_push ($q, ' GROUP BY wasteCodeNomenc, [rows].[dir]');
+      array_push ($q, ' GROUP BY wasteCodeNomenc, [rows].[dir], [rows].wasteHandlingCode, [rows].natCityId');
       array_push ($q, ' ORDER BY [rows].wasteCodeNomenc');
     }
 
@@ -525,10 +743,12 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 		$rows = $this->app->db()->query ($q);
 		forEach ($rows as $r)
 		{
+      $gid = 'G'.$r['wasteCodeNomenc'];
+
       $personOid = '';
       $personICOB = '';
       $pn = '';
-      $order = $r['itemId'].'_'.$r['dir'].'_';
+      $order = $r['itemId'].'_'.$r['dir'].'_'.$r['wasteHandlingCode'];
 
       if ($personType === 2)
       { // companies
@@ -546,6 +766,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
       $item = [
         'wasteCode' => $r['itemId'],
         'wasteName' => $r['fullName'],
+        'hc' => $r['wasteHandlingCode'],
         'oid' => $personOid,
         'pn' => $pn,
         'order' => $order,
@@ -555,16 +776,20 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
       if ($r['dir'] == WasteReturnEngine::rowDirIn)
       {
         if ($this->showUnits === 1)
-          $item['quantityIn'] = round($r['quantityKG'] / 1000, 3);
+          $item['quantityIn'] = round($r['quantityKG'] / 1000, 6);
         else
           $item['quantityIn'] = $r['quantityKG'];
       }
       elseif ($r['dir'] == WasteReturnEngine::rowDirOut)
       {
         if ($this->showUnits === 1)
-          $item['quantityOut'] = round($r['quantityKG'] / 1000, 3);
+          $item['quantityOut'] = round($r['quantityKG'] / 1000, 6);
         else
         $item['quantityOut'] = $r['quantityKG'];
+      }
+      if ($personType === 1)
+      { // citizens
+        $item['id4'] = strval($r['natCityId']);
       }
       if ($personType === 2)
       {
@@ -576,10 +801,22 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
             $item['street'] = $r['adrStreet'];
             $item['zipCode'] = str_replace(' ', '', $r['adrZipCode']);
 
-            if (($r['id1'] && $r['id1'] !== ''))
+            if ((isset($r['id1']) && $r['id1'] !== ''))
+            {
               $item['id1'] = $r['id1'];
-            if (($r['id2'] && $r['id2'] !== ''))
+              $item['icp'] = $r['id1'];
+            }
+            if ((isset($r['id2']) && $r['id2'] !== ''))
+            {
               $item['id2'] = $r['id2'];
+              $item['icz'] = $r['id2'];
+            }
+
+            if (($item['id1'] ?? '') === '' && ($item['id2'] ?? '') === '')
+            {
+              $item['id1'] = '1';
+              $item['icp'] = '1';
+            }
           }
           else
           {
@@ -589,20 +826,291 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
               $item['city'] = $addr['adrCity'];
               $item['street'] = $addr['adrStreet'];
               $item['zipCode'] = str_replace(' ', '', $addr['adrZipCode']);
+              $item['id1'] = '1';
+              $item['icp'] = '1';
             }
           }
         }
         else
         { // city
           $nomencCityRecData = $this->app()->loadItem($r['nomencCity'], 'e10.base.nomencItems');
+          $orp = substr($nomencCityRecData['itemId'] ?? '', 2);
           $item['id1'] = [
-            ['text' => 'ORP: '.substr($nomencCityRecData['itemId'], 2), 'class' => ''],
+            ['text' => 'ORP: '.$orp, 'class' => ''],
           ];
-          $item['id1'][0]['suffix'] = $nomencCityRecData['fullName'];
+          $item['id1'][0]['suffix'] = $nomencCityRecData['fullName'] ?? '!!!!';
+          $item['id_orp'] = $orp;
         }
       }
+      else
+      {
+        $item['isCity'] = 1;
+      }
 
-      $data[] = $item;
+      $item['partnerId'] = $this->registerPartner($item);
+
+      if (!isset($data[$gid]))
+      {
+        $data[$gid] = [
+          'wasteCode' => $r['itemId'],
+          'wasteName' => $r['fullName'],
+          'rows' => [],
+        ];
+      }
+
+      $data[$gid]['rows'][] = $item;
+      $cnt++;
+		}
+  }
+
+  protected function registerPartner(&$item)
+  {
+    $ico = $item['oid'] ?? '';
+    $icz = $item['icz'] ?? '';
+    $icob = $item['id3'] ?? '';
+    $icp = $item['icp'] ?? '';
+    $iczuj = strval($item['id4'] ?? '');
+
+    $partnerId = 'P'.$ico.'_';
+    if ($icz !== '')
+      $partnerId .= $icz;
+    elseif ($icob !== '')
+      $partnerId .= $icob;
+    elseif ($icp !== '')
+      $partnerId .= $icp;
+    elseif ($iczuj !== '')
+      $partnerId .= $iczuj;
+
+    if (isset($this->partners[$partnerId]))
+    {
+      if (isset($item['isCity']))
+      {
+        $partner = $this->partners[$partnerId];
+        $item['city'] = $partner['obec'];
+      }
+      return $partnerId;
+    }
+
+    $partnerNumber = count($this->partners) + 1;
+    $partner = [
+      'number' => $partnerNumber,
+      'name' => $item['pn'],
+    ];
+
+    if (isset($item['oid']) && $item['oid'] !== '')
+      $partner['ico'] = $item['oid'];
+
+    if (isset($item['icp']) && $item['icp'] !== '')
+      $partner['icp'] = $item['icp'];
+
+    if (isset($item['icz']) && $item['icz'] !== '')
+      $partner['icz'] = $item['icz'];
+
+    if (isset($item['id_orp']) && $item['id_orp'] !== '')
+      $partner['orp'] = $item['id_orp'];
+
+    if (isset($item['id3']) && $item['id3'] !== '')
+      $partner['icob'] = $item['id3'];
+
+    if (isset($item['city']) && $item['city'] !== '')
+      $partner['obec'] = $item['city'];
+
+    if (isset($item['zipCode']) && $item['zipCode'] !== '')
+      $partner['psc'] = $item['zipCode'];
+
+    if (isset($item['id4']) && $item['id4'] !== '')
+      $partner['iczuj'] = $item['id4'];
+    else
+      $partner['iczuj'] = strval($this->natCityId($item['obec'] ?? ''));
+
+    if (isset($item['street']) && $item['street'] !== '')
+    {
+      $sp = explode(' ', $item['street']);
+      if (count($sp) > 1)
+      {
+        $num = array_pop($sp);
+        $numbers = explode('/', $num);
+        if (is_numeric($numbers[0]))
+        {
+          $partner['cisloPopisne'] = $numbers[0];
+          if (isset($numbers[1]))
+            $partner['cisloOrientacni'] = $numbers[1];
+          $partner['ulice'] = implode(' ', $sp);
+        }
+        else
+          $partner['ulice'] = $item['street'];
+      }
+      else
+        $partner['ulice'] = $item['street'];
+    }
+
+    if (isset($item['isCity']))
+    {
+      $partner['isCity'] = 1;
+      $partner['obec'] = $this->cityById($partner['iczuj']);
+      $item['city'] = $partner['obec'];
+    }
+
+    $this->partners[$partnerId] = $partner;
+
+    return $partnerId;
+  }
+
+  protected function natCityId($city)
+  {
+    $natCityId = 585068;
+
+    $nc = $this->db()->query('SELECT * FROM e10_base_nomencItems WHERE shortName = %s', $city, ' AND [level] = %i', 2, ' AND id LIKE %s', 'cz-orp%')->fetch();
+    if ($nc)
+    {
+      $natCityId = intval(substr($nc['itemId'], 2));
+      if ($natCityId)
+        return $natCityId;
+    }
+
+    return $natCityId;
+  }
+
+  protected function cityById($cityId)
+  {
+    $nc = $this->db()->query('SELECT * FROM e10_base_nomencItems WHERE itemId = %s', 'CZ'.$cityId)->fetch();
+    if ($nc)
+    {
+      return $nc['shortName'];
+    }
+
+    return '';
+  }
+
+  public function createContent_Report_Load_WasteOps($dir, &$data)
+  {
+    $q = [];
+    array_push ($q, 'SELECT [rows].wasteCodeNomenc, [rows].[dir], [rows].wasteHandlingCode, ');
+    array_push ($q, ' SUM([rows].quantityKG) as quantityKG,');
+    array_push ($q, ' nomencItems.fullName, nomencItems.itemId');
+    array_push ($q, ' FROM e10pro_reports_waste_cz_returnRows AS [rows]');
+    array_push ($q, ' LEFT JOIN [e10_base_nomencItems] AS nomencItems ON [rows].wasteCodeNomenc = nomencItems.ndx');
+		array_push ($q, ' WHERE 1');
+		array_push ($q, ' AND [rows].rowSource = %i', 1);
+    array_push ($q, ' AND [rows].dir = %i', $dir);
+    array_push ($q, ' AND [rows].[wasteCodeKind] = %i', $this->codeKindNdx);
+
+    if ($this->periodBegin)
+      array_push ($q, ' AND [rows].[dateAccounting] >= %d', $this->periodBegin);
+    if ($this->periodEnd)
+      array_push ($q, ' AND [rows].[dateAccounting] <= %d', $this->periodEnd);
+
+    array_push ($q, ' GROUP BY wasteCodeNomenc, [rows].[dir], [rows].wasteHandlingCode');
+    array_push ($q, ' ORDER BY [rows].wasteCodeNomenc');
+
+    $cnt = 0;
+		$rows = $this->app->db()->query ($q);
+		forEach ($rows as $r)
+		{
+      $gid = 'G'.$r['wasteCodeNomenc'];
+
+      if ($dir == WasteReturnEngine::rowDirIn)
+        $order = $r['itemId'].'_'.$r['dir'].'_'.'00'.'000000000';
+      else
+        $order = $r['itemId'].'_'.$r['dir'].'_'.'ZZ'.'ZZZZZZZZZ';
+
+      $item = [
+        'wasteCode' => $r['itemId'],
+        'wasteName' => $r['fullName'],
+        'hc' => $r['wasteHandlingCode'],
+        'order' => $order,
+        'rs' => 1,
+      ];
+
+      if ($r['dir'] == WasteReturnEngine::rowDirIn)
+      {
+        if ($this->showUnits === 1)
+          $item['quantityIn'] = round($r['quantityKG'] / 1000, 6);
+        else
+          $item['quantityIn'] = $r['quantityKG'];
+      }
+      elseif ($r['dir'] == WasteReturnEngine::rowDirOut)
+      {
+        if ($this->showUnits === 1)
+          $item['quantityOut'] = round($r['quantityKG'] / 1000, 6);
+        else
+        $item['quantityOut'] = $r['quantityKG'];
+      }
+
+      if (!isset($data[$gid]))
+      {
+        $data[$gid] = [
+          'wasteCode' => $r['itemId'],
+          'wasteName' => $r['fullName'],
+          'rows' => [],
+        ];
+      }
+
+      $data[$gid]['rows'][] = $item;
+
+      $cnt++;
+		}
+  }
+
+  public function createContent_Report_Load_WasteSums(&$data)
+  {
+    $q = [];
+    array_push ($q, 'SELECT [rows].[dir], [rows].wasteCodeNomenc, [rows].wasteHandlingCode, ');
+    array_push ($q, ' SUM([rows].quantityKG) as quantityKG,');
+    array_push ($q, ' nomencItems.fullName, nomencItems.itemId');
+    array_push ($q, ' FROM e10pro_reports_waste_cz_returnRows AS [rows]');
+    array_push ($q, ' LEFT JOIN [e10_base_nomencItems] AS nomencItems ON [rows].wasteCodeNomenc = nomencItems.ndx');
+
+		array_push ($q, ' WHERE 1');
+    array_push ($q, ' AND [rows].[wasteCodeKind] = %i', $this->codeKindNdx);
+
+    if ($this->periodBegin)
+      array_push ($q, ' AND [rows].[dateAccounting] >= %d', $this->periodBegin);
+    if ($this->periodEnd)
+      array_push ($q, ' AND [rows].[dateAccounting] <= %d', $this->periodEnd);
+
+    array_push ($q, ' GROUP BY wasteCodeNomenc, [rows].[dir], [rows].wasteHandlingCode');
+    array_push ($q, ' ORDER BY [rows].wasteCodeNomenc');
+
+    $cnt = 0;
+		$rows = $this->app->db()->query ($q);
+		forEach ($rows as $r)
+		{
+      $gid = 'G'.$r['wasteCodeNomenc'];
+      $order = $r['itemId'].'_'.$r['dir'].'_'.$r['wasteHandlingCode'];
+
+      $item = [
+        'wasteCode' => $r['itemId'],
+        'wasteName' => $r['fullName'],
+        'hc' => $r['wasteHandlingCode'],
+        'order' => $order,
+      ];
+
+      if ($r['dir'] == WasteReturnEngine::rowDirIn)
+      {
+        if ($this->showUnits === 1)
+          $item['quantityIn'] = round($r['quantityKG'] / 1000, 6);
+        else
+          $item['quantityIn'] = $r['quantityKG'];
+      }
+      elseif ($r['dir'] == WasteReturnEngine::rowDirOut)
+      {
+        if ($this->showUnits === 1)
+          $item['quantityOut'] = round($r['quantityKG'] / 1000, 6);
+        else
+        $item['quantityOut'] = $r['quantityKG'];
+      }
+
+      if (!isset($data[$gid]))
+      {
+        $data[$gid] = [
+          'wasteCode' => $r['itemId'],
+          'wasteName' => $r['fullName'],
+          'rows' => [],
+        ];
+      }
+
+      $data[$gid]['rows'][] = $item;
       $cnt++;
 		}
   }
@@ -675,7 +1183,6 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
           '_options' => [
             'colSpan' => ['wasteCode' => 3],
             'class' => 'subheader',
-
           ]
         ];
 
@@ -684,7 +1191,6 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
         $data[] = $header;
       }
       $item = [
-
         'wasteCode' => $r['itemId'],
         'wasteName' => $r['fullName'],
         'quantity' => $r['quantityKG'],
@@ -804,10 +1310,20 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 
   function loadSendedReports (&$data, $dir)
 	{
-    if ($dir == WasteReturnEngine::rowDirIn)
-      $linkId = 'waste-suppliers-'.$this->calendarYear.'-'.$this->codeKindNdx;
+    if ($this->calendarYear)
+    {
+      if ($dir == WasteReturnEngine::rowDirIn)
+        $linkId = 'waste-suppliers-'.$this->calendarYear.'-'.$this->codeKindNdx;
+      else
+        $linkId = 'waste-cust-'.$this->calendarYear.'-'.$this->codeKindNdx;
+    }
     else
-      $linkId = 'waste-cust-'.$this->calendarYear.'-'.$this->codeKindNdx;
+    {
+      if ($dir == WasteReturnEngine::rowDirIn)
+        $linkId = 'waste-suppliers-'.$this->periodBegin->format('Ymd').'_'.$this->periodEnd->format('Ymd').'-'.$this->codeKindNdx;
+      else
+        $linkId = 'waste-cust-'.$this->periodBegin->format('Ymd').'_'.$this->periodEnd->format('Ymd').'-'.$this->codeKindNdx;
+    }
 
 		/** @var \wkf\core\TableIssues */
 		$tableIssues = $this->app()->table ('wkf.core.issues');
@@ -849,6 +1365,8 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
     $d[] = ['id' => 'citizensCities', 'icon' => 'system/iconMapMarker', 'title' => 'Občané podle obcí'];
     $d[] = ['id' => 'citizensCities2', 'icon' => 'system/iconMapMarker', 'title' => 'Občané podle obcí 2'];
     $d[] = ['id' => 'report', 'icon' => 'system/iconFile', 'title' => 'Hlášení'];
+    $d[] = ['id' => 'report2', 'icon' => 'system/iconFile', 'title' => 'Sumárně'];
+    $d[] = ['id' => 'partners', 'icon' => 'system/iconUser', 'title' => 'Partneři'];
 
 		return $d;
 	}
@@ -865,6 +1383,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
         'data-param-period-end' => $this->periodEnd->format('Y-m-d'),
         'data-param-calendar-year' => strval($this->calendarYear),
         'data-param-code-kind' => strval($this->codeKindNdx),
+        'data-param-send-status' => strval($this->sendStatus),
         'data-table' => 'e10.persons.persons', 'data-pk' => '0',
         'class' => 'btn-primary'
       ];

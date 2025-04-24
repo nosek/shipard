@@ -141,6 +141,20 @@ class TemplateCore extends \Mustache
 		return $t;
 	}
 
+	public function renderTextSafe ($text)
+	{
+		try
+		{
+			$t = $this->render ($text);
+		}
+		catch (\MustacheException $e)
+		{
+			$t = 'Chyba šablony: '.$e->getMessage();
+		}
+
+		return $t;
+	}
+
 	public function renderSubTemplate ($subtemplateName)
 	{
 		$subtemplateId = utils::parseMarkup($subtemplateName, $this->subTemplateParams);
@@ -186,7 +200,7 @@ class TemplateCore extends \Mustache
 		}
 		else
 		{
-			error_log ("template.json `$fullOptionsName` not found");
+			//error_log ("template.json `$fullOptionsName` not found");
 			$this->options = [];
 		}
 
@@ -210,8 +224,8 @@ class TemplateCore extends \Mustache
 
 		if ($templateFileName !== FALSE && !$this->template)
 		{
-			error_log("file `$fullTemplateName` not found [TID: $name]");
-			Utils::debugBacktrace();
+			//error_log("file `$fullTemplateName` not found [TID: $name]");
+			//Utils::debugBacktrace();
 		}
 	}
 
@@ -393,7 +407,7 @@ class TemplateCore extends \Mustache
 		if (isset ($params['dataItem']))
 			$date = Utils::createDateTime($this->getVar($params['dataItem']));
 		else
-			$date = Utils::today();
+			$date = new \DateTime();
 
 		if (!$date)
 			return '';

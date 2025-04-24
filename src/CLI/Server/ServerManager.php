@@ -281,6 +281,7 @@ class ServerManager extends Utility
 		}
 
 		$this->checkService ('shpd-ds-cmds', '/etc/services');
+		$this->checkService ('shpd-ds-queue', '/etc/services');
 		$this->checkService ('shpd-ds-services', '/etc/services');
 		$this->checkService ('shpd-headless-browser', '/etc/services');
 
@@ -340,6 +341,10 @@ class ServerManager extends Utility
 
 		$cfg .= "server {\n";
 		$cfg .= "\tlisten 443 ssl http2;\n";
+
+		if ($this->app()->cfgServer['ipv6Enabled'] ?? 0)
+			$cfg .= "\tlisten [::]:443 ssl http2;\n";
+
 		$cfg .= "\tserver_name {$serverName};\n";
 		$cfg .= "\troot {$dsRoot};\n";
 		$cfg .= "\tindex index.php;\n";

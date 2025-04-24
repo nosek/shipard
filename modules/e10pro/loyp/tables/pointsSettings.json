@@ -1,0 +1,33 @@
+{
+	"id": "e10pro.loyp.pointsSettings", "sql": "e10pro_loyp_pointsSettings", "name": "Nastavení věrnostních bodů",
+	"columns": [
+		{"id": "ndx", "name": "ndx", "type": "int_ai"},
+
+    {"id": "fullName", "name": "Název", "type": "string", "len": 120},
+
+		{"id": "settingsType", "name": "Nastavit pro", "type": "enumInt", "options": ["saveOnChange"],
+			"enumValues": {"0": "Položka", "1": "Kategorie", "2": "Vše"}},
+
+		{"id": "witemCategory", "name": "Kategorie položek", "type": "int", "reference": "e10.witems.itemcategories", "options": ["saveOnChange"]},
+		{"id": "item", "name": "Položka", "type": "int", "reference": "e10.witems.items", "comboViewer": "combo", "options": ["saveOnChange"]},
+
+		{"id": "loyp", "name": "Věrnostní program", "type": "int", "reference": "e10pro.loyp.loyps"},
+
+    {"id": "cntPoints", "name": "Počet bodů", "type": "number", "dec": 2},
+    {"id": "perAmount", "name": "Za částku", "type": "money"},
+    {"id": "perQuantity", "name": "Za množství", "type": "money"},
+
+		{"id": "validFrom", "name": "Platné od", "type": "date"},
+		{"id": "validTo", "name": "Platné do", "type": "date"},
+
+		{"id": "docState", "name": "Stav", "type": "int"},
+		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}
+	],
+	"states": {"stateColumn": "docState", "mainStateColumn": "docStateMain", "statesCfg": "e10.base.defaultDocStatesArchive"},
+	"views": [
+		{"id": "default", "class": "e10pro.loyp.ViewPointsSettings", "detail": "e10pro.loyp.ViewDetailPointsSettings"}
+	],
+	"forms": [
+		{"id": "default", "class": "e10pro.loyp.FormPointsSettings"}
+	]
+}

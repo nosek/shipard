@@ -8,6 +8,10 @@ class FormStockIn extends \e10doc\core\FormHeads
 	public function renderForm ()
 	{
 		$taxPayer = $this->recData['taxPayer'];
+		$wdm = $this->wasteDocMode();
+
+		$warehouse = $this->table->app()->cfgItem ('e10doc.warehouses.'.$this->recData['warehouse'], NULL);
+		$usePersonOffice = intval($warehouse['usePersonsOffice'] ?? 0);
 
 		$this->setFlag ('maximize', 1);
 		$this->setFlag ('sidebarPos', self::SIDEBAR_POS_RIGHT);
@@ -24,6 +28,8 @@ class FormStockIn extends \e10doc\core\FormHeads
 		$this->layoutOpen (self::ltHorizontal);
 		$this->layoutOpen (self::ltForm);
 		$this->addColumnInput ("person");
+		if ($usePersonOffice)
+			$this->addColumnInput ('otherAddress1');
 
 		$this->addColumnInput ("symbol1");
 		$this->addColumnInput ("symbol2");
@@ -38,6 +44,13 @@ class FormStockIn extends \e10doc\core\FormHeads
 		}
 		if ($this->table->app()->cfgItem ('options.core.useCentres', 0))
 			$this->addColumnInput ("centre");
+		if ($wdm === 1)
+		{
+			$this->addColumnInput ('addToWasteReport');
+		}
+		if ($this->table->app()->cfgItem ('options.waster.useWaster', 0))
+			$this->addColumnInput ('wasteOrigin', self::coHeader|self::coColW12);
+
 		$this->layoutClose ();
 
 		$this->layoutOpen (self::ltForm);

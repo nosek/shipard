@@ -1,7 +1,7 @@
 {
 	"panels": {
 		"agendy": {
-			"url": "/app/dashboard", "zone": "sec", "objectType": "panel", "name": "", "icon": "system/actionHomePage", "order": 1000,
+			"url": "/app/dashboard", "zone": "sec", "objectType": "panel", "name": "", "icon": "system/actionHomePage", "cntBigIcons": 7, "order": 1000,
 			"items": {
 				"start": {
 					"t1": "Start", "object": "widget", "class": "e10.widgetDashboard", "subclass": "main_new", "icon": "system/iconStart",
@@ -20,6 +20,10 @@
 				"bulEmails": {
 					"t1": "Hromadná pošta", "object": "viewer", "table": "e10pro.bume.bulkEmails", "viewer": "default",
 					"order": 400000, "enabledCfgItem": "options.experimental.bulkEmails"
+				},
+				"msgs": {
+					"t1": "Zprávy", "object": "viewer", "table": "wkf.msgs.msgs", "viewer": "default",
+					"order": 440000, "enabledCfgItem": "options.experimental.bulkEmails"
 				}
 			}
 		},
@@ -30,6 +34,10 @@
 				{"t1": "Přehled", "object": "widget", "class": "e10.widgetDashboard",
 					"subclass": "main", "icon": "system/dashboardDashboard", "order": 5000}
 			]
+		},
+		"others": {
+			"url": "/app/others", "zone": "sec", "objectType": "panel", "name": "Ostatní", "cntBigIcons": 7, "order": 800000,
+			"items": []
 		},
 		"wikiAppPageR": {"urlRegExp": "/^\\/app\\/wiki\\-[0-9]+$/", "zone": "sec", "objectType": "redirect", "redirect": "", "order": 100},
 		"wikiAppPage": {"urlRegExp": "/^\\/app\\/wiki\\-[0-9]+\\/(.*)$/", "objectType": "function", "function": "e10.web.createWebPageWiki", "zone": "sec", "order": 100}

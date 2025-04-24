@@ -237,6 +237,8 @@ function attLinkPreviewOpen (e)
 					"</div>"
 			;
 
+	e.on("remove", function(){attLinkPreviewClose ()});
+
 	var mainBrowserContent = $('#mainBrowserContent');
 	$('body').append (previewHtml);
 }
@@ -1608,6 +1610,18 @@ function e10viewerDoComboClick (e, event)
 		if (form.attr ('data-readonly') !== undefined)
 			return;
 		var options = {"appendRowList": "rows", "appendRowItemPK": pk};
+
+		var iel = e.get(0);
+		for (var i = 0, attrs = iel.attributes, l = attrs.length; i < l; i++)
+		{
+			var attrName = attrs.item(i).nodeName;
+			if (attrName.substring(0, 7) !== 'data-cc')
+				continue;
+			var valParts = attrs.item(i).nodeValue.split(':');
+
+			options[valParts[0]] = b64DecodeUnicode(valParts[1]);
+		}
+
 		if (!e10SaveOnChange (form, options))
 			setTimeout (function () {e10viewerDoComboClick (e, 0)}, 50);
 	}
@@ -2237,8 +2251,19 @@ function e10viewerSetDetail (viewerId, listItem, toolbarOnly)
   var tableName = searchParentAttr (listItem, 'data-table');
 
   var detail = $('#' + viewerId + 'Details');
-	var detailHeader = detail.find ('div.e10-mv-ld-header');
-	var detailContent = detail.find ('div.e10-mv-ld-content');
+	var detailContent = null;
+	var detailHeader = null;
+
+	var detailInPanelRight = parseInt(viewer.attr('data-detail-in-panel-right'));//$('#' + viewerId + 'PanelRight');
+	if (detailInPanelRight)
+	{
+		detailContent = $('#' + viewerId + 'PanelRight > div.detail');
+	}
+	else
+	{
+		detailHeader = detail.find ('div.e10-mv-ld-header');
+		detailContent = detail.find ('div.e10-mv-ld-content');
+	}
 
 	var detailToolbar = null;
 	var detailToolbarId = viewer.attr ('data-toolbar');
@@ -2263,9 +2288,10 @@ function e10viewerSetDetail (viewerId, listItem, toolbarOnly)
 			//alert (data.object.htmlContent);
 			detail.attr ('data-addparams', '');
 
-			if (toolbarOnly)
+			if (toolbarOnly && !detailInPanelRight)
 			{
-				detailHeader.html (data.object.htmlHeader);
+				if (detailHeader !== null)
+					detailHeader.html (data.object.htmlHeader);
 				if (detailToolbar !== null)
 					detailToolbar.html (data.object.htmlButtons);
 			}
@@ -2289,7 +2315,8 @@ function e10viewerSetDetail (viewerId, listItem, toolbarOnly)
 					}
 				}
 
-				detailHeader.html (data.object.htmlHeader);
+				if (detailHeader !== null)
+					detailHeader.html (data.object.htmlHeader);
 				detailContent.html (data.object.htmlContent);
 				if (detailToolbar !== null)
 					detailToolbar.html (data.object.htmlButtons);
@@ -2380,7 +2407,10 @@ function viewerRefresh (e, focusPK, appendLines)
 	}
 	var tableName = viewer.attr("data-table");
 	if (!tableName)
+	{
+		console.log('viewerRefresh - invalid table name', viewerId, viewer);
 		return;
+	}
 
 	var viewerOptions = viewer.attr("data-viewer-view-id");
 
@@ -2442,7 +2472,15 @@ function df2viewerFocusPK (viewerId, pk)
 		oneRow = viewerLines.find('tr[data-pk="' + pk + '"]').first ();
 		if (oneRow.length)
 		{
-			viewerLines.scrollTo(oneRow);
+			var ste = oneRow;
+			if (ste.prev().length)
+			{
+				ste = ste.prev();
+				if (ste.prev().length)
+					ste = ste.prev();
+				viewerLines.scrollTo(ste);
+			}
+			//oneRow.get(0).scrollIntoView({'block': 'center'});
 			viewerItemClick (oneRow);
 		}
 		return;
@@ -3665,7 +3703,7 @@ function e10DecorateFormWidgets (e)
 
 var g_openModals = Array ();
 
-function e10ViewerCreateEditForm (data, formId, srcObjectType, srcObjectId, inlineSourceElement)
+function e10ViewerCreateEditForm (data, formId, srcObjectType, srcObjectId, inlineSourceElement, fakePrimaryKey)
 {
 	var sidebarPos = data.flags.sidebarPos;
 	var infoPanelPos = (data.flags.infoPanelPos === undefined) ? 0 : data.flags.infoPanelPos;
@@ -3690,8 +3728,11 @@ function e10ViewerCreateEditForm (data, formId, srcObjectType, srcObjectId, inli
 
 	newFormHtml += "></div>";
 
-	newFormHtml +=      "<div id='" + formId + "Form' class='"+formClass+"' data-object='modal' data-formId='"+formId+"' data-srcObjectType='" + srcObjectType + "' data-srcObjectId='" + srcObjectId + "' data-sidebar-element-id='" + sidebarElementId + "' " + flags + ">" +
-											"<div id='" + formId + "Header' class='e10-ef-header'></div>" +
+	newFormHtml +=      "<div id='" + formId + "Form' class='"+formClass+"' data-object='modal' data-formId='"+formId+"' data-srcObjectType='" + srcObjectType + "' data-srcObjectId='" + srcObjectId + "' data-sidebar-element-id='" + sidebarElementId + "' " + flags;
+	if (fakePrimaryKey !== undefined)
+		newFormHtml += " data-fake-pk='" + fakePrimaryKey + "'";
+	newFormHtml +=      ">";
+	newFormHtml +=			"<div id='" + formId + "Header' class='e10-ef-header'></div>" +
 											"<div id='" + formId + "Content' class='e10-ef-content' data-e10mxw='1'></div>" +
 											"<div id='" + formId + "Buttons' class='e10-ef-buttons'></div>";
 
@@ -4176,6 +4217,7 @@ function df2saveForm (srcEl, successFunction)
 
 				var srcObjectType = modalElement.attr ('data-srcObjectType');
 				var srcObjectId = modalElement.attr ('data-srcObjectId');
+				var srcObjectFakePk = modalElement.attr ('data-fake-pk');
 
 				var sidebarId = modalElement.attr('data-sidebar-element-id');
 				if (sidebarId !== undefined)
@@ -4189,7 +4231,13 @@ function df2saveForm (srcEl, successFunction)
 
 				if (srcObjectType == 'viewer')
 				{
-					viewerRefresh ($('#' + srcObjectId), data.recData ['ndx']);
+					if (srcObjectId === 'default')
+						srcObjectId = $('#mainBrowserContent div.e10-mainViewer').attr ('id');
+
+					var pk = data.recData ['ndx'];
+					if (srcObjectFakePk !== undefined)
+						pk = srcObjectFakePk;
+					viewerRefresh ($('#' + srcObjectId), pk);
 				}
 				else
 				if (srcObjectType == 'widget')
@@ -4227,6 +4275,8 @@ function df2saveForm (srcEl, successFunction)
 						else
 						{
 							var oneRow = $('#mainBrowserContent div.e10-mainViewer div.e10-sv-body .e10-viewer-list>.r.active').first ();
+							if (oneRow.length === 0)
+								oneRow = $('#mainBrowserContent div.e10-mainViewer div.e10-sv-body table.dataGrid>tbody>.r.active').first (); // grid viewer
 							if (oneRow.length !== 0)
 							{
 								var viewerId = $('#mainBrowserContent div.e10-mainViewer').attr ('id');
@@ -4706,7 +4756,12 @@ function e10DocumentAdd (e, params)
 	if (addParams)
 		url += '&' + addParams;
 
-	if (e !== 0 && e.attr('data-pict'))
+	if (e !== 0 && e.attr('data-add-snapshot-url'))
+	{
+		let fn = 'img-'+(Date.now() - 1646000000000)+'-'+Math.floor(Math.random() * 1000)+'.jpg';
+		url += '&addSnapshotUrl=' + e.attr('data-add-snapshot-url') + '&addPicture=' + e.attr('data-add-snapshot-url') + fn;
+	}
+	else if (e !== 0 && e.attr('data-pict'))
 		url += '&addPicture=' + e.attr('data-pict');
 
 	if (e !== 0 && e.attr('data-copyfrom'))
@@ -4749,6 +4804,7 @@ function e10DocumentEdit (e, params, actionType)
 	var pk = 0;
 	var srcObjectType = 'none';
 	var srcObjectId = '';
+	var srcObjectFakePk = null;
 
 	if (e !== 0)
 	{
@@ -4759,6 +4815,8 @@ function e10DocumentEdit (e, params, actionType)
 			srcObjectType = e.attr ('data-srcobjecttype');
 		if (e.attr ('data-srcobjectid') !== undefined)
 			srcObjectId = e.attr ('data-srcobjectid');
+		if (e.attr ('data-srcobjectfakepk') !== undefined)
+			srcObjectFakePk = e.attr ('data-srcobjectfakepk');
 	}
 	else
 	{
@@ -4783,7 +4841,7 @@ function e10DocumentEdit (e, params, actionType)
 
 
   e10.server.post(url, postData, function(data) {
-			e10ViewerCreateEditForm (data, newElementId, srcObjectType, srcObjectId);
+			e10ViewerCreateEditForm (data, newElementId, srcObjectType, srcObjectId, null, srcObjectFakePk);
   });
 }
 

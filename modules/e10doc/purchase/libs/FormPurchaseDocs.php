@@ -92,6 +92,12 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 							$this->addFormPersonInfo();
 						$this->layoutClose ();
 
+						$this->addSeparator(self::coH2);
+						$this->layoutOpen(self::ltVertical);
+							$this->addColumnInput ('wasteOrigin', self::coHeader|self::coColW12);
+							//$this->addColumnInput ('wasteOriginCity', self::coHeader|self::coColW12);
+						$this->layoutClose();
+
 						if ($this->recData['personType'] == 2)
 						{
 							$this->addSeparator(self::coH2);
@@ -258,6 +264,12 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 		$this->recData ['roundMethod'] = intval($this->app()->cfgItem ('options.e10doc-buy.roundPurchase', 1));
 		$this->recData ['taxCalc'] = 0;
 		$this->recData ['dateDue'] = utils::today();
+
+		if ($this->recData['person'] ?? 0)
+		{
+			$saveData = ['recData' => &$this->recData];
+			$this->resetWasteOrigin($saveData);
+		}
 	}
 
 	function columnLabel ($colDef, $options)
@@ -508,6 +520,57 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 		{
 			$this->addColumnInput('personNomencCity', self::coNoLabel);
 		}
+
+		if ($this->app()->model()->table ('e10pro.loyp.pointsJournal') !== FALSE)
+		{
+			$q = [];
+			array_push ($q, 'SELECT SUM([journal].cntPoints) AS sumCntPoints');
+			array_push ($q, ' FROM [e10pro_loyp_pointsJournal] AS [journal]');
+			array_push ($q, ' WHERE [person] = %i', $personNdx);
+			$cntLoypPoints = $this->app()->db()->query($q)->fetch();
+			if ($cntLoypPoints)
+			{
+				$pc = '';
+				if ($cntLoypPoints['sumCntPoints'] < 0)
+					$pc = 'e10-warning1 block';
+				elseif ($cntLoypPoints['sumCntPoints'] > 0)
+					$pc = 'e10-row-plus block';
+				$this->addStatic(['text' => Utils::nf($cntLoypPoints['sumCntPoints']).' bodů', 'class' => $pc]);
+			}
+
+			$q = [];
+			array_push($q, 'SELECT [journal].*');
+			array_push($q, ' FROM [e10pro_loyp_pointsJournal] AS [journal]');
+			array_push($q, ' WHERE 1');
+			array_push($q, ' AND [journal].[person] = %i', $this->recData['person']);
+			array_push($q, ' AND [journal].[rowType] = %i', 2);
+			array_push($q, ' ORDER BY [journal].ndx DESC');
+			array_push($q, ' LIMIT 2');
+
+			$docsNdxs = [];
+			$rows = $this->app()->db()->query($q);
+			foreach ($rows as $r)
+			{
+				if (!in_array($r['document'], $docsNdxs))
+					$docsNdxs[] = $r['document'];
+			}
+
+			if (count($docsNdxs))
+			{
+				$q = [];
+				array_push($q, 'SELECT [rows].ndx, [rows].[text], [heads].[dateAccounting] AS [docDate]');
+				array_push($q, ' FROM [e10doc_core_rows] AS [rows]');
+				array_push($q, ' LEFT JOIN [e10doc_core_heads] AS [heads] ON [rows].[document] = [heads].[ndx]');
+				array_push($q, ' WHERE 1');
+				array_push($q, ' AND [rows].[document] IN %in', $docsNdxs);
+
+				$rows = $this->app()->db()->query($q);
+				foreach ($rows as $r)
+				{
+					$this->addStatic(['text' => $r['text'], 'suffix' => Utils::datef($r['docDate'])]);
+				}
+			}
+		}
 	}
 
 	public function addFormPersonInfo_Address ($addresses, $columnId, $suggestedAddressNdx, $labelText)
@@ -557,5 +620,13 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 		{ // company
 			$saveData ['recData']['deliveryAddress'] = 0;
 		}
+	}
+
+	public function checkChangedInput ($changedInput, &$saveData)
+	{
+		parent::checkChangedInput ($changedInput, $saveData);
+
+		if ($changedInput === 'person')
+			$this->resetWasteOrigin($saveData);
 	}
 }

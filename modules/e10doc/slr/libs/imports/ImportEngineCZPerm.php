@@ -12,13 +12,14 @@ class ImportEngineCZPerm extends \e10doc\slr\libs\ImportEngine
 {
   protected function doAllAttachments()
   {
-    $attachments = UtilsBase::loadAttachments ($this->app, [$this->importNdx], 'e10doc.slr.imports');
-		if (!count($attachments))
-			return;
-
-		foreach ($attachments[$this->importNdx]['files'] as $a)
+    foreach ($this->allAttachments as $a)
 		{
-			$srcFullFileName = __APP_DIR__.'/att/'. $a['path'].$a['filename'];
+      $srcFullFileName = __APP_DIR__.'/att/'. $a['path'].$a['filename'];
+      if ($a['filetype'] !== 'json' && $a['filetype'] !== 'txt')
+        continue;
+
+      if ($this->app()->debug)
+        echo " --> ".$srcFullFileName."\n";
 
       if ($this->app()->debug)
         echo " --> ".$srcFullFileName."\n";
@@ -74,13 +75,19 @@ class ImportEngineCZPerm extends \e10doc\slr\libs\ImportEngine
     if ($empRecRecData)
     {
       $empRecNdx = $empRecRecData['ndx'];
+
+      $updateEmpRec = [
+        'docState' => 4000, 'docStateMain' => 2,
+     ];
+
+     $this->db()->query('UPDATE [e10doc_slr_empsRecs] SET ', $updateEmpRec, ' WHERE ndx = %i', $empRecNdx);
     }
     else
     {
       $newEmpRec = [
          'emp' => $empRecData['ndx'],
          'import' => $this->importNdx,
-         'docState' => 1000, 'docStateMain' => 0,
+         'docState' => 4000, 'docStateMain' => 2,
       ];
       $this->db()->query('INSERT INTO [e10doc_slr_empsRecs]', $newEmpRec);
 

@@ -193,6 +193,339 @@ class RegsChangesCZ extends Utility
     $this->db()->query('INSERT INTO [services_persons_regsChangesItems] ', $newItem);
   }
 
+  public function doChangeSetItems($maxCount = 10, $addOnly = 0)
+  {
+    /** @var \services\persons\TableRegsChangesItems */
+    $table = $this->app()->table('services.persons.regsChangesItems');
+    $changeTypes = $table->columnInfoEnum ('changeType', 'cfgText');
+
+    $q = []; //
+    array_push($q, 'SELECT changeItems.*');
+    array_push($q, ' FROM [services_persons_regsChangesItems] AS changeItems');
+    array_push($q, ' WHERE 1');
+    array_push($q, ' AND [done] = %i', 0);
+    if ($addOnly)
+      array_push($q, ' AND [changeType] = %i', 0);
+    array_push($q, ' ORDER BY ndx');
+
+    $cnt = 0;
+    $rows = $this->db()->query($q);
+    foreach ($rows as $r)
+    {
+      if ($r['changeType'] == 1)
+        continue; // deleted
+
+      if ($this->app->debug)
+        echo "=== #".$r['ndx'].": ".$r['oid']."; ".$changeTypes[$r['changeType']]." ===\n";
+
+      if ($r['changeType'] == 0)
+      { // new
+        $e = new \services\persons\libs\PersonData($this->app());
+        $e->addPersonFromReg($r['oid'], $r['country']);
+      }
+      elseif ($r['changeType'] == 2)
+      { // update
+        $e = new \services\persons\libs\PersonData($this->app());
+        $e->refreshImport($r['person']);
+      }
+
+      $this->db()->query('UPDATE [services_persons_regsChangesItems] SET [done] = 1 WHERE [ndx] = %i', $r['ndx']);
+
+      $cnt++;
+      if ($cnt >= $maxCount)
+        break;
+
+      sleep(1);
+    }
+
+    return $cnt;
+  }
+
+  public function doChangeSetItemsQueue($maxCount = 10)
+  {
+    $cntAdded = $this->doChangeSetItems($maxCount, 1);
+    if ($cntAdded)
+      return $cntAdded;
+
+    $cntUpdated = $this->doChangeSetItems($maxCount);
+    if ($cntUpdated)
+      return $cntUpdated;
+
+    return 0;
+  }
+
+  public function doChangeSetItemsFromFiles($maxCount = 10)
+  {
+    $cntMissingFiles = 0;
+    $cntExists = 0;
+    $cntTotal = 0;
+    $cntAdded = 0;
+
+		$archiveFileName = __APP_DIR__.'/res/ares_vreo_all.tar';
+		ini_set('memory_limit', '1024M');
+		$archive = new \PharData($archiveFileName);
+
+
+    /** @var \services\persons\TableRegsChangesItems */
+    $table = $this->app()->table('services.persons.regsChangesItems');
+    $changeTypes = $table->columnInfoEnum ('changeType', 'cfgText');
+
+    $q = [];
+    array_push($q, 'SELECT changeItems.*');
+    array_push($q, ' FROM [services_persons_regsChangesItems] AS changeItems');
+    array_push($q, ' WHERE 1');
+    array_push($q, ' AND ',
+        ' NOT EXISTS (SELECT ndx FROM services_persons_persons WHERE ',
+        'changeItems.oid = services_persons_persons.oid AND changeItems.country = services_persons_persons.country',
+    ')');
+    array_push($q, ' AND [done] = %i', 0);
+    array_push($q, ' AND [changeType] = %i', 0);
+    array_push($q, ' ORDER BY ndx');
+
+    $cnt = 0;
+    $rows = $this->db()->query($q);
+    foreach ($rows as $r)
+    {
+      $cntTotal++;
+
+      if ($this->app->debug)
+        echo "=== ".sprintf('%10d', $cntTotal).": ".$r['oid']."; ".$changeTypes[$r['changeType']].": ";
+
+      $exist = $this->db()->query('SELECT * FROM [services_persons_persons] WHERE [oid] = %s', $r['oid'], ' AND [country] = %i', 60)->fetch();
+      if ($exist)
+      {
+        if ($this->app->debug)
+          echo "record exist...\n";
+        $cntExists++;
+        continue;
+      }
+
+      $oid = sprintf('%08d', intval($r['oid']));
+      $oneTarFileName = 'VYSTUP/DATA/'.$oid.'.xml';
+      $xmlTarFileName = __APP_DIR__.'/tmp/'.$oneTarFileName;
+
+      try
+      {
+        $archive->extractTo(__APP_DIR__.'/tmp/', './'.$oneTarFileName, TRUE);
+      }
+      catch (\Exception $e){}
+
+      if (!is_readable($xmlTarFileName))
+      {
+        if ($this->app->debug)
+          echo "file `$oneTarFileName` not found\n";
+        $cntMissingFiles++;
+        continue;
+      }
+
+      $data = file_get_contents($xmlTarFileName);
+
+      $ii = new \services\persons\libs\cz\InitialImportPersonsCZ($this->app());
+      $newPersonNdx = $ii->importOnePersonARES($data, $oid);
+      if (!$newPersonNdx)
+      {
+        if ($this->app->debug)
+          echo "save person failed\n";
+        continue;
+      }
+
+      $now = new \DateTime();
+      $this->db()->query('UPDATE [services_persons_regsChangesItems] SET [done] = 1, [doneAt] = %t', $now,
+                          ' WHERE [oid] = %s', $r['oid'], ' AND country = %i', 60);
+
+      echo "SUCCESS; chsndx: {$r['regsChangeSet']}!\n";
+
+      $cnt++;
+      if ($cnt >= $maxCount)
+        break;
+    }
+
+    echo "#### DONE; ADDED: {$cnt}; total scanned: ".$cntTotal.'; '. $cntMissingFiles . ' files missing'."\n";
+  }
+
+  public function doChangeSetItemsFromRES($maxCount = 10)
+  {
+		$fn = __APP_DIR__.'/res/res_data.csv';
+		$cnt = 0;
+		$cntNew = 0;
+		$rowNumber = 0;
+
+		if ($file = fopen($fn, "r"))
+		{
+			while(!feof($file))
+			{
+				$line = fgets($file);
+				if ($line === '')
+					continue;
+				if ($cnt === 0)
+				{
+					$cnt = 1;
+					continue;
+				}
+				if ($line === '')
+					continue;
+
+				$rowNumber++;
+
+				$cols = str_getcsv($line, ',');
+				$id = ltrim($cols[0], " \t\n\r\0\x0B0");
+				$oid = sprintf('%08d', intval($id));
+				$count = 0;
+				$exist = $this->db()->query('SELECT * FROM [services_persons_persons] WHERE [country] = %i', 60, ' AND [oid] = %s', $oid, ' LIMIT 1')->fetch();
+        if ($exist)
+        {
+          continue;
+        }
+
+				$name = trim($cols[11] ?? '');
+        if ($name === '')
+					continue;
+
+        $newInChages = $this->db()->query('SELECT * FROM [services_persons_regsChangesItems] ',
+                                          ' WHERE [done] = %i', 0, ' AND [changeType] = %i', 0,
+                                          ' AND [oid] = %s', $oid , ' AND country = %i', 60)->fetch();
+        if (!$newInChages)
+          continue;
+
+				$cntNew++;
+				echo sprintf("%8d", $rowNumber).' / '.sprintf("%06d", $cntNew).': '.$oid.": `".$name."`";
+
+        $ii = new \services\persons\libs\cz\InitialImportPersonsCZ($this->app());
+        $addResult = $ii->importOnePersonRES($line, '');
+        if ($addResult)
+					echo " OK";
+				else
+					echo " ERROR";
+
+        $now = new \DateTime();
+        $this->db()->query('UPDATE [services_persons_regsChangesItems] SET [done] = 1, [doneAt] = %t', $now,
+                            ' WHERE [oid] = %s', $oid, ' AND country = %i', 60, ' AND changeType IN %in', [0, 2]);
+
+				echo "\n";
+				if ($cntNew >= $maxCount)
+					break;
+			}
+			fclose($file);
+
+			echo "\n\n";
+		}
+		else
+		{
+
+		}
+  }
+
+  public function doChangeSetItemsCleanup($maxCount = 10)
+  {
+    // -- change data
+    $q = [];
+    array_push($q, 'SELECT * FROM [services_persons_regsChangesItems]');
+    array_push($q, ' WHERE [done] = %i', 0);
+    array_push($q, ' AND [changeType] = %i', 2);
+    $rows = $this->db()->query($q);
+    $cnt = 1;
+    $cntNonExistedPerson = 0;
+    $cntDeletedPerson = 0;
+    $cntNewDataAdded = 0;
+    foreach ($rows as $r)
+    {
+      echo '#'.sprintf('%5d', $cnt).': '.$r['oid'].';';
+      $person = $this->db()->query('SELECT * FROM [services_persons_persons]',
+                        ' WHERE [country] = %i', $r['country'], ' AND [oid] = %s', $r['oid'], ' LIMIT 1')->fetch();
+      if ($person)
+      {
+        echo ' exist; ';
+        if ($person['newDataAvailable'])
+        {
+          echo ' has new data; ';
+        }
+        else
+        {
+          if (!$person['valid'])
+            $cntDeletedPerson++;
+          $cntNewDataAdded++;
+          $this->db()->query('UPDATE [services_persons_persons] SET [newDataAvailable] = %i', 1, ' WHERE [ndx] = %i', $person['ndx']);
+          echo ' new data added; ';
+        }
+      }
+      else
+      {
+        echo ' NOT exist; ';
+        $cntNonExistedPerson++;
+      }
+
+      $now = new \DateTime();
+      $this->db()->query('UPDATE [services_persons_regsChangesItems] SET [done] = 1, [doneAt] = %t', $now, ' WHERE [ndx] = %i', $r['ndx']);
+      echo ' set-done';
+
+      echo "\n";
+      $cnt++;
+
+      if ($cnt > $maxCount)
+        break;
+    }
+
+    echo "==== UPDATED ====\n";
+    echo "cntNonExistedPerson: $cntNonExistedPerson\n";
+    echo "cntDeletedPerson: $cntDeletedPerson\n";
+    echo "cntNewDataAdded: $cntNewDataAdded\n";
+    if ($cnt > 2)
+      return;
+
+    // -- delete data
+    $q = [];
+    array_push($q, 'SELECT * FROM [services_persons_regsChangesItems]');
+    array_push($q, ' WHERE [done] = %i', 0);
+    array_push($q, ' AND [changeType] = %i', 1);
+    $rows = $this->db()->query($q);
+    $cnt = 1;
+    $cntNonExistedPerson = 0;
+    $cntDeletedPerson = 0;
+    $cntNewDataAdded = 0;
+    foreach ($rows as $r)
+    {
+      echo '#'.sprintf('%5d', $cnt).': '.$r['oid'].';';
+      $person = $this->db()->query('SELECT * FROM [services_persons_persons]',
+                        ' WHERE [country] = %i', $r['country'], ' AND [oid] = %s', $r['oid'], ' LIMIT 1')->fetch();
+      if ($person)
+      {
+        echo ' exist; ';
+        if ($person['newDataAvailable'])
+        {
+          echo ' has new data; ';
+        }
+        else
+        {
+          if (!$person['valid'])
+            $cntDeletedPerson++;
+          $cntNewDataAdded++;
+          $this->db()->query('UPDATE [services_persons_persons] SET [newDataAvailable] = %i', 1, ' WHERE [ndx] = %i', $person['ndx']);
+          echo ' new data added; ';
+        }
+      }
+      else
+      {
+        echo ' NOT exist; ';
+        $cntNonExistedPerson++;
+      }
+
+      $now = new \DateTime();
+      $this->db()->query('UPDATE [services_persons_regsChangesItems] SET [done] = 1, [doneAt] = %t', $now, ' WHERE [ndx] = %i', $r['ndx']);
+      echo ' set-done';
+
+      echo "\n";
+      $cnt++;
+
+      if ($cnt > $maxCount)
+        break;
+    }
+
+    echo "==== DELETED ====\n";
+    echo "cntNonExistedPerson: $cntNonExistedPerson\n";
+    echo "cntDeletedPerson: $cntDeletedPerson\n";
+    echo "cntNewDataAdded: $cntNewDataAdded\n";
+  }
+
   public function run()
   {
     $this->downloadChangeSets();

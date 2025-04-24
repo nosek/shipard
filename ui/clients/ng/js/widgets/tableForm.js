@@ -1,13 +1,14 @@
-class ShipardTableForm extends ShipardWidget
+class ShipardTableForm extends ShipardCoreForm
 {
-  formData = null;
-
   init(e)
   {
     console.log("ShipardTableForm::init");
     super.init(e);
     this.rootElm.style.display = 'grid';
+  }
 
+  create(e)
+  {
     let apiParams = {
       'cgType': 2,
       'formOp': e.formOp,
@@ -72,7 +73,6 @@ class ShipardTableForm extends ShipardWidget
 
     return 0;
   }
-
 
   doWidgetResponse(data)
   {
@@ -139,99 +139,6 @@ class ShipardTableForm extends ShipardWidget
     super.doWidgetResponse(data);
   }
 
-  setFormData(data)
-  {
-    this.formData = data;
-    //console.log('setFormData', data);
-    const inputs = this.rootElm.querySelectorAll('input, textarea, select');
-
-    inputs.forEach(input => {
-      this.setFormInputValue(input);
-    });
-  }
-
-  setFormInputValue(input)
-  {
-    const inputId = input.getAttribute('name');
-    if (!inputId)
-      return;
-
-    const iv = this.dataInputValue(inputId);
-    //console.log('setFormInputValue', inputId, iv);
-
-    if (input.classList.contains('e10-inputDateN'))
-    {
-      let siv = iv;
-      if (iv === null || iv === '0000-00-00')
-        siv = '';
-
-      input.value = siv;
-      return;
-    }
-    if (input.classList.contains('e10-inputLogical'))
-    {
-      input.checked = parseInt(iv) == 1;
-      return;
-    }
-
-    //console.log('set input value ', iv, input);
-    input.value = iv;
-  }
-
-  dataInputValue (inputId)
-  {
-    var iidParts = inputId.split ('.');
-
-		if (iidParts.length == 1)
-    {
-      return this.formData['recData'][inputId] ? this.formData['recData'][inputId] : null;
-    }
-
-    return null;
-  }
-
-  getFormData()
-  {
-    const inputs = this.rootElm.querySelectorAll('input, textarea, select');
-    inputs.forEach(input => {
-      this.getFormInputValue(input);
-    });
-  }
-
-  getFormInputValue(input)
-  {
-    const inputId = input.getAttribute('name');
-    if (!inputId)
-      return;
-
-    const iv = input.value;
-    //console.log('getFormInputValue', inputId, iv);
-
-    let siv = iv;
-
-    if (input.classList.contains('e10-inputDateN'))
-    {
-      if (iv === null || iv === '0000-00-00' || iv === '')
-        siv = null;
-    }
-    else if (input.classList.contains('e10-inputLogical'))
-    {
-      siv = input.checked ? 1 : 0;
-    }
-
-    this.setDataInputValue(inputId, siv);
-  }
-
-  setDataInputValue (inputId, value)
-  {
-    var iidParts = inputId.split ('.');
-
-		if (iidParts.length == 1)
-    {
-      this.formData['recData'][inputId] = value;
-    }
-  }
-
   closeForm(e)
   {
     this.rootElm.remove();
@@ -242,9 +149,28 @@ class ShipardTableForm extends ShipardWidget
   inputValueChanged(e)
   {
     //console.log("--INPUT-CHANGED--", e);
+    if (e.type === 'file')
+    {
+      console.log('form-file input CHANGED');
+      this.checkFileUploader(e);
+      return;
+    }
+
     if (e.classList.contains('e10-ino-checkOnChange'))
     {
       this.checkForm(e);
     }
+  }
+
+  checkFileUploader(input)
+  {
+    console.log('checkFileUploader');
+    let fileUploaderElm = input.parentElement;
+    if (fileUploaderElm.fileUploader === undefined)
+    {
+      fileUploaderElm.fileUploader = new ShipardFilesUploader();
+      fileUploaderElm.fileUploader.init(fileUploaderElm);
+    }
+    fileUploaderElm.fileUploader.resetInfo();
   }
 }

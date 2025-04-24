@@ -71,17 +71,20 @@ class TableLansAddrRanges extends DbTable
 class ViewLansAddrRanges extends TableView
 {
 	var $prevPools = [];
+	var $activeLan = 0;
 
 	/** @var \mac\lan\TableLans */
 	var $tableLans;
 
 	public function init ()
 	{
+		$this->activeLan = intval($this->queryParam ('lan'));
+
 		parent::init();
 		$this->setMainQueries ();
 
 		$this->tableLans = $this->app()->table('mac.lan.lans');
-		$this->tableLans->setViewerBottomTabs($this);
+		$this->tableLans->setViewerBottomTabs($this, $this->activeLan);
 	}
 
 	public function renderRow ($item)
@@ -137,6 +140,7 @@ class ViewLansAddrRanges extends TableView
 						'OR ranges.[shortName] LIKE %s', '%'.$fts.'%',
 						'OR ranges.[range] LIKE %s', '%'.$fts.'%',
 						'OR ranges.[note] LIKE %s', '%'.$fts.'%',
+						'OR ranges.[id] LIKE %s', '%'.$fts.'%',
 				')');
 		}
 
@@ -215,7 +219,6 @@ class FormLanAddrRange extends TableForm
 					$this->addColumnInput ('lan');
 					$this->addColumnInput ('vlan');
 					$this->addColumnInput ('serverMonitoring');
-					$this->addColumnInput ('dhcpServerId');
 					$this->addColumnInput ('dhcpPoolBegin');
 					$this->addColumnInput ('dhcpPoolEnd');
 					$this->addColumnInput ('nextPool');

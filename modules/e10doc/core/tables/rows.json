@@ -19,6 +19,8 @@
 			"enumCfg": {"cfgItem": "e10.balance", "cfgValue": "", "cfgText": "name"}},
 		{"id": "itemIsSet", "name": "Položka je sada", "type": "enumInt",
 			"enumValues": {"0": "ne", "1": "ano, nutno doplnit do dokladu", "2": "ano, nutno přepočítat", "99": "ano, hotovo"}},
+		{"id": "itemIsLoyp", "name": "Věrnostní program", "type": "enumInt",
+			"enumValues": {"0": "ne", "1": "ano, dárek"}},
     {"id": "text", "name": "Text", "type": "string", "len": 220},
 		{"id": "usrText1", "name": "Už. text 1", "type": "string", "len": 25},
 
@@ -96,6 +98,9 @@
 
 		{"id": "rowVds", "name": "Rozšíření struktury", "type": "int", "reference": "vds.base.defs"},
 		{"id": "rowData", "name": "Data řádku", "type": "subColumns"},
+
+    {"id": "lpPriceItem", "name": "Jednotková cena v bodech", "label": "Body/jed", "type": "int"},
+    {"id": "lpPriceAll", "name": "Cena celkem v bodech", "type": "int"},
 
     {"id": "invDirection", "name": "Směr skladového pohybu", "type": "enumInt",
 			"enumValues": {"0": "žádný", "1": "příjem", "-1": "výdej"}},

@@ -140,7 +140,7 @@ class TableServers extends DbTable
 				'template' => $r['template'], 'look' => $r['templateLook'], 'lookNdx' => $r['templateLookNdx'], 'templateStylePath' => $r['templateStylePath'],
 				'templateParams' => $templateParams, 'themeColor' => '#00508a',
 				'gaid' => $r['gaid'], 'mtmSiteId' => $r['mtmSiteId'], 'mtmUrl' => $r['mtmUrl'], 'gmApiKey' => $r['gmApiKey'],
-				'authType' => $r['authType'],
+				'authType' => $r['authType'], 'redirTo' => $r['redirTo'], 'formsEmail' => $r['formsEmail'],
 			];
 
 			if ($r['domainsRedirectHere'] !== '')
@@ -249,6 +249,10 @@ class TableServers extends DbTable
 
 			foreach ($servers as $server)
 			{
+				$forceRedirTo = '';
+				if ($server['serverMode'] === 'redir' && isset($server['redirTo']) && $server['redirTo'] !== 0)
+					$forceRedirTo = $server['redirTo'];
+
 				$rh = explode (' ', $server['domainsRedirectHere']);
 				foreach ($rh as $oneHost)
 				{
@@ -262,7 +266,7 @@ class TableServers extends DbTable
 
 			if (count ($redirectsHosts))
 				$cfg .= ' < '.implode (' ', $redirectsHosts);
-			$cfg .= '; cfg ver 0.5'."\n\n";
+			$cfg .= '; cfg ver 0.6; mode: '.$server['serverMode']."\n\n";
 
 			$domainParts = explode('.', $domain);
 			$cntAllDomainParts = count($domainParts);
@@ -277,9 +281,19 @@ class TableServers extends DbTable
 			// -- web via https
 			$cfg .= "server {\n";
 			$cfg .= "\tlisten 443 ssl http2;\n";
+			if ($this->app()->cfgServer['ipv6Enabled'] ?? 0)
+				$cfg .= "\tlisten [::]:443 ssl http2;\n";
 			$cfg .= "\tserver_name $domain;\n";
-			$cfg .= "\troot /var/lib/shipard/data-sources/$dsid;\n";
-			$cfg .= "\tindex index.php;\n";
+			if ($forceRedirTo !== '')
+			{
+				$cfg .= "\troot /var/www;\n";
+				$cfg .= "\treturn 301 ".$forceRedirTo.";\n";
+			}
+			else
+			{
+				$cfg .= "\troot /var/lib/shipard/data-sources/$dsid;\n";
+				$cfg .= "\tindex index.php;\n";
+			}
 
 			$cfg .= "\tssl_certificate $certPath/$certId/chain.pem;\n";
 			$cfg .= "\tssl_certificate_key $certPath/$certId/privkey.pem;\n";
@@ -295,6 +309,8 @@ class TableServers extends DbTable
 				$cfg .= "\n";
 				$cfg .= "server {\n";
 				$cfg .= "\tlisten 443 ssl http2;\n";
+				if ($this->app()->cfgServer['ipv6Enabled'] ?? 0)
+					$cfg .= "\tlisten [::]:443 ssl http2;\n";
 				$cfg .= "\tserver_name ";
 				$cfg .= ' '.implode(' ', $redirectsHosts);
 				$cfg .= ";\n";
@@ -307,7 +323,10 @@ class TableServers extends DbTable
 				$cfg .= "\tinclude /usr/lib/shipard/etc/nginx/shpd-https.conf;\n";
 
 				$cfg .= "\tlocation / {\n";
-				$cfg .= "\t\treturn 301 https://$domain".'$request_uri'.";\n";
+				if ($forceRedirTo !== '')
+					$cfg .= "\t\treturn 301 ".$forceRedirTo.";\n";
+				else
+					$cfg .= "\t\treturn 301 https://$domain".'$request_uri'.";\n";
 				$cfg .= "\t}\n";
 				$cfg .= "}\n\n";
 			}
@@ -315,6 +334,8 @@ class TableServers extends DbTable
 			// -- http redirects
 			$cfg .= "server {\n";
 			$cfg .= "\tlisten 80;\n";
+			if ($this->app()->cfgServer['ipv6Enabled'] ?? 0)
+				$cfg .= "\tlisten [::]:80;\n";
 			$cfg .= "\tserver_name $domain";
 			if (count($redirectsHosts))
 				$cfg .= ' '.implode(' ', $redirectsHosts);
@@ -323,7 +344,10 @@ class TableServers extends DbTable
 			$cfg .= "\troot /var/www;\n";
 
 			$cfg .= "\tlocation / {\n";
-			$cfg .= "\t\treturn 301 https://$domain".'$request_uri'.";\n";
+			if ($forceRedirTo !== '')
+				$cfg .= "\t\treturn 301 ".$forceRedirTo.";\n";
+			else
+				$cfg .= "\t\treturn 301 https://$domain".'$request_uri'.";\n";
 			$cfg .= "\t}\n";
 			$cfg .= "}\n\n";
 
@@ -554,6 +578,8 @@ class FormServer extends TableForm
 						$this->addColumnInput ('wiki');
 					if (isset($serverMode['askHpFunction']))
 						$this->addColumnInput ('homePageFunction');
+					if (isset($serverMode['askRedirTo']))
+						$this->addColumnInput ('redirTo');
 
 					$this->addColumnInput('authType');
 					if ($this->recData['authType'] != 0)
@@ -584,7 +610,7 @@ class FormServer extends TableForm
 				$this->openTab ();
 					$this->addColumnInput ('excludeFromDashboard');
 					$this->addColumnInput ('order');
-
+					$this->addColumnInput ('formsEmail');
 					$this->addColumnInput ('gaid');
 					$this->addColumnInput ('mtmSiteId');
 					$this->addColumnInput ('mtmUrl');

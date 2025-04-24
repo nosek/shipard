@@ -138,6 +138,14 @@ class Router extends Utility
 		{
 			$object = $this->app->createObject('Shipard.UI.ng.Auth');
 		}
+		elseif ($first === 'arq')
+		{ // anonymous requests
+			$requestCfg = $this->app()->cfgItem ('registeredClasses.anonymousRequests.'.($this->urlPath[1] ?? ''), NULL);
+			if ($requestCfg)
+			{
+				$object = $this->app->createObject($requestCfg['classId']);
+			}
+		}
 		else
 		{
 			if (!$this->checkUserLogin())
@@ -152,6 +160,7 @@ class Router extends Utility
 				$object->uiCfg = $this->uiCfg;
 			}
 		}
+
 		if ($object)
 		{
 			$object->uiRouter = $this;
@@ -181,6 +190,45 @@ class Router extends Utility
 			error_log("__OLD_API__");
 			return $this->app()->routeApiRun();
 		}
+
+		// -- download files
+    if (isset($this->urlPath[2]) && $this->urlPath[2] === 'files' && isset($this->urlPath[3]) && $this->urlPath[3] === 'download')
+    {
+			$filesCfg = $this->app()->cfgItem ('registeredClasses.downloadFiles.'.($this->urlPath[4] ?? ''), NULL);
+			if ($filesCfg)
+			{
+        /**  @var \Shipard\Base\ApiObject2 */
+				$apiResponseObject = $this->app->createObject($filesCfg['classId']);
+
+				if ($apiResponseObject)
+				{
+					$apiResponseObject->uiRouter = $this;
+					$apiResponseObject->run();
+          return NULL;
+				}
+				return new \Shipard\Application\Response ($this->app(), 'invalid download object 1', 404);
+			}
+			return new \Shipard\Application\Response ($this->app(), 'invalid download object 2', 404);
+    }
+		// -- upload files
+    if (isset($this->urlPath[2]) && $this->urlPath[2] === 'files' && isset($this->urlPath[3]) && $this->urlPath[3] === 'upload')
+    {
+			$filesCfg = $this->app()->cfgItem ('registeredClasses.uploadFiles.'.($this->urlPath[4] ?? ''), NULL);
+			if ($filesCfg)
+			{
+        /**  @var \Shipard\Base\ApiObject2 */
+				$apiResponseObject = $this->app->createObject($filesCfg['classId']);
+
+				if ($apiResponseObject)
+				{
+					$apiResponseObject->uiRouter = $this;
+					$apiResponseObject->run();
+          return NULL;
+				}
+				return new \Shipard\Application\Response ($this->app(), 'invalid download object 1', 404);
+			}
+			return new \Shipard\Application\Response ($this->app(), 'invalid download object 2', 404);
+    }
 
 		$requestParamsStr = $this->app()->postData();
 		if ($requestParamsStr === '')

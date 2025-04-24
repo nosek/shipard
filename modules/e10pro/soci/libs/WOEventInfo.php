@@ -10,6 +10,7 @@ use \e10\base\libs\UtilsBase;
 class WOEventInfo extends \e10mnf\core\libs\WorkOrderInfo
 {
   var $woPersons = [];
+  var $woPersonsWithInvoices = [];
   var $entries = [];
 
   protected function loadEntries()
@@ -101,17 +102,18 @@ class WOEventInfo extends \e10mnf\core\libs\WorkOrderInfo
 
   public function loadPersonsList ()
 	{
-		$h = ['#' => '#', 'personName' => 'Jméno'];
+    $tagMembersNdx = intval($this->app->cfgItem('options.e10-pro-soci.tagMembers', 0));
+		$h = ['#' => '#', 'personName' => 'Jméno2'];
 
 		$q[] = 'SELECT [rowsPersons].*,';
 		array_push($q, ' [persons].fullName AS personFullName');
 		array_push($q, ' FROM [e10mnf_core_workOrdersPersons] AS [rowsPersons]');
 		array_push($q, ' LEFT JOIN [e10_persons_persons] AS [persons] ON [rowsPersons].[person] = [persons].[ndx]');
 		array_push($q, ' WHERE [rowsPersons].workOrder = %i', $this->recData ['ndx']);
-		array_push($q, ' ORDER BY rowOrder, rowsPersons.ndx');
+    array_push($q, ' ORDER BY persons.fullName, rowsPersons.ndx');
+		//array_push($q, ' ORDER BY rowOrder, rowsPersons.ndx');
 
 		$rows = $this->db()->query($q);
-		$list = [];
 		forEach ($rows as $r)
 		{
       $personNdx = $r['person'];
@@ -119,26 +121,80 @@ class WOEventInfo extends \e10mnf\core\libs\WorkOrderInfo
 
 			$item = [];
 			if ($this->forPrint)
-				$item['personName'] = ['text' => $r['personFullName'], 'class' => 'e10-bold block'];
+				$item['personName'] = [['text' => $r['personFullName'], 'class' => 'e10-bold block']];
 			else
-				$item['personName'] = ['text' => $r['personFullName'], 'docAction' => 'edit', 'pk' => $r['person'], 'table' => 'e10.persons.persons', 'class' => 'e10-bold block'];
+				$item['personName'] = [['text' => $r['personFullName'], 'docAction' => 'edit', 'pk' => $r['person'], 'table' => 'e10.persons.persons', 'class' => '__e10-bold block']];
 
 			$this->loadProperties ('e10.persons.persons', $r['person'], $item, $h);
-			$list[] = $item;
+      $classification = UtilsBase::loadClassification ($this->app(), 'e10.persons.persons', $r['person']);
+      if (isset($classification[$r['person']]['personsTags']))
+      {
+        foreach ($classification[$r['person']]['personsTags'] as $opt)
+        {
+          if ($opt['clsfItem'] == $tagMembersNdx)
+            continue;
+          $item['personName'][] = $opt;
+        }
+      }
 
       $this->woPersons[$personNdx] = $item;
 		}
 
-		if (count ($list))
+    if (1)
+    {
+      $this->loadMemberFeeInvoices($this->woPersons);
+      $h['mfDocNumber'] = 'Faktura';
+      $h['mfPrice'] = ' Částka';
+      $h['bi'] = 'Uhrazeno';
+    }
+
+		if (count ($this->woPersons))
 		{
 			$this->data['personsList'] = [
         'pane' => 'e10-pane e10-pane-table',
         'type' => 'table',
         'title' => ['icon' => 'system/iconUser', 'text' => 'Osoby'],
-        'header' => $h, 'table' => $list
+        'header' => $h, 'table' => $this->woPersons,
       ];
 		}
 	}
+
+  protected function loadMemberFeeInvoices(&$dest)
+  {
+    /** @var \E10Doc\Core\TableHeads */
+    $tableHeads = $this->app()->table('e10doc.core.heads');
+
+		$q = [];
+		array_push($q, 'SELECT heads.*');
+		array_push($q, ' FROM e10doc_core_heads AS heads');
+		array_push($q, ' WHERE 1');
+    array_push($q, ' AND workOrder = %i', $this->recData['ndx']);
+		array_push($q, ' AND person IN %in', array_keys($this->woPersons));
+
+    $rows = $this->db()->query($q);
+
+    foreach ($rows as $r)
+    {
+      $docStates = $tableHeads->documentStates ($r);
+			$docStateIcon = $tableHeads->getDocumentStateInfo ($docStates, $r, 'styleIcon');
+			$docStateClass = $tableHeads->getDocumentStateInfo ($docStates, $r, 'styleClass');
+
+      $personNdx = $r['person'];
+
+
+      if ($this->forPrint)
+        $dest[$personNdx]['mfDocNumber'] = $r['docNumber'];
+      else
+        $dest[$personNdx]['mfDocNumber'] = ['text' => $r['docNumber'], 'docAction' => 'edit', 'table' => 'e10doc.core.heads', 'pk' => $r['ndx'], 'icon' => $docStateIcon];
+
+      $dest[$personNdx]['mfPrice'] = $r['sumTotal'];
+
+			$bi = $this->balanceInfo ($r);
+			$dest[$personNdx]['bi'] = $bi;
+			$dest[$personNdx]['_options']['cellClasses']['bi'] = $bi['class'];
+      $dest[$personNdx]['_options']['cellClasses']['mfDocNumber'] = $docStateClass;
+    }
+  }
 
   public function createMembers()
   {
@@ -183,6 +239,14 @@ class WOEventInfo extends \e10mnf\core\libs\WorkOrderInfo
 
       if (isset($props[$personNdx]))
         $personInfo = array_merge($personInfo, $props[$personNdx]);
+
+      if ($entry['note'] && trim($entry['note']) !== '')
+      {
+        $textRenderer = new \lib\core\texts\Renderer($this->app());
+        $textRenderer->render ($entry['note']);
+        $code = "<div class='pageText'>".$textRenderer->code.'</div>';
+        $personInfo[] = ['code' => $code, 'class' => 'block'];
+      }
 
       $item = [
         'num' => ($rowIdx + 1).'.',
@@ -242,12 +306,75 @@ class WOEventInfo extends \e10mnf\core\libs\WorkOrderInfo
     ];
   }
 
+	protected function balanceInfo ($item)
+	{
+		$bi = new \e10doc\balance\BalanceDocumentInfo($this->app());
+		$bi->setDocRecData ($item);
+		$bi->run ();
+
+		if (!$bi->valid)
+			return;
+
+    $balanceInfo = [];
+
+		$line = [];
+		$line[] = ['text' => utils::datef($item['dateDue']), 'icon' => 'system/iconStar'];
+
+		if ($bi->restAmount < -1.0)
+		{
+			$balanceInfo['text'] = 'Přeplatek: '.Utils::nf(- $bi->restAmount, 2);
+      $balanceInfo['icon'] = 'system/iconCheck';
+      $balanceInfo['class'] = 'e10-warning1';
+		}
+		elseif ($bi->restAmount < 1.0)
+		{
+			$balanceInfo['text'] = '_Uhrazeno';
+			if (!$this->forPrint && isset($bi->lastPayment['date']) && !Utils::dateIsBlank($bi->lastPayment['date']))
+				$balanceInfo['suffix'] = Utils::datef($bi->lastPayment['date'], '%S');
+      $balanceInfo['icon'] = 'system/iconCheck';
+      $balanceInfo['class'] = 'e10-bg-t1';
+		}
+		else
+    {
+			if ($bi->restAmount == $item['toPay'])
+			{
+        if ($bi->daysOver > 0)
+        {
+          $balanceInfo['text'] = 'NEUHRAZENO';
+          $balanceInfo['icon'] = 'system/iconWarning';
+          $balanceInfo['class'] = 'e10-warning3';
+        }
+        else
+        {
+          $balanceInfo['text'] = 'Uhradit do: '.Utils::datef($item['dateDue'], '%S');
+          $balanceInfo['icon'] = 'system/iconCheck';
+          $balanceInfo['class'] = 'e10-bg-t4';
+        }
+			}
+			else
+			{
+        $balanceInfo['text'] = 'NEDOPLATEK: '.Utils::nf($bi->restAmount, 2);
+        $balanceInfo['icon'] = 'system/iconCheck';
+        $balanceInfo['class'] = 'e10-warning1';
+			}
+    }
+
+    return $balanceInfo;
+	}
 
   public function loadInfo()
   {
     parent::loadInfo();
     $this->loadEntries();
-    $this->createMembers();
+
+    if ($this->woKind['usePersonsList'])
+    {
+      $this->loadPersonsList();
+    }
+    else
+    {
+      $this->createMembers();
+    }
   }
 
 	public function loadRows ()

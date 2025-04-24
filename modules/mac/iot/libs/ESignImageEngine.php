@@ -14,6 +14,7 @@ class ESignImageEngine extends Utility
   var $esignNdx = 0;
   var $esignRecData = NULL;
   var $displayInfo = NULL;
+  var $esignIoTDeviceInfo = NULL;
 
   var $templateCss = '';
   var $templateHtml = '';
@@ -38,12 +39,16 @@ class ESignImageEngine extends Utility
   protected function createHTML()
   {
     $this->template = new \Shipard\Report\TemplateMustache($this->app());
+    $this->template->data['esignNdx'] = $this->esignNdx;
     $this->template->data['displayInfo'] = $this->displayInfo;
 
-    $this->template->data['vds'] = Json::decode($this->esignRecData['vdsData']);
+    if ($this->esignIoTDeviceInfo)
+      $this->template->data['deviceInfo'] = $this->esignIoTDeviceInfo;
 
-    $this->template->data['cssStyle'] = $this->template->render($this->templateCss);
-    $this->htmlCode = $this->template->render($this->templateHtml);
+    $this->template->data['vds'] = Json::decode($this->esignRecData['vdsData']);
+    $this->template->data['dataVer'] = md5(json_encode($this->esignRecData));
+    $this->template->data['cssStyle'] = $this->template->renderTextSafe($this->templateCss);
+    $this->htmlCode = $this->template->renderTextSafe($this->templateHtml);
   }
 
   protected function postProcessHTML()
@@ -128,6 +133,21 @@ class ESignImageEngine extends Utility
       $this->esignImgRecData = ['ndx' => $this->esignNdx];
       $this->db()->query('INSERT INTO [mac_iot_esignsImgs] ', $this->esignImgRecData);
       $this->esignImgRecData = $this->app()->loadItem($this->esignNdx, 'mac.iot.esignsImgs');
+    }
+
+    if ($this->esignRecData['iotDevice'])
+    {
+      $di = $this->db()->query('SELECT * FROM [mac_iot_devicesInfo] WHERE device = %i', $this->esignRecData['iotDevice'])->fetch();
+      if ($di)
+      {
+        $this->esignIoTDeviceInfo = $di->toArray();
+        $this->esignIoTDeviceInfo['test'] = 'test';
+        $this->esignIoTDeviceInfo['available'] = 1;
+      }
+      else
+      {
+        $this->esignIoTDeviceInfo = ['available' => 0];
+      }
     }
   }
 

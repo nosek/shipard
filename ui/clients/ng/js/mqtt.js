@@ -14,6 +14,7 @@ class ShipardMqtt {
   {
     var ws = webSocketServers[serverIndex];
 
+    //console.log("START SERVER: ", ws);
     if (ws.fqdn === null || ws.fqdn === '')
       return;
     let portNumber = parseInt(ws.port);
@@ -42,26 +43,36 @@ class ShipardMqtt {
     //console.log ("SUBSCRIBE-ALL", JSON.stringify(serverIndex));
 
     var ws = webSocketServers[serverIndex];
-    //ws.mqttClient.subscribe('#');
 
+    if (uiData['iotTopicsMap'] !== undefined)
+    {
+      for (const oneTopic in uiData['iotTopicsMap']) {
+        console.log("SUBS: ", oneTopic);
+        ws.mqttClient.subscribe(oneTopic);
+      }
 
-    for (const oneTopic in uiData['iotTopicsMap']) {
-      //console.log("SUBS: ", oneTopic);
-      ws.mqttClient.subscribe(oneTopic);
+      for (const oneTopic in uiData['iotTopicsMap']) {
+        //console.log("GET: ", oneTopic);
+
+        if (uiData['iotTopicsMap'][oneTopic]['type'] === 'device' || uiData['iotTopicsMap'][oneTopic]['type'] === 'scene')
+        {
+          let message = new Paho.MQTT.Message('{"state": ""}');
+          if (oneTopic.endsWith('/'))
+            message.destinationName = oneTopic+'get';
+          else
+            message.destinationName = oneTopic+'/get';
+          console.log("GET: ", message.destinationName);
+          ws.mqttClient.send(message);
+        }
+      }
     }
 
-    for (const oneTopic in uiData['iotTopicsMap']) {
-      //console.log("GET: ", oneTopic);
-
-      if (uiData['iotTopicsMap'][oneTopic]['type'] === 'device' || uiData['iotTopicsMap'][oneTopic]['type'] === 'scene')
-      {
-        let message = new Paho.MQTT.Message('{"state": ""}');
-        if (oneTopic.endsWith('/'))
-          message.destinationName = oneTopic+'get';
-        else
-          message.destinationName = oneTopic+'/get';
-        console.log("GET: ", message.destinationName);
-        ws.mqttClient.send(message);
+    if (uiData['widgetsTopics'] !== undefined)
+    {
+      for (const oneTopic in uiData['widgetsTopics']) {
+        let wt = uiData['widgetsTopics'][oneTopic];
+        ws.mqttClient.subscribe(wt['topic']);
+        console.log("_SUBSCRIBE: ", wt['topic']);
       }
     }
   }
@@ -92,14 +103,14 @@ class ShipardMqtt {
 
     if (uiData['iotTopicsMap'] === undefined)
     {
-      console.log("Missing uiData topics map");
+      //console.log("Missing uiData topics map");
       return;
     }
 
     let topicInfo = uiData['iotTopicsMap'][data.destinationName];
     if (topicInfo === undefined)
     {
-      console.log("Missing topic info in uiData");
+      //console.log("Missing topic info in uiData");
       return;
     }
 
@@ -110,6 +121,12 @@ class ShipardMqtt {
       if (!mqttItem)
       {
         console.log("NOT EXIST", elid);
+        continue;
+      }
+
+      if (mqttItem.shpWidget !== undefined)
+      {
+        mqttItem.shpWidget.onMqttMessage(serverIndex, data.destinationName, payload);
         continue;
       }
 
@@ -164,6 +181,18 @@ class ShipardMqtt {
 
         setTimeout(function (){shc.mqtt.checkGroups()}, 100);
       }
+      else if (family === 'iot-level')
+      {
+        let levelElement = mqttItem.getElementsByClassName('shp-iot-primary-level');
+        if (levelElement.length > 0)
+        {
+          let propertyId = levelElement[0].getAttribute('data-shp-iot-state-id');
+          if (levelElement[0].disabled)
+              levelElement[0].disabled = false;
+          if (payload[propertyId] !== undefined)
+            levelElement[0].value = payload[propertyId].toString();
+        }
+      }
       else if (family === 'iot-setup-scene')
       {
         //console.log ('### SETUP SCENE ###', data.destinationName, payload);
@@ -179,6 +208,9 @@ class ShipardMqtt {
 
   checkGroups()
   {
+    if (uiData['iotElementsGroups'] === undefined)
+      return;
+
     for (const groupId in uiData['iotElementsGroups']) {
       this.checkGroup(groupId);
     }
@@ -246,9 +278,15 @@ class ShipardMqtt {
   publish (serverIndex, topic, payload)
   {
     var ws = webSocketServers[serverIndex];
+
+    if (!ws.hasOwnProperty('mqttClient'))
+      return 0;
+
     let message = new Paho.MQTT.Message(payload);
     message.destinationName = topic;
     ws.mqttClient.send(message);
+
+    return 1;
   }
 
 	applyUIData (responseUIData)

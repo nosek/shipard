@@ -1,0 +1,75 @@
+<?php
+
+namespace e10pro\vendms;
+
+/**
+ * class ModuleServices
+ */
+class ModuleServices extends \E10\CLI\ModuleServices
+{
+	public function importISIC()
+	{
+		$fileParam = $this->app()->arg('file');
+		if (!$fileParam)
+		{
+			echo "Missing `--file` param!\n";
+			return FALSE;
+		}
+
+		$labelIticNdx = intval($this->app()->arg('labelIticNdx'));
+		$labelIsicNdx = intval($this->app()->arg('labelIsicNdx'));
+
+
+		$e = new \e10pro\vendms\libs\ImportISIC($this->app());
+		$e->fileName = $fileParam;
+		$e->personLabelIsicNdx = $labelIsicNdx;
+		$e->personLabelIticNdx = $labelIticNdx;
+
+		$e->run();
+	}
+
+	public function importPersonsIds()
+	{
+		$fileParam = $this->app()->arg('file');
+		if (!$fileParam)
+		{
+			echo "Missing `--file` param!\n";
+			return FALSE;
+		}
+
+		$labelIsicNdx = intval($this->app()->arg('labelIsicNdx'));
+
+		$e = new \e10pro\vendms\libs\ImportPersonsIds($this->app());
+		$e->fileName = $fileParam;
+		$e->personLabelIsicNdx = $labelIsicNdx;
+
+		$e->run();
+	}
+
+	public function importParentsEmails()
+	{
+		$fileParam = $this->app()->arg('file');
+		if (!$fileParam)
+		{
+			echo "Missing `--file` param!\n";
+			return FALSE;
+		}
+
+		$e = new \e10pro\vendms\libs\ImportParentsEmails($this->app());
+		$e->fileName = $fileParam;
+
+		$e->run();
+	}
+
+	public function onCliAction ($actionId)
+	{
+		switch ($actionId)
+		{
+			case 'import-isic': return $this->importISIC();
+			case 'import-persons-ids': return $this->importPersonsIds();
+			case 'import-parents-emails': return $this->importParentsEmails();
+		}
+
+		parent::onCliAction($actionId);
+	}
+}

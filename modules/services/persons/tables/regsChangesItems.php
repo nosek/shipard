@@ -18,6 +18,21 @@ class TableRegsChangesItems extends DbTable
 		parent::__construct ($dbmodel);
 		$this->setName ('services.persons.regsChangesItems', 'services_persons_regsChangesItems', 'Položky změny v registrech');
 	}
+
+	public function createHeader ($recData, $options)
+	{
+		$changeTypes = $this->columnInfoEnum ('changeType', 'cfgText');
+
+		$hdr = parent::createHeader ($recData, $options);
+		$hdr ['info'][] = [
+			'class' => 'title', 'value' => [
+				['text' => $recData ['oid']],
+				['text' =>$changeTypes[$recData ['changeType']], 'class' => 'id pull-right'],
+			]
+		];
+
+		return $hdr;
+	}
 }
 
 
@@ -28,12 +43,23 @@ class ViewRegsChangesItems extends TableView
 {
 	var $registers;
   var $changeTypes;
+	var $regsChangesNdx = 0;
 
 	public function init()
 	{
-		parent::init();
+		if ($this->queryParam ('regsChangesNdx'))
+			$this->regsChangesNdx = intval($this->queryParam ('regsChangesNdx'));
+
 		$this->registers = $this->app()->cfgItem('services.personsRegisters', []);
     $this->changeTypes = $this->table->columnInfoEnum ('changeType', 'cfgText');
+		$this->enableDetailSearch = TRUE;
+
+		$mq [] = ['id' => 'active', 'title' => 'Aktivní'];
+		$mq [] = ['id' => 'done', 'title' => 'Hotovo'];
+		$mq [] = ['id' => 'all', 'title' => 'Vše'];
+		$this->setMainQueries ($mq);
+
+		parent::init();
 	}
 
 	public function renderRow ($item)
@@ -52,6 +78,9 @@ class ViewRegsChangesItems extends TableView
     else
       $listItem ['t2'] = '';
 
+		if ($item['done'])
+			$listItem['class'] = 'e10-row-plus';
+
 		$listItem ['icon'] = $this->table->tableIcon ($item);
 
 		return $listItem;
@@ -59,6 +88,7 @@ class ViewRegsChangesItems extends TableView
 
 	public function selectRows ()
 	{
+		$mainQuery = $this->mainQueryId ();
 		$fts = $this->fullTextSearch ();
 
 		$q = [];
@@ -68,10 +98,22 @@ class ViewRegsChangesItems extends TableView
     array_push ($q, ' LEFT JOIN [services_persons_regsChanges] AS [changeSets] ON [items].[regsChangeSet] = [changeSets].[ndx]');
 		array_push ($q, ' WHERE 1');
 
+		if ($this->regsChangesNdx)
+			array_push($q, ' AND regsChangeSet = %i', $this->regsChangesNdx);
+
 		// -- fulltext
 		if ($fts != '')
 		{
+			array_push ($q, ' AND [items].[oid] LIKE %s', $fts.'%');
     }
+
+		if ($mainQuery === 'active')
+			array_push ($q, ' AND [items].[done] = %i', 0);
+		elseif ($mainQuery === 'done')
+			array_push ($q, ' AND [items].[done] = %i', 1);
+
+		//array_push ($q, ' AND [items].[changeType] = %i', 0);
+
 
     array_push ($q, ' ORDER BY ndx DESC');
 		array_push ($q, $this->sqlLimit());

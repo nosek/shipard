@@ -1,17 +1,14 @@
 <?php
 
 namespace e10pro\vendms\libs;
-use \Shipard\Base\Utility;
+use \Shipard\Base\ApiObject2;
 
 
 /**
  * class ObjectValidateCode
  */
-class ObjectValidateCode extends Utility
+class ObjectValidateCode extends ApiObject2
 {
-  var $requestParams = NULL;
-  var $result = ['success' => 0];
-
   public function checkData()
   {
     $this->result ['validPerson'] = 0;
@@ -47,9 +44,9 @@ class ObjectValidateCode extends Utility
 
   protected function personsCredit($personNdx)
   {
-    $c = $this->db()->query('SELECT SUM(amount) AS totalCredit FROM [e10pro_vendms_credits] WHERE [person] = %i', $personNdx)->fetch();
+    $c = $this->db()->query('SELECT SUM(amount) AS totalCredit FROM [e10pro_vendms_credits] WHERE [person] = %i', $personNdx, ' AND [docState] = %i', 4000)->fetch();
     if ($c)
-      return $c['totalCredit'];
+      return floatval($c['totalCredit']);
 
     return 0;
   }

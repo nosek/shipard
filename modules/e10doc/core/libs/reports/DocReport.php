@@ -76,6 +76,13 @@ class DocReport extends DocReportBase
 			$r = $row->toArray();
 			$r ['print'] = $this->getPrintValues($tableDocRows, $r);
 
+			// -- item price with VAT - ISDOC :-(
+			$q = $r['quantity'];
+			if ($q == 0)
+				$q = 1;
+			$r['priceItemWithVAT'] = round($r['priceTotal'] / $q, 4);
+			$r['priceItemWithVATHc'] = round($r['priceTotalHc'] / $q, 4);
+
 			// -- advances
 			if ($r['operation'] === 1010101/*1010104*/ && $r['taxCode'] !== '122')
 			{ // tax advance
@@ -155,6 +162,12 @@ class DocReport extends DocReportBase
 
 			if ($r['isAdvance'])
 				$this->data['rowsAdvance'][] = $r;
+
+			if ($r['itemIsLoyp'] == 1)
+			{
+				$this->data ['flags']['rowsWithLoypPresent'] = 1;
+				$r['itemIsLoypPresent'] = 1;
+			}
 
 			$rowNumberAll++;
 			$this->data ['rows'][] = $r;
@@ -304,12 +317,15 @@ class DocReport extends DocReportBase
 		// -- items codes
 		$this->data ['itemCodesHeader'] = [];
 		$rowNumber = 1;
-		forEach ($this->data ['rows'] as &$row)
+		if (isset($this->data ['rows']))
 		{
-			$row ['rowNumber'] = $rowNumber;
-			$rowNumber++;
-			$row ['rowItemProperties'] = \E10\Base\getPropertiesTable ($this->table->app(), 'e10.witems.items', $row['item']);
-			$this->table->loadDocRowItemsCodes($this->recData, $this->data ['person']['personType'], $row, NULL, $row, $this->data);
+			forEach ($this->data ['rows'] as &$row)
+			{
+				$row ['rowNumber'] = $rowNumber;
+				$rowNumber++;
+				$row ['rowItemProperties'] = \E10\Base\getPropertiesTable ($this->table->app(), 'e10.witems.items', $row['item']);
+				$this->table->loadDocRowItemsCodes($this->recData, $this->data ['person']['personType'], $row, NULL, $row, $this->data);
+			}
 		}
 
 		if (count($this->data ['itemCodesHeader']))

@@ -89,8 +89,22 @@ class LanDevices extends \lib\dataView\DataView
 
 		$this->loadConnections($pks, $t);
 		$this->loadAddresses($pks, $t);
+		$this->loadDevicesInfo($pks, $t);
 
-		$this->data['header'] = ['#' => '#', 'id' => 'id', 'deviceKind' => 'Druh', 'name' => 'Název', 'typeName' => 'Typ', 'place' => 'Místo', 'rack' => 'Rack', 'connectedTo' => 'Zapojeno do', 'addr' => 'IP adresa'];
+		$this->data['header'] = [
+			'#' => '#',
+			'id' => 'id',
+			'deviceKind' => 'Druh',
+			'deviceSN' => 'Výr. č.',
+			'name' => 'Název',
+			'typeName' => 'Typ',
+			'place' => 'Místo',
+			'rack' => 'Rack',
+			'connectedTo' => 'Zapojeno do',
+			'addr' => 'IP adresa',
+			'addrm' => 'IP/MAC adresa',
+			'osInfo' => 'Operační systém',
+		];
 		$this->data['table'] = $t;
 	}
 
@@ -272,12 +286,19 @@ class LanDevices extends \lib\dataView\DataView
 
 			$at = $addrTypes[$r['addrType']] ?? NULL;
 			$a = ['prefix' => $r['portId'], 'text' => $r['ip']];
+			$am = ['prefix' => $r['portId'], 'text' => $r['ip']];
 			if ($at && $at['sc'] !== 'F')
 				$a['suffix'] = $at['sc'];
+			if ($r['mac'] !== '')
+				$am['suffix'] = $r['mac'];
 
 			if (isset($data[$r['device']]['addr']))
 				$data[$r['device']]['addr'][] = ['code' => '<br>'];
 			$data[$r['device']]['addr'][] = $a;
+
+			if (isset($data[$r['device']]['addrm']))
+				$data[$r['device']]['addrm'][] = ['code' => '<br>'];
+			$data[$r['device']]['addrm'][] = $am;
 		}
 
 		// -- remove unused portId
@@ -287,9 +308,41 @@ class LanDevices extends \lib\dataView\DataView
 				unset ($data[$deviceNdx]['addr'][0]['prefix']);
 		}
 	}
+
+	public function loadDevicesInfo ($devices, &$data)
+	{
+		$rows = $this->db()->query ('SELECT * FROM [mac_lan_devicesInfo] WHERE [device] IN %in', $devices);
+
+		$info = [];
+		foreach ($rows as $row)
+		{
+			$deviceNdx = $row['device'];
+			$info[$row['infoType']] = $row->toArray();
+
+			$infoList = ['system', 'drives', 'storages', 'sw', 'counters'];
+			foreach ($infoList as $infoType)
+			{
+				if (!isset($info[$infoType]))
+					continue;
+
+				$r = $info[$infoType];
+				$infoData = json_decode($r['data'], TRUE);
+				if ($r['infoType'] === 'system')
+				{
+					if (isset($infoData['items']['device-sn']))
+						$data[$deviceNdx]['deviceSN'] = $infoData['items']['device-sn'];
+				}
+			}
+		}
+
+		// -- OS
+		$osBadges = [];
+		$swDeviceUtils = new \mac\swlan\libs\SWDevicesUtils($this->app());
+		$swDeviceUtils->devicesOSBadges($devices, $osBadges);
+		foreach ($osBadges as $deviceNdx => $osInfo)
+		{
+			$data[$deviceNdx]['osInfo'] = $osInfo;
+			unset($data[$deviceNdx]['osInfo'][0]['icon']);
+		}
+	}
 }
-
-
-
-
-

@@ -7,8 +7,8 @@
 		"prihlasky", "studium", "studiumpre",
 		"vyuky", "vyukystudenti", "vyukyrozvrh", "hodiny", "hodinydochazka", "hodnoceni", "omluvenky", "omluvenkyHodiny"
 	],
-	"modules": ["e10/persons", "wkf/bboard"],
-	"extensions": ["persons", "wkf", "ezk"],
+	"modules": ["e10/persons", "wkf/bboard", "wkf/events"],
+	"extensions": ["persons", "wkf", "ezk", "workRecs"],
   "config": [
 		{"id": "+apps", "file": "apps.json"},
     {"id": "+appSkeleton", "name": "Rozšíření menu aplikace", "file": "zus.appSkeleton.json"},
@@ -35,6 +35,7 @@
 		{"id": "+widgets", "file": "widgets.json"},
 		{"id": "+e10.persons.virtualGroups", "file": "e10.persons.virtualGroups.json"},
 		{"id": "+e10.reports.sendReports", "file": "sendReports.json"},
-		{"id": "+e10.usersContexts", "file": "usersContexts.json"}
+		{"id": "+e10.usersContexts", "file": "usersContexts.json"},
+		{"id": "+registeredClasses", "file": "registeredClasses.json"}
   ]
 }

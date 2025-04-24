@@ -22,6 +22,8 @@ class ViewItemsGantt extends TableViewGrid
 	var $useProjectId = 0;
 	var $lastGroupId = '';
 
+	var $useViewStatesColors = 0;
+
 	var $showPrevItemInMonth = 1;
 
   var $dateFirst = NULL;
@@ -46,6 +48,7 @@ class ViewItemsGantt extends TableViewGrid
 				$this->useCustomer = $this->planCfg['useCustomer'] ?? 0;
 				$this->useProjectId = $this->planCfg['useProjectId'] ?? 0;
 				$this->useTableViewTabsMonths = $this->planCfg['useTableViewTabsMonths'] ?? 0;
+				$this->useViewStatesColors = $this->planCfg['useViewStatesColors'] ?? 0;;
 			}
 		}
 
@@ -66,8 +69,6 @@ class ViewItemsGantt extends TableViewGrid
 
 		$g['subject'] = 'Název';
 
-
-
 		$weekDate = clone $this->firstDay;
     while (1)
     {
@@ -77,7 +78,7 @@ class ViewItemsGantt extends TableViewGrid
 
       $colId = 'W-'.$weekYear.'-'.sprintf('%02d', $weekNumber);
       $colTitle = [
-        ['text' => $weekNumber/*.'/'.$weekYearShort*/, 'class' => 'e10-small block', 'css' => 'text-align: center;'],
+        ['text' => $weekNumber/*.'/'.$weekYearShort*/, 'class' => 'e10-small block', 'colClass' => 'center'],
         ['text' => $weekDate->format('d.m'), 'class' => 'id', 'css' => 'font-weight: normal;']
       ];
 
@@ -100,18 +101,26 @@ class ViewItemsGantt extends TableViewGrid
 		array_push ($q, ' SELECT MIN([items].[datePlanBegin]) AS [dateFirst], MAX([items].[dateDeadline]) AS [dateLast]');
 		array_push ($q, ' FROM [plans_core_items] AS [items]');
 		array_push ($q, ' WHERE 1');
+		array_push ($q, ' AND [items].[docState] IN %in', [4000, 8000]);
 
 		if ($this->planNdx)
 			array_push ($q, ' AND [plan] = %i', $this->planNdx);
 
-    array_push ($q, ' AND [datePlanBegin] IS NOT NULL');
-    array_push ($q, ' AND [dateDeadline] IS NOT NULL');
+		array_push ($q, ' AND ([datePlanBegin] IS NOT NULL OR [dateDeadline] IS NOT NULL)');
 
     $data = $this->db()->query($q)->fetch();
     if ($data)
     {
-      $this->dateFirst = $data['dateFirst'];
-      $this->dateLast = $data['dateLast'];
+      $this->dateFirst = Utils::createDateTime($data['dateFirst']);
+			if (!$this->dateFirst)
+				$this->dateFirst = new \DateTime();
+      $this->dateLast = Utils::createDateTime($data['dateLast']);
+			if (!$this->dateLast)
+				$this->dateLast = new \DateTime();
+
+			$days = Utils::dateDiff($this->dateFirst, $this->dateLast);
+			if ($days < 180)
+				$this->dateLast->add(new \DateInterval('P40D'));
 
       $today = Utils::today();
       if ($today > $this->dateFirst)
@@ -125,6 +134,30 @@ class ViewItemsGantt extends TableViewGrid
 	public function renderRow ($item)
 	{
 		$itemState = $this->itemStates[$item['itemState']] ?? NULL;
+		$itemContent = NULL;
+		if (!$item['datePlanBegin'])
+		{
+			$itemContent = ['text' => '', 'icon' => 'user/chevronLeft', 'class' => 'pull-right'];
+			$item['datePlanBegin'] = Utils::createDateTime($item['dateDeadline']);
+			$item['datePlanBegin']->sub(new \DateInterval('P1D'));
+
+			if ($item['datePlanBegin'] < $this->firstDay)
+				$item['datePlanBegin'] = Utils::createDateTime($this->firstDay);
+		}
+		if (!$item['dateDeadline'])
+		{
+			$itemContent = ['text' => '', 'icon' => 'user/chevronRight', 'class' => 'pull-left'];
+			$item['dateDeadline'] = Utils::createDateTime($item['datePlanBegin']);
+			$item['dateDeadline']->add(new \DateInterval('P1D'));
+			if ($item['dateDeadline'] < $this->firstDay)
+				$item['dateDeadline'] = Utils::createDateTime($this->firstDay);
+		}
+
+		if ($this->useViewStatesColors)
+		{
+			$itemStateCss = 'background-color: '.$itemState['colorbg'].'; color: '.$itemState['colorfg'];
+			$listItem ['rowIconCss'] = $itemStateCss;
+		}
 
 		$listItem ['pk'] = $item ['ndx'];
 
@@ -141,16 +174,16 @@ class ViewItemsGantt extends TableViewGrid
 
 		$listItem ['price'] = $item['price'];
 		$curr = World::currency($this->app(), $item ['currency']);
-		$listItem ['currency'] = strtoupper($curr['i']);
+		if ($curr)
+			$listItem ['currency'] = strtoupper($curr['i']);
 
 		$listItem ['icon'] = $itemState['icon'];//$this->table->tableIcon ($item);
 
-		if ($itemState)
+		if ($itemState && $this->useViewStatesColors === 1)
 		{
 			$css = "background-color: ".$itemState['colorbg'].'; color: '.$itemState['colorfg'];
 			$listItem['_options']['cellCss'] = ['subject' => $css];
 		}
-
 
     $weekYearBegin = intval($item['datePlanBegin']->format('o'));
     $weekNumberBegin = intval($item['datePlanBegin']->format('W'));
@@ -171,7 +204,13 @@ class ViewItemsGantt extends TableViewGrid
       if ($gridColId > $colIdEnd)
         break;
 
-      $listItem['_options']['cellCss'][$gridColId] = 'background-color: #445566B0;';
+			if ($itemContent)
+				$listItem[$gridColId] = $itemContent;
+
+			if ($this->useViewStatesColors)
+				$listItem['_options']['cellCss'][$gridColId] = 'background-color: '.$itemState['colorbg'].';';
+			else
+				$listItem['_options']['cellCss'][$gridColId] = 'background-color: #44556630;';
       if ($colSpanCol === '')
         $colSpanCol = $gridColId;
       $colSpanCnt++;
@@ -235,8 +274,7 @@ class ViewItemsGantt extends TableViewGrid
 		if ($this->planNdx)
 			array_push ($q, ' AND [plan] = %i', $this->planNdx);
 
-    array_push ($q, ' AND [datePlanBegin] IS NOT NULL');
-    array_push ($q, ' AND [dateDeadline] IS NOT NULL');
+		array_push ($q, ' AND ([datePlanBegin] IS NOT NULL OR [dateDeadline] IS NOT NULL)');
 		array_push ($q, ' AND [items].[docState] IN %in', [1000, 4000, 8000]);
 
 		$inProgressIS = array_merge($this->lifeCycleItemStates[20] ?? [], $this->lifeCycleItemStates[10] ?? []);
@@ -272,7 +310,7 @@ class ViewItemsGantt extends TableViewGrid
 		array_push ($q, ')');
 		array_push ($q, ')');
 
-    array_push ($q, 'ORDER BY items.[datePlanBegin], items.[dateDeadline], items.[ndx]');
+    array_push ($q, 'ORDER BY COALESCE(items.[datePlanBegin],items.[dateDeadline]), items.[ndx]');
     array_push ($q, $this->sqlLimit());
 
 		$this->runQuery ($q);

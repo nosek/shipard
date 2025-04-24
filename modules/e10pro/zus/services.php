@@ -72,7 +72,8 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			if (!$existedETK)
 				continue;
 
-			echo "# ".$test.' > '.$r['nazev']."\n";
+			if ($this->app()->debug)
+				echo "# ".$test.' > '.$r['nazev']."\n";
 			$this->addUsersFromContact($r['student'], $uiNdx, $mainRoleRecData['ndx']);
 		}
 	}
@@ -255,6 +256,35 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			$newRequest = ['user' => $newUserNdx, 'ui' => $uiNdx, 'shortId' => $shortId];
 			$newRequestNdx = $tableRequests->dbInsertRec($newRequest);
 		}
+	}
+
+	protected function syncStudentsPull()
+	{
+		$listNdx = intval($this->app->arg('listNdx'));
+		if (!$listNdx)
+			return $this->app->err('arg `--listNdx` is missing or wrong');
+
+		$url = $this->app->arg('url');
+		if (!$url || $url == '')
+			return $this->app->err('arg `--url` is missing or wrong');
+
+		$apiKey = $this->app->arg('apiKey');
+		if (!$apiKey || $apiKey == '')
+			return $this->app->err('arg `--apiKey` is missing or wrong');
+
+		$addLabels = $this->app->arg('addLabels');
+
+		$e = new \e10pro\zus\libs\StudentsSyncPullEngine($this->app());
+		$e->contactsListNdx = $listNdx;
+		$e->url = $url;
+		$e->apiKey = $apiKey;
+
+		if ($addLabels && $addLabels != '')
+			$e->setAddLabels($addLabels);
+
+		$e->run();
+
+		return TRUE;
 	}
 
 	public function anonymizeVyuky ()
@@ -657,6 +687,8 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			case 'create-studies': return $this->createStudies();
 			case 'add-users': return $this->addUsers();
 			case 'add-students': return $this->addStudents();
+			case 'sync-students-pull': return $this->syncStudentsPull();
+			case 'close-work-in-progress': return $this->closeWorkInProgress();
 		}
 
 		parent::onCliAction($actionId);
@@ -681,6 +713,28 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$tablePrihlasky = $this->app()->table('e10pro.zus.prihlasky');
 		$tablePrihlasky->archiveEntries($yearParam);
 		return TRUE;
+	}
+
+	protected function closeWorkInProgress()
+	{
+    $q = [];
+    array_push($q, 'SELECT [wr].* ');
+    array_push($q, ' FROM [e10mnf_core_workRecs] AS [wr]');
+    array_push($q, ' WHERE 1');
+    array_push($q, ' AND [docState] = %i', 1000);
+    array_push($q, ' AND [workInProgress] = %i', 1);
+    //array_push($q, ' AND [person] = %i', $this->userNdx);
+    array_push($q, ' ORDER BY ndx');
+
+    $rows = $this->db()->query($q);
+    foreach ($rows as $r)
+    {
+			$wip = new \e10mnf\core\libs\WorkInProgressEngine($this->app());
+			$wip->init();
+			$wip->userNdx = $r['person'];
+			$wip->loadState();
+			$wip->endWork();
+    }
 	}
 
 	public function archiveStudents()
@@ -751,6 +805,22 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$this->sendEntriesEmails();
 	}
 
+	public function onCronHourly ()
+	{
+		$now = new \DateTime ();
+		$hour = intval($now->format('H'));
+
+		if ($hour === 17)
+		{
+			$this->addUsers();
+			$this->addStudents();
+		}
+		if ($hour === 21)
+		{
+			$this->closeWorkInProgress();
+		}
+	}
+
 	public function onStats()
 	{
 		$this->dataSourceStatsCreate();
@@ -761,6 +831,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		switch ($cronType)
 		{
 			case 'ever': $this->onCronEver(); break;
+			case 'hourly': $this->onCronHourly(); break;
 			case 'stats': $this->onStats(); break;
 		}
 		return TRUE;

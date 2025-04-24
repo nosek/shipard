@@ -132,10 +132,15 @@ class TableItems extends DbTable
 	}
 
 	public function icon ($item)
-	{ // TODO: check
-		if (isset ($this->itemsTypes [$item['type']]))
+	{ // @TODO: remove?
+		return $this->tableIcon($item);
+	}
+
+	public function tableIcon($recData, $options = NULL)
+	{
+		if (isset ($this->itemsTypes [$recData['type']]))
 		{
-			$itemType = $this->itemsTypes [$item['type']];
+			$itemType = $this->itemsTypes [$recData['type']];
 			return (isset ($itemType ['icon']) && $itemType ['icon'] !== '') ? $itemType ['icon'] : 'tables/e10.witems.items';
 		}
 		return 'tables/e10.witems.items';
@@ -330,6 +335,7 @@ class ViewItems extends TableView
 	var $units;
 	var $itemKind = FALSE;
 	var $activeCategory = FALSE;
+	var $loypMode = 0;
 
 	CONST PRICE_NONE = 0, PRICE_SALE = 1, PRICE_BUY = 2;
 	var $showPrice = self::PRICE_SALE;
@@ -373,10 +379,15 @@ class ViewItems extends TableView
 		{
 			if ($topTabId[0] === 't') // item type
 				$this->defaultType = substr ($topTabId, 1);
-			else
-			if ($topTabId[0] === 'c') // item category
+			elseif ($topTabId[0] === 'c') // item category
 			{
-				$catNdx = intval (substr($topTabId, 1));
+				if ($topTabId[1] === 'l')
+				{
+					$this->loypMode = 1;
+					$catNdx = intval (substr($topTabId, 2));
+				}
+				else
+					$catNdx = intval (substr($topTabId, 1));
 				$catRootPath = $this->app->cfgItem ('e10.witems.categories.list.'.$catNdx, '');
 				if ($catRootPath != '')
 				{
@@ -612,7 +623,7 @@ class ViewItems extends TableView
 		else
 			$listItem ['i1'] = ['text' => '#'.$item['id'], 'class' => 'id'];
 
-		$listItem ['icon'] = $this->table->icon ($item);
+		$listItem ['icon'] = $this->table->tableIcon ($item);
 
 		if ($thisItemType && $thisItemType['kind'] !== 2)
 		{
@@ -621,11 +632,11 @@ class ViewItems extends TableView
 			if ($this->showPrice === self::PRICE_SALE)
 			{
 				if ($item['priceSell'] != 0.0)
-					$listItem ['i2'][] = ['text' => utils::nf($item['priceSell'], 2), 'icon' => 'icon-money', 'class' => 'label label-warning'];
+					$listItem ['i2'][] = ['text' => utils::nf($item['priceSell'], 2), 'icon' => 'system/iconMoney', 'class' => 'label label-warning'];
 				if ($item['priceSellBase'] != 0.0)
-					$listItem ['i2'][] = ['text' => utils::nf($item['priceSellBase'], 2), 'suffix' => 'bez DPH', 'icon' => 'icon-money', 'class' => 'label label-success'];
+					$listItem ['i2'][] = ['text' => utils::nf($item['priceSellBase'], 2), 'suffix' => 'bez DPH', 'icon' => 'system/iconMoney', 'class' => 'label label-success'];
 				if ($item['priceSellTotal'] != 0.0)
-					$listItem ['i2'][] = ['text' => utils::nf($item['priceSellTotal'], 2), 'suffix' => 's DPH', 'icon' => 'icon-money', 'class' => 'label label-info'];
+					$listItem ['i2'][] = ['text' => utils::nf($item['priceSellTotal'], 2), 'suffix' => 's DPH', 'icon' => 'system/iconMoney', 'class' => 'label label-info'];
 			}
 			else
 			if ($this->showPrice === self::PRICE_BUY)
@@ -679,7 +690,7 @@ class ViewItems extends TableView
 			$item ['i2'][] = [
 				'text' => utils::nf($this->itemsStates [$item ['pk']]['quantity'], 2),
 				'suffix' => $this->itemsStates [$item ['pk']]['unit'],
-				'icon' => 'icon-shopping-basket',
+				'icon' => 'e10doc-buy/buy',
 				'class' => '',
 			];
 		}

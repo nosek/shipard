@@ -104,6 +104,27 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		return TRUE;
 	}
 
+	public function cliPersonAdd ()
+	{
+    $e = new \services\persons\libs\PersonData($this->app());
+
+		$debug = $this->app->arg('debug');
+		if ($debug)
+			$e->debug = 1;
+
+		$personId = $this->app->arg('personId');
+		if ($personId != '')
+		{
+			$e->addPersonFromReg($personId);
+		}
+		else
+		{
+			echo "ERROR: no `personNdx` param...\n";
+		}
+
+		return TRUE;
+	}
+
 	public function cliPersonRefresh ()
 	{
     $e = new \services\persons\libs\PersonData($this->app());
@@ -152,6 +173,58 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$rc->prepareChangeSetsItems();
 	}
 
+	public function doChangeSetItems($fromFile = 0)
+	{
+		$maxCount = intval($this->app->arg('maxCount'));
+		if (!$maxCount)
+			$maxCount = 20;
+		$rc = new \services\persons\libs\cz\RegsChangesCZ($this->app());
+		if ($fromFile === 1)
+		{ // ARES
+			$rc->doChangeSetItemsFromFiles($maxCount);
+		}
+		elseif ($fromFile === 2)
+		{ // RES
+			$rc->doChangeSetItemsFromRES($maxCount);
+		}
+		elseif ($fromFile === 3)
+		{ // queue
+			$rc->doChangeSetItemsQueue($maxCount);
+		}
+		else
+		{
+			$addOnly = intval($this->app->arg('addOnly'));
+			$rc->doChangeSetItems($maxCount, $addOnly);
+		}
+	}
+
+	public function doChangeSetItemsDone()
+	{
+		$now = new \DateTime();
+		$q = [];
+		array_push($q, 'SELECT changes.ndx, cntChanges');
+		array_push($q, ' FROM services_persons_regsChanges AS changes');
+		array_push($q, ' WHERE (SELECT COUNT(*) FROM services_persons_regsChangesItems WHERE changes.ndx = services_persons_regsChangesItems.regsChangeSet AND done = 1) = cntChanges');
+		array_push($q, ' AND changeState != %i', 3);
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			$this->db()->query ('UPDATE services_persons_regsChanges SET changeState = %i, ', 3, 'tsDone = %t', $now,
+													' WHERE ndx = %i', $r['ndx']);
+			if ($this->app()->debug)
+				echo "# ".\dibi::$sql."\n";
+		}
+	}
+
+	public function doChangeSetItemsCleanup()
+	{
+		$maxCount = intval($this->app->arg('maxCount'));
+		if (!$maxCount)
+			$maxCount = 20;
+		$rc = new \services\persons\libs\cz\RegsChangesCZ($this->app());
+		$rc->doChangeSetItemsCleanup($maxCount);
+	}
+
 	protected function onCronMorning()
 	{
 		$this->downloadRegsChangeSets();
@@ -161,6 +234,12 @@ class ModuleServices extends \E10\CLI\ModuleServices
 	{
 		$this->downloadRegsChangeSetsContents();
 		$this->prepareRegsChangeItems();
+		$this->doChangeSetItemsDone();
+	}
+
+	protected function onCronQueue()
+	{
+		$this->doChangeSetItems(3);
 	}
 
 	public function onCliAction ($actionId)
@@ -172,10 +251,17 @@ class ModuleServices extends \E10\CLI\ModuleServices
 			case 'online-person-regs-download': return $this->cliOnlinePersonRegsDownload();
 			case 'person-regs-import': return $this->cliPersonRegsImport();
 			case 'person-refresh': return $this->cliPersonRefresh();
+			case 'person-add': return $this->cliPersonAdd();
 			case 'refresh-import-res': return $this->cliRefreshImportRES();
 			case 'download-regs-change-sets': return $this->downloadRegsChangeSets();
 			case 'download-regs-change-sets-contents': return $this->downloadRegsChangeSetsContents();
 			case 'prepare-regs-change-items': return $this->prepareRegsChangeItems();
+			case 'do-regs-change-set-items': return $this->doChangeSetItems();
+			case 'do-regs-change-set-items-from-file': return $this->doChangeSetItems(1);
+			case 'do-regs-change-set-items-from-res': return $this->doChangeSetItems(2);
+			case 'do-regs-change-set-items-queue': return $this->doChangeSetItems(3);
+			case 'do-regs-change-set-items-done': return $this->doChangeSetItemsDone();
+			case 'do-regs-change-set-items-cleanup': return $this->doChangeSetItemsCleanup();
 		}
 
 		parent::onCliAction($actionId);
@@ -187,6 +273,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		{
 			case 'morning':  $this->onCronMorning(); break;
 			case 'ever':   $this->onCronEver(); break;
+			case 'queue':   $this->onCronQueue(); break;
 		}
 		return TRUE;
 	}

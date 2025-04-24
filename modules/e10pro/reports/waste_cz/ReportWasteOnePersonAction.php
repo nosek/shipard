@@ -41,9 +41,10 @@ class ReportWasteOnePersonAction extends DocumentAction
 		$person = $documentTable->loadItem ($personNdx);
 
 		$report = new \e10pro\reports\waste_cz\ReportWasteOnePerson($documentTable, $person);
-		$report->calendarYear = intval($this->params['data-param-calendar-year']);
-		$report->periodBegin = $report->calendarYear.'-01-01';
-		$report->periodEnd = $report->calendarYear.'-12-31';
+		$report->calendarYear = intval($this->params['data-param-calendar-year'] ?? 0);
+		$report->periodBegin = Utils::createDateTime($this->params['data-param-period-begin']);
+		$report->periodEnd = Utils::createDateTime($this->params['data-param-period-end']);
+
 		$report->codeKindNdx = intval($this->params['data-param-code-kind']);
 
 		$report->init();
@@ -90,11 +91,11 @@ class ReportWasteOnePersonAction extends DocumentAction
 	{
 		$report = new \e10pro\reports\waste_cz\libs\ReportWasteCompanies($this->app());
 		$report->subReportId = 'companiesIn';
-		$report->sendStatus = 'toSend';
 		$report->calendarYear = intval($this->params['data-param-calendar-year']);
 		$report->periodBegin = $this->params['data-param-period-begin'];
 		$report->periodEnd = $this->params['data-param-period-end'];
 		$report->codeKindNdx = $this->params['data-param-code-kind'];
+		$report->sendStatus = $this->params['data-param-send-status'];
 		$report->createPdf();
 
 		$cnt = 0;

@@ -39,6 +39,9 @@ class TableViewGrid extends \Shipard\Viewer\TableView
 			$tableClass .= ' editable';
 		else
 			$tableClass .= ' static';
+
+		$c .= $this->createLeftPanelCode();
+
 		if ($this->fullWidthToolbar)
 			$c .= $this->createFullWidthToolbarCode();
 
@@ -111,7 +114,10 @@ class TableViewGrid extends \Shipard\Viewer\TableView
 			$c .= "<td class='e10-icon";
 			if (isset ($listItem['class']))
 				$c .= ' '.$listItem['class'];
-			$c .= "'>";
+			$c .= "'";
+			if (isset ($listItem['rowIconCss']))
+				$c .= ' style="'.$listItem['rowIconCss'].'"';
+			$c .= '>';
 
 			if ((isset ($listItem ['icon'])) && ($listItem ['icon'] !== ''))
 			{
