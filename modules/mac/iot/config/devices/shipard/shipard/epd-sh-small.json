@@ -1,0 +1,45 @@
+{
+	"gpioLayout": "shipard/espressif/esp32s3-generic",
+	"enabledPins": {
+		"p17": {"title": "qwiic.sda"},
+		"p18": {"title": "qwiic.scl"}
+	},
+	"fields": {
+		"groups": [
+			{"id":  "opts", "title":  "Nastavení"}
+		],
+		"columns": [
+			{
+				"id": "displayType", "group":  "opts", "name": "Typ displeje", "type": "enumInt", "options": ["saveOnChange"],
+				"enumValues": {
+					"GxEPD2_750c_Z08": "7.5\", 800 x 480, čb + červená (GxEPD2_750c_Z08)",
+					"GxEPD2_583_GDEQ0583T31": "5.83\", 648 x 480, čb (GxEPD2_583_GDEQ0583T31)",
+					"GxEPD2_730c_GDEY073D46": "7.3\", 800 x 480, čb + červená, žlutá, modrá, zelená a oranžová (GxEPD2_730c_GDEY073D46)"
+				}
+			}
+		]
+	},
+	"device": {
+		"ds": 1,
+		"dsWakeupTimer": 300
+	},
+	"fixedIOPorts": {
+		"epd": {
+			"type": "display/epaper",
+			"portId": "epd",
+			"_cfgColumns": {"displayType": "displayType"}
+		},
+		"i2c": {
+			"type": "bus/i2c",
+			"portId": "i2c",
+			"pinSDA": "p17",
+			"pinSCL": "p18"
+		},
+		"pwr": {
+			"type": "power/battusb",
+			"portId": "pwr",
+			"i2cBusPortId": "i2c"
+		}
+	},
+	"fwId": "epd-esp32S3-wifi-GxEPD2_1248c"
+}
