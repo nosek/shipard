@@ -407,7 +407,7 @@ class Detail extends \Shipard\Base\DocumentCard
 	public function docsRows ()
 	{
 		$q = [];
-		array_push($q, 'SELECT [rows].text AS rText, [rows].quantity AS rQuantity, [rows].unit AS rUnit, [rows].priceItem AS rPriceItem,');
+		array_push($q, 'SELECT [rows].text AS rText, [rows].quantity AS rQuantity, [rows].unit AS rUnit, [rows].priceItem AS rPriceItem, [rows].operation,');
 		array_push($q, ' [rows].priceAll AS rPriceAll, [rows].item, [rows].ownerRowMain, [rows].ownerRow AS rowOwnerRow,');
 		array_push($q, ' [items].[id] AS [itemId]');
 		array_push($q, ' FROM [e10doc_core_rows] AS [rows] ');
@@ -421,6 +421,7 @@ class Detail extends \Shipard\Base\DocumentCard
 		$rows = $this->table->db()->query($q);
 		$list = [];
 		$totalPriceAll = 0.0;
+		$sumQuantityAll = 0.0;
 		forEach ($rows as $r)
 		{
 			$unit = (isset($cfgUnits[$r['rUnit']])) ? $cfgUnits[$r['rUnit']]['shortcut'] : '';
@@ -432,6 +433,8 @@ class Detail extends \Shipard\Base\DocumentCard
 				'priceItem' => $r['rPriceItem'],
 				'priceAll' => $r['rPriceAll']
 			];
+
+			$sumQuantityAll += $r['rQuantity'];
 
 			$this->table->loadDocRowItemsCodes($this->recData, $this->personRecData['personType'] ?? 2, $r->toArray(), NULL, $rowItem, $itemCodesInfo);
 
@@ -474,7 +477,12 @@ class Detail extends \Shipard\Base\DocumentCard
 				];
 				if (count ($list) > 1)
 				{
-					$list[] = ['text' => 'Celkem', 'priceAll' => $totalPriceAll, '_options' => ['class' => 'sum']];
+					$list[] = [
+						'text' => 'Celkem',
+						'quantity' => $sumQuantityAll,
+						'priceAll' => $totalPriceAll,
+						'_options' => ['class' => 'sum'],
+					];
 				}
 			}
 			//else

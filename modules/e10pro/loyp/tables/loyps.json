@@ -16,13 +16,17 @@
     {"id": "minPointsPerDoc", "name": "Minimální počet bodů za doklad", "type": "int"},
 
 		{"id": "dbCounterInvoiceOut", "type": "int", "name": "Číselná řada pro vydané faktury", "reference": "e10doc.base.docnumbers", "group": "invoices"},
-    {"id": "warehouse", "name": "Sklad s dárky", "type": "int", "reference": "e10doc.base.warehouses"},
+		{"id": "docKindInvoiceOut", "name": "Druh dokladu pro vydané faktury", "type": "enumInt",
+			"enumCfg": {"cfgItem": "e10.docs.kinds", "cfgValue": "ndx", "cfgText": "fullName"}},
 
-		{"id": "debsAccIdInDr", "name": "Účet Získání bodů - MD", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
-		{"id": "debsAccIdInCr", "name": "Účet Získání bodů - DAL", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
+		{"id": "warehouse", "name": "Sklad s dárky", "type": "int", "reference": "e10doc.base.warehouses"},
+
+		{"id": "debsAccIdInDr", "name": "Účet Získání bodů - MD / Náklady", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
+		{"id": "debsAccIdInCr", "name": "Účet Získání bodů - DAL / Závazky", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
 		{"id": "debsAccIdOutDr", "name": "Účet Uplatnění bodů - MD", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
-		{"id": "debsAccIdOutCr", "name": "Účet Uplatnění bodů - DAL", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
-    {"id": "pointAccPrice", "name": "Částka za 1 bod", "type": "money"},
+		{"id": "debsAccIdOutBalanceDr", "name": "Účet Uplatnění bodů - DAL / Úhrada pohledávky", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
+		{"id": "debsAccIdOutCosts", "name": "Účet Uplatnění bodů - DAL / Doúčtování nákladů", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
+		{"id": "pointAccPrice", "name": "Částka za 1 bod", "type": "money"},
 
 		{"id": "docState", "name": "Stav", "type": "int"},
 		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}

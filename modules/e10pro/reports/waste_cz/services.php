@@ -19,9 +19,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		}
 
 		$wre = new \e10pro\reports\waste_cz\libs\WasteReturnEngine($this->app);
-		$wre->year = $year;
-
-		$wre->run();
+		$wre->resetYear($year);
 	}
 
 
@@ -64,7 +62,7 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		switch ($actionId)
 		{
 			case 'reset-waste-return': return $this->resetWasteReturn();
-			case 'repair-waste-return': return $this->repairWasteReturn();
+			//case 'repair-waste-return': return $this->repairWasteReturn();
 		}
 
 		return parent::onCliAction($actionId);

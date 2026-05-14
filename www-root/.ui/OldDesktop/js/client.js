@@ -459,16 +459,25 @@ newItem="<li class='data' data-pk='"+pk+"' data-table='"+table+"'"+'>'+infotext+
 formId=searchObjectId(target,'form');var
 form=$('#'+formId);e10doSizeHints(form);if(target.hasClass('e10-ino-saveOnChange'))e10FormNeedSave(target,-1);}else{var
 valueInput=target.find('input.e10-inputNdx');if(valueInput.is('INPUT')){valueInput.val(pk);target.find('span.btns').show();var
-infotext=e.find('div.df2-list-item-t1').text();target.find('span.e10-refinp-infotext').text(infotext);}else{valueInput=target.find('input.e10-inputRefId, textarea.e10-inputRefId');var
+infotext=e.find('div.df2-list-item-t1').text();target.find('span.e10-refinp-infotext').text(infotext);var
+inputPrefix=searchParentAttr(valueInput,'data-inputprefix');if(inputPrefix==null)inputPrefix='';var
+iel=e.get(0);if(e.attr('data-cc-force')!=undefined){for(var
+i=0,attrs=iel.attributes,l=attrs.length;i<l;i++){var
+attrName=attrs.item(i).nodeName;if(attrName.substring(0,7)!=='data-cc')continue;var
+valParts=attrs.item(i).nodeValue.split(':');var
+inputId='#'+inputPrefix+valParts[0];var
+inputElement=$(inputId);console.log("DATA-CC: "+inputId+' = ',inputElement);if(inputElement.hasClass('e10-inputLogical')){var
+checkIt=(b64DecodeUnicode(valParts[1])==='1');inputElement[0].checked=checkIt;}else{var
+ivd=b64DecodeUnicode(valParts[1]);console.log("SET-VALUE: "+inputId+' = ',ivd);console.log(inputElement);inputElement.val(b64DecodeUnicode(valParts[1]));}}}}else{valueInput=target.find('input.e10-inputRefId, textarea.e10-inputRefId');var
 inputPrefix=searchParentAttr(valueInput,'data-inputprefix');var
 iel=e.get(0);for(var
 i=0,attrs=iel.attributes,l=attrs.length;i<l;i++){var
 attrName=attrs.item(i).nodeName;if(attrName.substring(0,7)!=='data-cc')continue;var
 valParts=attrs.item(i).nodeValue.split(':');var
 inputId='#'+inputPrefix+valParts[0];var
-inputElement=$(inputId);if(inputElement.hasClass('e10-inputLogical')){var
+inputElement=$(inputId);console.log("DATA-CC: "+inputId+' = ',inputElement);if(inputElement.hasClass('e10-inputLogical')){var
 checkIt=(b64DecodeUnicode(valParts[1])==='1');inputElement[0].checked=checkIt;}else
-inputElement.val(b64DecodeUnicode(valParts[1]));}valueInput.addClass('e10-ino-saveOnChange');}if(event!==0&&event.shiftKey)valueInput.attr('data-softchange','1');e10FormSetAsModified(valueInput);if(valueInput.hasClass('e10-ino-saveOnChange'))valueInput.change();target.find('input.e10-inputRefId').focus();}return;}if(viewer.attr('data-combo-rows-target')){var
+inputElement.val(b64DecodeUnicode(valParts[1]));}valueInput.addClass('e10-ino-saveOnChange');}if(event!==0&&event.shiftKey)valueInput.attr('data-softchange','1');e10FormSetAsModified(valueInput);if(valueInput.hasClass('e10-ino-saveOnChange'))valueInput.change();target.find('input.e10-inputRefId').focus();}return;}if(viewer.attr('data-combo-rows-target')){console.log("data-combo-rows-target");var
 formId=viewer.attr('data-combo-formid-target');var
 form=$('#'+formId);if(form.attr('data-readonly')!==undefined)return;var
 options={"appendRowList":"rows","appendRowItemPK":pk};var
@@ -587,7 +596,8 @@ e10viewerNavPath(viewer,tableName,docPK,listItem){var
 viewerId=viewer.attr('data-viewer-view-id');var
 detailId='default';var
 activeDetail=viewer.find('div.e10-mv-ld-tabs >ul >li.active');if(activeDetail.is('LI')){detailId=activeDetail.attr('data-detail');}else{activeDetail=$('#mainViewerDetailMenu li.active');if(activeDetail.is('LI'))detailId=activeDetail.attr('data-detail');}var
-apiPath="/api/detail/"+tableName+"/"+viewerId+'/'+detailId+"/"+docPK+'?mismatch=1';return apiPath;}function
+apiPath="/api/detail/"+tableName+"/"+viewerId+'/'+detailId+"/"+docPK+'?mismatch=1';var
+mainQueryInput=viewer.find("div.viewerQuerySelect>input");if(mainQueryInput.is('INPUT')){apiPath+='&mainQueryId='+mainQueryInput.val();}return apiPath;}function
 viewerMenuLoadViewer(e){var
 objectType=e.attr('data-object');if(objectType===undefined)return;var
 subMenu=$('#mainBrowserLeftMenuSubItems');if(subMenu.hasClass('open')&&objectType!=='subMenu'&&(e.parent().attr('id')==='mainListViewMenu'||e.parent().attr('id')==='smallPanelMenu')){subMenu.removeClass('open').addClass('closed');}$('#mainBrowserRightBarButtonsAdd *').detach();$('#mainBrowserRightBarButtonsEdit *').detach();if(objectType=='viewer'){var
@@ -715,7 +725,7 @@ inp=e.parent().parent().find("input").first();inp.val("").focus();viewerIncSearc
 table=searchParentAttr(e,"data-table");if(callUiHook(actionType,table,$(e)))return;if(actionType=="newform"){var
 copyDoc=0;var
 doIt=1;if(event.shiftKey||event.altKey||e.attr('data-copyfrom')){copyDoc=1;if(!event.shiftKey&&!event.altKey)doIt=confirm("Opravdu udělat kopii dokumentu?");else
-if(event.altKey){doIt=confirm("Opravdu udělat kopii dokumentu včetně příloh?");if(doIt)copyDoc=2;}}if(doIt)e10ViewerAddRow(e,copyDoc);return;}if(actionType=="editform"){e10ViewerEditRow(e);return;}if(actionType=="saveform"){if(event.shiftKey&&e.attr('data-noclose')=='1')e.removeAttr('data-noclose');if(!df2saveForm(e))setTimeout(function(){df2ViewerAction(event,e)},50);return;}if(actionType=="cancelform"){e10ViewerCancelForm(e);return;}if(actionType=="deleteform"){e10ViewerDeleteRow(e,'delete');return;}if(actionType=="undeleteform"){e10ViewerDeleteRow(e,'undelete');return;}if(actionType=="close-lv-detail"){e10viewerCloseDetail(e);return;}if(actionType=="print-lv-detail"){e10viewerPrintDetail(e);return;}if(actionType=="print"){e10ViewerPrintDetail(e);return;}if(actionType=="printdirect"){e10ViewerPrintDetailDirect(e);return;}if(actionType=="printviewer"){e10ViewerPrint(e);return;}if(actionType=="help"){e10Help(e);return;}if(actionType=="close-help"){e10CloseHelp(e);return;}if(actionType=="addwizard"){e10ViewerAddWizard(e);return;}if(actionType==="window"){e10ViewerWindow(e);return;}if(actionType=="wizardnext"){e10WizardNext(e);return;}if(actionType==="open-link"){var
+if(event.altKey){doIt=confirm("Opravdu udělat kopii dokumentu včetně příloh?");if(doIt)copyDoc=2;}}if(doIt)e10ViewerAddRow(e,copyDoc);return;}if(actionType=="editform"){e10ViewerEditRow(e);return;}if(actionType=="saveform"){if(event.shiftKey&&e.attr('data-noclose')=='1')e.removeAttr('data-noclose');if(!df2saveForm(e))setTimeout(function(){df2ViewerAction(event,e)},50);return;}if(actionType=="cancelform"){e10ViewerCancelForm(e);return;}if(actionType=="deleteform"){e10ViewerDeleteRow(e,'delete');return;}if(actionType=="undeleteform"){e10ViewerDeleteRow(e,'undelete');return;}if(actionType=="close-lv-detail"){e10viewerCloseDetail(e);return;}if(actionType=="print-lv-detail"){e10viewerPrintDetail(e);return;}if(actionType=="print"){e10ViewerPrintDetail(e);return;}if(actionType=="printdirect"){e10ViewerPrintDetailDirect(e);return;}if(actionType=="printviewer"){e10ViewerPrint(e);return;}if(actionType=="help"){e10Help(e);return;}if(actionType=="close-help"){e10CloseHelp(e);return;}if(actionType=="addwizard"){e10ViewerAddWizard(e,event);return;}if(actionType==="window"){e10ViewerWindow(e);return;}if(actionType=="wizardnext"){e10WizardNext(e);return;}if(actionType==="open-link"){var
 url=e.attr('data-url-download');var
 usePopup=0;var
 shift=0;if((event&&event.altKey))shift=1;var
@@ -748,7 +758,7 @@ btap=bottomTab.attr('data-addparams');if(btap!==undefined){if(ap!='')ap+='&';ap+
 leftPanelList=viewer.find('div.e10-sv-left div.title.active');if(leftPanelList.length&&leftPanelList.attr('data-addparams')){var
 btap=leftPanelList.attr('data-addparams');if(btap!==undefined){if(ap!='')ap+='&';ap+=btap;}}if(button){var
 btap=button.attr('data-addparams');if(btap!==undefined){if(ap!='')ap+='&';ap+=btap;}}return ap;}function
-e10ViewerAddWizard(e){var
+e10ViewerAddWizard(e,event){var
 viewerId=searchParentAttr(e,'data-viewer');var
 viewer=$('#'+viewerId);var
 table=searchParentAttr(viewer,"data-table");var
@@ -762,6 +772,7 @@ focusedRow=viewer.find('ul.e10-viewer-list > li.active');if(focusedRow.is('li'))
 if(e.attr('data-pk'))focusedPK=e.attr('data-pk');g_formId++;var
 newElementId="mainEditF"+g_formId;var
 url="/api/wizard/"+wizardClass+"/0?callback=?&fullTextSearch="+fullTextSearch+"&newFormId="+newElementId;if(addParams)url+='&'+addParams;if(focusedPK!='')url+='&focusedPK='+focusedPK;var
+dataShiftParam=e.attr('data-shift-param');if(dataShiftParam&&(event.shiftKey||event.altKey))url+='&'+dataShiftParam;var
 params=elementAttributes(e,'data-param');if(params)url+='&'+params;var
 postData={};var
 dataFormElementId='mainBrowserTopBar';if(e.attr('data-form-element-id')!=undefined)dataFormElementId=e.attr('data-form-element-id');var

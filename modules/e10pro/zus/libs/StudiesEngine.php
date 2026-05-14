@@ -32,7 +32,7 @@ class StudiesEngine extends Utility
     array_push($q, ' WHERE 1');
     array_push($q, ' AND [smazano] = %i', 0);
     array_push($q, ' AND [stavHlavni] < %i', 4);
-    array_push($q, ' AND [skolniRok] = %s', '2023');
+    array_push($q, ' AND [skolniRok] = %s', '2024');
 
     $cnt = 1;
     $rows = $this->db()->query($q);
@@ -89,7 +89,19 @@ class StudiesEngine extends Utility
       if ($exist)
       {
         if ($this->debug)
-          echo "; INFO - studium EXISTUJE\n";
+          echo "; INFO - studium EXISTUJE";
+
+        if ($exist['stavHlavni'] == 0)
+        {
+          if ($this->debug)
+            echo "; INFO - studium je NEHLAVNÍ";
+
+          $this->db()->query('UPDATE [e10pro_zus_studium] SET [stavHlavni] = 1, [stav] = 1200 WHERE [ndx] = %i', $exist['ndx']);
+        }
+
+        if ($this->debug)
+          echo "\n";
+
         continue;
       }
 
@@ -122,8 +134,8 @@ class StudiesEngine extends Utility
           'oznaceniStudia' => $r ['oznaceniStudia'],
           'pobocka' => $r ['pobocka'],
           'misto' => $r ['misto'],
-          //'stavHlavni' => 1, 'stav' => 1200,
-          'stavHlavni' => 0, 'stav' => 1000,
+          'stavHlavni' => 1, 'stav' => 1200,
+          //'stavHlavni' => 0, 'stav' => 1000,
           'datumNastupuDoSkoly' => $r ['datumNastupuDoSkoly'],
           'datumUkonceniSkoly' => $r ['datumUkonceniSkoly'],
         ];
@@ -236,7 +248,7 @@ class StudiesEngine extends Utility
 		$this->rocniky = $this->app()->cfgItem ('e10pro.zus.rocniky');
     $this->tableStudium = $this->app()->table('e10pro.zus.studium');
 
-    $this->schoolYearId = '2024';
+    $this->schoolYearId = '2025';
     $this->schoolYearCfg = $this->app()->cfgItem ('e10pro.zus.roky.'.$this->schoolYearId);
 
     $this->generateFromPastYear();

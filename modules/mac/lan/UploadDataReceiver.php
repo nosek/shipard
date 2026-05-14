@@ -1,7 +1,8 @@
 <?php
 
 namespace mac\lan;
-use e10\DbTable, e10\utils, e10\Utility;
+use \Shipard\Table\DbTable, \Shipard\Utils\Utils, \Shipard\Base\Utility;
+use \Shipard\Utils\Str;
 
 
 /**
@@ -51,7 +52,7 @@ class UploadDataReceiver extends Utility
 
 		if ($infoType === 'counters')
 		{
-			$date = utils::createDateTime($this->data['data']['datetime']);
+			$date = Utils::createDateTime($this->data['data']['datetime']);
 			$dateId = $date->format ('Y-m-d').'D';
 			foreach ($this->data['data']['items'] as $counterInfo)
 			{
@@ -76,7 +77,7 @@ class UploadDataReceiver extends Utility
 		return 'OK';
 	}
 
-	protected function doShnIbInfo ()
+	public function doShnIbInfo ()
 	{
 		$deviceRecData = NULL;
 		if (isset($this->data['devId']))
@@ -118,6 +119,20 @@ class UploadDataReceiver extends Utility
 			$update['pwrBatteryLevel'] = $this->data['battery'];
 		if (isset($this->data['linkquality'])) // zigbee devices
 			$update['signalLevel'] = intval($this->data['linkquality']);
+		elseif (isset($this->data['rssiW'])) // shipard iot devices - wifi rssi
+		{
+			$sl = 255 - max(abs(intval($this->data['rssiW'])) - 30, 0);
+			if ($sl < 0)
+				$sl = 0;
+			if ($sl > 255)
+				$sl = 255;
+
+			$update['signalLevel'] = intval($sl);
+			$update['wifiRSSI'] = intval($this->data['rssiW'] ?? 0);
+		}
+
+		if (isset($this->data['ssidW'])) // shipard iot devices - active SSID
+			$update['wifiSSID'] = Str::upToLen($this->data['ssidW'], 100);
 
 		if (isset($this->data['pwr-batt-perc']))
 		{
@@ -134,6 +149,12 @@ class UploadDataReceiver extends Utility
 
 			$update['pwrChargeCurrent'] = $this->data['pwr-charge-current'];
 			$pwrInfo['pwrChargeCurrent'] = $this->data['pwr-charge-current'];
+
+			if ($pwrInfo['pwrCharging'])
+			{
+				$update['pwrLastChargingDT'] = new \DateTime();
+				$update['pwrLastChargingBL'] = $this->data['pwr-batt-perc'] ?? 0;
+			}
 		}
 
 		$this->db()->query('UPDATE [mac_iot_devicesInfo] SET ', $update, ' WHERE [ndx] = %i', $deviceInfoNdx);

@@ -22,6 +22,7 @@ class PersonRegister extends Utility
 
   var $personOid = '';
   var $personVATIDs = [];
+  var $personGovDataBoxIds = [];
   var $personNdx = 0;
   var $personRecData = NULL;
   var $personNames = [];
@@ -34,12 +35,16 @@ class PersonRegister extends Utility
   var $addDocState = 1000;
   var $addDocStateMain = 0;
 
+  var $useStandardizedAddress = 0;
+
+
   var $diff = ['msgs' => [], 'updates' => []];
 
   protected function init()
   {
     $this->useOfficesAutoLoading = intval($this->app()->cfgItem ('options.persons.useOfficesAutoLoading', 0));
     $this->tablePersonsContact = $this->app()->table('e10.persons.personsContacts');
+    $this->useStandardizedAddress = intval($this->app()->cfgItem ('options.persons.useStandardizedAddress', 0));
   }
 
   public function setPersonNdx($personNdx)
@@ -50,6 +55,7 @@ class PersonRegister extends Utility
     $this->personRecData = $this->app()->loadItem($this->personNdx, 'e10.persons.persons');
     $this->loadPersonOid();
     $this->loadPersonVatIDs();
+    $this->loadPersonGovEBoxIds();
     $this->loadPersonNames();
 
     if ($this->generalFailure)
@@ -90,9 +96,12 @@ class PersonRegister extends Utility
 
     // -- bank accounts
     $baIds = [];
-    foreach ($this->registerData['bankAccounts'] as $ba)
-      $baIds[] = $ba['bankAccount'];
-    $this->addBankAccounts($baIds);
+    if (isset($this->registerData['bankAccounts']))
+    {
+      foreach ($this->registerData['bankAccounts'] as $ba)
+        $baIds[] = $ba['bankAccount'];
+      $this->addBankAccounts($baIds);
+    }
   }
 
   protected function addPerson_saveBase()
@@ -105,8 +114,15 @@ class PersonRegister extends Utility
 		$newPerson ['person']['docStateMain'] = $this->addDocStateMain;
 
 		$newPerson ['ids'][] = ['type' => 'oid', 'value' => $this->registerData['person']['oid']];
+
     if (isset($this->registerData['person']['vatID']) && $this->registerData['person']['vatID'] !== '')
 		  $newPerson ['ids'][] = ['type' => 'taxid', 'value' => $this->registerData['person']['vatID']];
+
+    if ($this->useStandardizedAddress)
+    {
+      if (isset($this->registerData['person']['govEBoxId']) && $this->registerData['person']['govEBoxId'] !== '')
+        $newPerson ['contacts'][] = ['type' => 'govDataBox', 'value' => $this->registerData['person']['govEBoxId']];
+    }
 
     $this->personNdx = \E10\Persons\createNewPerson ($this->app, $newPerson);
     $this->personRecData = $this->app()->loadItem($this->personNdx, 'e10.persons.persons');
@@ -180,6 +196,23 @@ class PersonRegister extends Utility
 			if ($r['valueString'] === '')
 				continue;
 			$this->personVATIDs[$r['valueString']] = ['valid' => 0];
+		}
+	}
+
+  protected function loadPersonGovEBoxIds ($forcePersonNdx = 0)
+	{
+    $personNdx = ($forcePersonNdx) ? $forcePersonNdx : $this->personRecData['ndx'];
+
+		$q[] = 'SELECT * FROM [e10_base_properties] AS props';
+		array_push ($q, ' WHERE [recid] = %i', $this->personRecData['ndx']);
+		array_push ($q, ' AND [tableid] = %s', 'e10.persons.persons', 'AND [group] = %s', 'contacts', ' AND property = %s', 'govDataBox');
+
+		$rows = $this->db()->query ($q);
+		foreach ($rows as $r)
+		{
+			if ($r['valueString'] === '')
+				continue;
+			$this->personGovDataBoxIds[$r['valueString']] = ['valid' => 0];
 		}
 	}
 
@@ -301,29 +334,87 @@ class PersonRegister extends Utility
 
   protected function addAddress($addressData, $flags = NULL)
   {
+    $newAddress = $this->createAddressFromReg($addressData);
+    $newNdx = $this->tablePersonsContact->dbInsertRec($newAddress);
+    $this->tablePersonsContact->docsLog($newNdx);
+    //$this->db()->query('INSERT INTO e10_persons_personsContacts', $newAddress);
+  }
+
+  protected function createAddressFromReg($regAddr)
+  {
     $newAddress = [
       'person' => $this->personNdx,
-      'adrSpecification' => $addressData['specification'],
-      'adrStreet' => $addressData['street'],
-      'adrCity' => $addressData['city'],
-      'adrZipCode' => $addressData['zipcode'],
-      'adrCountry' => World::countryNdx($this->app(), $addressData['country']),
-
-      'validFrom' => $addressData['validFrom'] ?? NULL,
-      'validTo' => $addressData['validTo'] ?? NULL,
-
+      'validFrom' => $regAddr['validFrom'] ?? NULL,
+      'validTo' => $regAddr['validTo'] ?? NULL,
       'flagAddress' => 1,
+      'flagMainAddress' => 0,
+      'flagOffice' => 0,
       'onTop' => 99,
 
-      'id1' => $addressData['natId'],
+      'id1' => $regAddr['natId'],
 
       'docState' => 4000,
       'docStateMain' => 2,
     ];
 
-    if ($addressData['type'] === 0)
+    $countryId = $regAddr['country'] ?? 'cz';
+    if ($countryId === '')
+      $countryId = 'cz';
+    $newAddress['adrCountry'] = World::countryNdx($this->app(), $countryId);
+
+    $newAddress['flagStandardized'] = intval($regAddr['standardized']);
+    $newAddress['natAddressGeoId'] = $regAddr['natAddressGeoId'];
+    $newAddress['saStreetName'] = $regAddr['saStreetName'];
+    $newAddress['saHouseNr'] = $regAddr['saHouseNr'];
+    $newAddress['saCityPartName'] = $regAddr['saCityPartName'];
+    $newAddress['saCityPart2Name'] = $regAddr['saCityPart2Name'];
+    $newAddress['saCityName'] = $regAddr['saCityName'];
+    $newAddress['saZipCodeId'] = $regAddr['saZipCodeId'];
+
+    $newAddress['saStreetId'] = $regAddr['saStreetId'];
+    $newAddress['saCityPartId'] = $regAddr['saCityPartId'];
+    $newAddress['saCityPart2Id'] = $regAddr['saCityPart2Id'];
+    $newAddress['saCityId'] = $regAddr['saCityId'];
+
+    $newAddress['saAdmUnit11Id'] = $regAddr['saLaUnit11Id'];
+    $newAddress['saAdmUnit11Ndx'] = $this->admUnitNdx($regAddr['saLaUnit11Id'], 11);
+    $newAddress['saAdmUnit10Id'] = $regAddr['saLaUnit10Id'];
+    $newAddress['saAdmUnit10Ndx'] = $this->admUnitNdx($regAddr['saLaUnit10Id'], 10);
+
+    $newAddress['adrSpecification'] = $regAddr['specification'] ?? '';
+
+		// -- 'old' columns
+    if ($regAddr['source'] == 0)
+    { // OLD adress, use OLD columns
+      $newAddress['adrStreet'] = $regAddr['street'] ?? '';
+      $newAddress['adrCity'] = $regAddr['city'] ?? '';
+      $newAddress['adrZipCode'] = $regAddr['zipcode'] ?? '';
+    }
+    else
+    { // NEW adress, use NEW columns
+      $newAddress['adrStreet'] = $regAddr['saStreetName'] ?? '';
+      if ($newAddress['adrStreet'] === '' && $newAddress['saCityPartName'] !== '')
+        $newAddress['adrStreet'] = $regAddr['saCityPartName'];
+
+      if ($newAddress['saHouseNr'] !== '')
+      {
+        if ($newAddress['adrStreet'] === '')
+        {
+          $newAddress['adrStreet'] = $regAddr['saHouseNr1Type'] == 1 ? 'č.ev. ' : 'č.p. ';
+        }
+        else
+          $newAddress['adrStreet'] .= ' ';
+        if ($regAddr['saHouseNr1Type'] == 1)
+          $newAddress['adrStreet'] .= 'č.ev. ';
+        $newAddress['adrStreet'] .= $regAddr['saHouseNr'];
+      }
+      $newAddress['adrCity'] = $regAddr['saCityName'] ?? '';
+      $newAddress['adrZipCode'] = $regAddr['saZipCodeId'] ?? '';
+    }
+
+    if ($regAddr['type'] == 0)
       $newAddress['flagMainAddress'] = 1;
-    elseif ($addressData['type'] === 1)
+    elseif ($regAddr['type'] === 1)
       $newAddress['flagOffice'] = 1;
 
     if (!Utils::dateIsBlank($newAddress['validTo']))
@@ -336,8 +427,31 @@ class PersonRegister extends Utility
       }
     }
 
-    $this->tablePersonsContact->checkBeforeSave($newAddress);
-    $this->db()->query('INSERT INTO e10_persons_personsContacts', $newAddress);
+    if (isset($regAddr['wgs84lat']) && isset($regAddr['wgs84lng']))
+    {
+      $newAddress['adrLocLat'] = $regAddr['wgs84lat'] ?? 0.0;
+      $newAddress['adrLocLon'] = $regAddr['wgs84lng'] ?? 0.0;
+      $newAddress['adrLocState'] = 1;
+      $newAddress['adrLocHash'] = $this->tablePersonsContact->geoCodeLocHash ($newAddress);
+    }
+    else
+    {
+      $newAddress['adrLocLat'] = 0.0;
+      $newAddress['adrLocLon'] = 0.0;
+      $newAddress['adrLocState'] = 0;
+      $newAddress['adrLocHash'] = '';
+    }
+    $newAddress['adrLocHash'] = $this->tablePersonsContact->geoCodeLocHash ($newAddress);
+    $newAddress['adrLocTime'] = NULL;
+
+    if (!$this->useStandardizedAddress)
+    {
+      $newAddress['flagStandardized'] = 0;
+    }
+
+    Json::polish($newAddress);
+
+    return $newAddress;
   }
 
   protected function checkBA()
@@ -375,9 +489,9 @@ class PersonRegister extends Utility
       ];
 
       if (!Utils::dateIsBlank($baData['validFrom']))
-        $newBA['validFrom'] = $baData['validFrom'];
+        $newBA['validFrom'] = Utils::createDateTime($baData['validFrom']);
       if (!Utils::dateIsBlank($baData['validTo']))
-        $newBA['validFrom'] = $baData['validTo'];
+        $newBA['validTo'] = Utils::createDateTime($baData['validTo']);
 
       $this->db()->query('INSERT INTO e10_persons_personsBA', $newBA);
     }
@@ -393,6 +507,16 @@ class PersonRegister extends Utility
   public function makeDiff_Core()
   {
     $update = [];
+
+    if (isset($this->registerData['person']['validTo']) && !Utils::dateIsBlank($this->registerData['person']['validTo']))
+    {
+      if (!isset($this->personRecData['personCanceled']) || !$this->personRecData['personCanceled'])
+      {
+        $this->addDiffMsg('Osoba je od '.Utils::datef($this->registerData['person']['validTo']).' zrušena');
+        $update['personCanceled'] = 1;
+        $update['personCancelDate'] = $this->registerData['person']['validTo'];
+      }
+    }
 
     $nameFound = in_array($this->registerData['person']['fullName'], $this->personNames);
     if (!$nameFound)
@@ -413,6 +537,21 @@ class PersonRegister extends Utility
       ];
     }
 
+    if ($this->useStandardizedAddress)
+    {
+      if (isset($this->registerData['person']['govEBoxId']) && $this->registerData['person']['govEBoxId'] !== '' && !isset($this->personGovDataBoxIds[$this->registerData['person']['govEBoxId']]))
+      {
+        $this->addDiffMsg('Nová datová schránka `'.$this->registerData['person']['govEBoxId'].'`');
+        $this->diff['properties']['add'][] = [
+          'recid' => $this->personRecData['ndx'],
+          'tableid' => 'e10.persons.persons',
+          'group' => 'contacts', 'property' => 'govDataBox',
+          'valueString' => $this->registerData['person']['govEBoxId'],
+          'created' => new \DateTime(),
+        ];
+      }
+    }
+
     if (count($update))
       $this->diff['updates']['e10.persons.persons'][] = ['update' => $update, 'ndx' => $this->personRecData['ndx']];
   }
@@ -430,24 +569,63 @@ class PersonRegister extends Utility
       $cma = $ma;
     }
 
-    if ($cma['adrStreet'] !== $mar['street'])
+    //if ($this->useStandardizedAddress)
     {
-      $this->addDiffMsg('Změna ulice sídla z `'.$cma['adrStreet'].'` na `'.$mar['street'].'`');
-      $update['adrStreet'] = $mar['street'];
+      if ($cma['flagStandardized'] == 0 && $mar['standardized'] > 0)
+      {
+        $newAddrFromReg = $this->createAddressFromReg($mar);
+        $this->addDiffMsg('Přepnutí sídla na standardizovanou adresu: '.$this->tablePersonsContact->addressTextOneLine($newAddrFromReg));
+        $this->makeDiff_CoreAddress($cma, $newAddrFromReg, $update, TRUE);
+        $this->diff['updates']['e10.persons.personsContacts'][] = ['update' => $update, 'ndx' => $cma['ndx']];
+        return;
+      }
     }
-    if ($cma['adrCity'] !== $mar['city'])
-    {
-      $this->addDiffMsg('Změna města sídla z `'.$cma['adrCity'].'` na `'.$mar['city'].'`');
-      $update['adrCity'] = $mar['city'];
-    }
-    if ($cma['adrZipCode'] !== $mar['zipcode'])
-    {
-      $this->addDiffMsg('Změna PSČ sídla z `'.$cma['adrZipCode'].'` na `'.$mar['zipcode'].'`');
-      $update['adrZipCode'] = $mar['zipcode'];
-    }
+
+    $newAddrFromReg = $this->createAddressFromReg($mar);
+    $this->makeDiff_CoreAddress($cma, $newAddrFromReg, $update);
 
     if (count($update))
       $this->diff['updates']['e10.persons.personsContacts'][] = ['update' => $update, 'ndx' => $cma['ndx']];
+  }
+
+  protected function admUnitNdx($admUnitId, $level)
+  {
+    $unit = $this->app()->db()->query('SELECT ndx FROM [e10_world_admUnits] WHERE country = %i', 60,
+                                        ' AND admUnitId = %s ', $admUnitId,
+                                        ' AND level = %i', $level)->fetch();
+    if ($unit)
+      return $unit['ndx'];
+    return 0;
+  }
+
+  protected function makeDiff_CoreAddress($currentAddr, $newRegAddr, &$update, $disableMsgs = FALSE)
+  {
+    $first = TRUE;
+    Json::polish($currentAddr);
+    foreach ($currentAddr as $k => $v)
+    {
+      if (!isset($newRegAddr[$k]))
+        continue;
+      if ($v != $newRegAddr[$k])
+      {
+        if (!$disableMsgs)
+        {
+          if ($first)
+          {
+            if (intval($newRegAddr['flagOffice'] ?? 0))
+              $this->addDiffMsg(' Změny adresy pobočky '.$newRegAddr['id1'].' `'.$currentAddr['addressText'].'`:');
+            elseif (intval($newRegAddr['flagMainAddress'] ?? 0))
+              $this->addDiffMsg(' Změny adresy sídla `'.$currentAddr['addressText'].'`:');
+            else
+              $this->addDiffMsg(' Změny adresy `'.$currentAddr['addressText'].'`:');
+            $first = FALSE;
+          }
+          $cn = $this->tablePersonsContact->columnName($k);
+          $this->addDiffMsg('Změna '.$cn.' z `'.$v.'` na `'.$newRegAddr[$k].'`');
+        }
+        $update[$k] = $newRegAddr[$k];
+      }
+    }
   }
 
   public function makeDiff_ExistedOffices()
@@ -474,26 +652,20 @@ class PersonRegister extends Utility
       }
 
       $update = [];
-      if ($cpo['adrStreet'] !== $registerOffice['street'])
+
+      //if ($this->useStandardizedAddress)
       {
-        $this->addDiffMsg('Změna ulice provozovny z `'.$cpo['adrStreet'].'` na `'.$registerOffice['street'].'`');
-        $update['adrStreet'] = $registerOffice['street'];
+        if ($cpo['flagStandardized'] == 0 && $registerOffice['standardized'] > 0)
+        {
+          $newAddrFromReg = $this->createAddressFromReg($registerOffice);
+          $this->addDiffMsg('Přepnutí pobočky `'.$cpo['id1'].'` na standardizovanou adresu: '.$this->tablePersonsContact->addressTextOneLine($newAddrFromReg));
+          $this->makeDiff_CoreAddress($cpo, $newAddrFromReg, $update, TRUE);
+          $this->diff['updates']['e10.persons.personsContacts'][] = ['update' => $update, 'ndx' => $cpo['ndx']];
+          continue;
+        }
       }
-      if ($cpo['adrSpecification'] !== $registerOffice['specification'])
-      {
-        $this->addDiffMsg('Změna názvu provozovny z `'.$cpo['adrSpecification'].'` na `'.$registerOffice['specification'].'`');
-        $update['adrSpecification'] = $registerOffice['specification'];
-      }
-      if ($cpo['adrCity'] !== $registerOffice['city'])
-      {
-        $this->addDiffMsg('Změna města provozovny z `'.$cpo['adrCity'].'` na `'.$registerOffice['city'].'`');
-        $update['adrCity'] = $registerOffice['city'];
-      }
-      if ($cpo['adrZipCode'] !== $registerOffice['zipcode'])
-      {
-        $this->addDiffMsg('Změna PSČ provozovny z `'.$cpo['adrZipCode'].'` na `'.$registerOffice['zipcode'].'`');
-        $update['adrZipCode'] = $registerOffice['zipcode'];
-      }
+      $newAddrFromReg = $this->createAddressFromReg($registerOffice);
+      $this->makeDiff_CoreAddress($cpo, $newAddrFromReg, $update);
 
       $validToPerson = ($cpo['validTo'] ? Utils::createDateTime($cpo['validTo'])->format('Y-m-d') : '');
       $validToRegister = ($registerOffice['validTo'] ? $registerOffice['validTo'] : '');

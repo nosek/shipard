@@ -65,7 +65,7 @@
 			"enumValues": {"1": "příjem", "2": "výdej"}},
     {"id": "cashPersonName", "name": "Jméno příjemce", "type": "string", "len": 100},
     {"id": "cashPersonID", "name": "OP příjemce", "type": "string", "len": 30},
-	  {"id": "personHandover", "name": "Převzal", "type": "int", "reference": "e10.persons.persons", "options": ["saveOnChange"]},
+	  {"id": "personHandover", "name": "Převzal", "type": "int", "reference": "e10.persons.persons", "comboViewer": "handovers", "options": ["saveOnChange"]},
 		{"id": "personBalance", "name": "Osoba pro saldokonto", "type": "int", "label": "Plátce", "reference": "e10.persons.persons"},
 		{"id": "askPersonBalance", "name": "Nastavit Plátce", "type": "logical", "options": ["saveOnChange"]},
 
@@ -86,7 +86,11 @@
 
 		{"id": "wasteOrigin", "name": "Původ odpadu", "type": "enumInt",
       "enumCfg": {"cfgItem": "e10doc.base.wasteOrigins", "cfgValue": "", "cfgText": "sn"}},
+    {"id": "wasteOriginAdmUnit", "name": "Obec původu odpadu", "type": "int", "reference": "e10.world.admUnits", "comboViewer": "level11"},
     {"id": "addToWasteReport", "name": "Zařadit do Hlášení o odpadech", "type": "logical"},
+    {"id": "excludeFromWasteReport", "name": "Vyloučit z Hlášení o odpadech", "type": "logical"},
+    {"id": "docStateWaste", "name": "Stav odpadů", "type": "enumInt",
+				"enumValues": {"0": "Neodpadový doklad", "1": "V pořádku", "9": "Chyba"}},
 
     {"id": "dateIssue", "name": "Datum vystavení", "type": "date"},
     {"id": "dateDue", "name": "Datum splatnosti", "type": "date"},
@@ -175,6 +179,9 @@
 		  "enumCfg": {"cfgItem": "e10pro.loyp.loyps", "cfgValue": "", "cfgText": "sn"}},
     {"id": "loypOtherDoc", "name": "Související doklad", "type": "int", "reference": "e10doc.core.heads"},
 
+    {"id": "disablePrintRows", "name": "Netisknout řádky dokladu", "type": "logical"},
+    {"id": "disablePrintVAT", "name": "Netisknout rekapitulaci DPH", "type": "logical"},
+
 	  {"id": "docState", "name": "Stav", "type": "int"},
 		{"id": "docStateMain", "name": "Hlavní stav", "type": "int"}
   ],
@@ -198,6 +205,7 @@
 	"indexes": [
 		{"id": "docTypeD", "columns": ["docType", "docStateMain", "docNumber DESC"]},
 		{"id": "docType2", "columns": ["docType", "dbCounter", "docStateMain", "docNumber"]},
-		{"id": "s3", "columns": ["person"]}
+		{"id": "s3", "columns": ["person"]},
+    {"id": "fy", "columns": ["fiscalYear"]}
 	]
 }

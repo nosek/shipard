@@ -1,7 +1,12 @@
 <?php
 
 namespace e10doc\purchase\libs;
+use \Shipard\Utils\Utils;
 
+
+/**
+ * class PurchaseReport
+ */
 class PurchaseReport extends \e10doc\core\libs\reports\DocReport
 {
 	function init ()
@@ -56,11 +61,17 @@ class PurchaseReport extends \e10doc\core\libs\reports\DocReport
 
 		if ($this->recData ['otherAddress1Mode'] == 1)
 		{ // city & code
-			$nomencCityRecData = $this->app()->loadItem($this->recData ['personNomencCity'], 'e10.base.nomencItems');
+			$admUnit11Data = $this->app()->loadItem($this->recData['wasteOriginAdmUnit'], 'e10.world.admUnits'); // ZUJ
+			$zujId = strval($admUnit11Data['admUnitId'] ?? '!!!');
+			$admUnit10Data = $this->app()->loadItem($admUnit11Data['admUnitOwner10'], 'e10.world.admUnits'); // ORP
+			$orpId = strval($admUnit10Data['admUnitId'] ?? '!!!');
 
 			$this->data ['flags']['useORP'] = 1;
-			$this->data ['ORP']['code'] = substr($nomencCityRecData['itemId'], 2);
-			$this->data ['ORP']['name'] = $nomencCityRecData['fullName'];
+			$this->data ['ORP']['code'] = $orpId;
+			$this->data ['ORP']['name'] = $admUnit10Data['fullName'] ?? '!!!';
+			$this->data ['ZUJ']['code'] = $zujId;
+			$this->data ['ZUJ']['name'] = $admUnit11Data['fullName'] ?? '!!!';
+
 			$this->data ['flags']['useAddressPersonOffice'] = 0;
 			$this->data ['flags']['usePersonsAddress'] = 1;
 		}
@@ -71,6 +82,26 @@ class PurchaseReport extends \e10doc\core\libs\reports\DocReport
 			if ($wasteOrigin)
 			{
 				$this->data['flags']['wasteOrigin']['text'] = ($wasteOrigin['tfr'] !== '') ? $wasteOrigin['tfr'] : $wasteOrigin['fn'];
+			}
+		}
+	}
+
+	public function addMessageAttachments(\Shipard\Report\MailMessage $msg)
+	{
+		/** @var \e10pro\purchase\libs\WasteInfoInReport $wiReport */
+		$wiReport = $this->table->getReportData ('e10pro.purchase.libs.WasteInfoInReport', $this->recData['ndx']);
+		if ($wiReport)
+		{
+			$wiReport->renderReport();
+			$wiReport->createReport();
+			$wiReport->saveReportAs();
+
+			if ($wiReport->data['infoWasteCodes'] && count($wiReport->data['infoWasteCodes']) > 0)
+			{
+				$attName = 'vykupni-pio-'.$this->recData['docNumber'].'.pdf';
+				$attName = Utils::safeChars($attName);
+				$mimeType = 'application/pdf';
+				$msg->addAttachment($wiReport->fullFileName, $attName, $mimeType);
 			}
 		}
 	}

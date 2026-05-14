@@ -42,7 +42,7 @@ class WasteCheckEngine extends Utility
     array_push($q, 'SELECT [rows].*');
 		array_push($q, ' FROM [e10pro_reports_waste_cz_returnRows] as [rows]');
 		array_push($q, ' WHERE [document] = %i', $this->docNdx);
-		array_push($q, ' ORDER BY [ndx] DESC');
+		array_push($q, ' ORDER BY [ndx]');
 
 		$data = [];
 		$rows = $this->db()->query ($q);
@@ -79,8 +79,7 @@ class WasteCheckEngine extends Utility
     $this->newWRErrors = NULL;
 
 		$wre = new \e10pro\reports\waste_cz\libs\WasteReturnEngine($this->app);
-		$wre->year = $cy;
-		$wre->createDataForDocument($this->docRecData['ndx']);
+		$wre->createDataForDocument($this->docRecData);
     $this->newWRData = $wre->wasteReturnRows;
     if ($wre->wasteReturnErrorLabels && count($wre->wasteReturnErrorLabels))
       $this->newWRErrors = $wre->wasteReturnErrorLabels;
@@ -88,25 +87,37 @@ class WasteCheckEngine extends Utility
 
   protected function checkData()
   {
+    $wasteHandlingCodes = $this->app->cfgItem('e10doc.waster.handlingCodes', []);
+    $whcIcons = [ // CONST whcDirIn = 0, whcDirOut = 1, whcDirInitState = 2, whcDirMove = 3, whcDirProduction = 5;
+      0 => 'system/iconPlusSquare',
+      1 => 'system/iconMinusSquare',
+      2 => 'system/actionAdd',
+      3 => 'user/arrowRight',
+      5 => 'user/arrowDown',
+    ];
+
     $this->checkWRTable = [];
     $this->checkWRTableHeader = [
-      '#' => '#', 'hc' => 'EK', 'wc' => 'Kód odpadu', 'wcm' => 'Kód pro převod', 'quantity' => '+Množství kg', 'note' => 'Pozn.'
+      '#' => '#', 'hc' => '_EK', 'wc' => 'Kód odpadu', 'wcm' => 'Kód pro převod', 'quantity' => '+Množství kg', 'note' => 'Pozn.'
     ];
 
     foreach ($this->currentWRData as $wrRow)
     {
+      $whc = $wasteHandlingCodes[$wrRow['wasteHandlingCode']] ?? NULL;
+
 			$item = [
 				'wc' => $wrRow['wasteCodeText'],
-        'hc' => $wrRow['wasteHandlingCode'],
+        'hc' => ['text' => $wrRow['wasteHandlingCode'], 'icon' => $whcIcons[$whc['dir']] ?? 'system/iconQuestion'],
         'wcm' => $wrRow['wasteCodeTextMove'],
 				'quantity' => $wrRow['quantityKG'],
+        'note' => [['text' => $whc['hn'] ?? $whc['sn'] ?? '!!!', 'class' => 'e10-small block']]
 			];
 
       $existedRow = $this->searchNewWRRow($wrRow);
       if (!$existedRow)
       {
         $item['_options']['class'] = 'e10-warning2';
-        $item['note'] = 'PŘEBÝVÁ v hlášení';
+        $item['note'][] = ['text' => 'PŘEBÝVÁ v hlášení', 'class' => 'label label-danger'];
         $this->checkOk = 0;
       }
       else
@@ -130,7 +141,7 @@ class WasteCheckEngine extends Utility
           'quantity' => $wrRow['quantityKG'],
         ];
 
-        $item['note'] = 'CHYBÍ v hlášení';
+        $item['note'][] = ['text' => 'CHYBÍ v hlášení', 'class' => 'label label-danger'];
         $item['_options']['class'] = 'e10-warning2';
         $this->checkWRTable[] = $item;
         $this->checkOk = 0;
@@ -150,7 +161,7 @@ class WasteCheckEngine extends Utility
       }
     }
 
-    $t = [['icon' => 'system/actionRecycle', 'text' => 'Hlášení o odpadechX']];
+    $t = [['icon' => 'system/actionRecycle', 'text' => 'Hlášení o odpadech']];
 		$this->checkWRContent = [
 			'pane' => 'e10-pane e10-pane-table', 'type' => 'table',
 			'table' => $this->checkWRTable, 'header' => $this->checkWRTableHeader,
@@ -218,8 +229,7 @@ class WasteCheckEngine extends Utility
         echo "* ".$r['docNumber'];
 
       $wre = new \e10pro\reports\waste_cz\libs\WasteReturnEngine($this->app);
-      $wre->year = intval(Utils::createDateTime($r['dateAccounting'])->format('Y'));
-      $wre->resetDocument($r['ndx']);
+      $wre->resetDocument($r->toArray());
 
       if ($this->app()->debug)
         echo "\n";

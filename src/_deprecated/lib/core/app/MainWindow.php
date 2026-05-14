@@ -321,6 +321,37 @@ class MainWindow extends \Shipard\Base\BaseObject
 			$c .= "<li id='e10-mm-close'>".$this->app()->ui()->icon('system/actionClose')."</li>";
 		$c .= "</ul>";
 
+		$testNewUI = $this->app()->cfgItem ('options.experimental.testNewUI', 0);
+		if ($testNewUI)
+		{
+			/** @var \e10\ui\TableExtApps */
+			$tableExtApps = $this->app()->table('e10.ui.extApps');
+			$extApps = $tableExtApps->extAppsList();
+			if (count($extApps))
+			{
+				$c .= "<ul class='e10-mm-list'>";
+				$c .= "<li style='width: 5em; text-align: center;'><span style='font-size: 270%;'>".$this->app()->ui()->icon('tables/e10.ui.extApps')."</span></li>";
+				$c .= "<li style='line-height: 1.8;'>";
+				$c .= "<div class='h2'>" . utils::es('Aplikace') . '</div>';
+				foreach ($extApps as $app)
+				{
+					$icon = $app['icon'] === '' ? 'user/hourglass' : $app['icon'];
+					$link = [
+						'type' => 'action', 'action' => 'open-popup',
+						'_element' => 'span',
+						'data-popup-url' => $app['url'],
+						'data-popup-width' => '0.98', 'data-popup-height' => '0.9',
+						'with-shift' => 'tab',
+						'text' => $app['fullName'],
+						'icon' => $icon, 'class' => 'mr1 nowrap',
+						'popup-id' => 'shpd_ext_app_'.md5($app['url']),
+					];
+					$c .= $this->app()->ui()->renderTextLine($link);
+				}
+				$c .= '</ul>';
+			}
+		}
+
 		// -- help
 		if ($dsMode)
 		{
@@ -393,15 +424,24 @@ class MainWindow extends \Shipard\Base\BaseObject
 		}
 
 		$c .= "<div class='e10-mm-dsInfo'>";
-		$c .= "<small'>" . utils::es('powered by') . '</small>';
-		$c .= "<a href='https://shipard.org/' target='_blank'><img src='$bottomImgUrl' style='width:100%; max-height: 1.8em; text-align: center; margin-top: .2ex;'></a>";
-		$c .= "<small>";
-		$c .= utils::es('Verze '.__E10_VERSION__.'.'.$si['e10commit']);
-		$c .= ($this->app->mobileMode) ? '.m' : '.d';
-		$c .= ".<span class='visible-xs-inline'>xs</span><span class='visible-sm-inline'>sm</span><span class='visible-md-inline'>md</span><span class='visible-lg-inline'>lg</span>";
-		$c .= utils::es('.'.$si['channelId']);
-		$c .= '&nbsp;#'.utils::es($dsId);
-		$c .= '</small>';
+			$c .= "<small'>" . utils::es('powered by') . '</small>';
+			$c .= "<a href='https://shipard.org/' target='_blank'><img src='$bottomImgUrl' style='width:100%; max-height: 1.8em; text-align: center; margin-top: .2ex;'></a>";
+			$c .= "<small>";
+				$c .= utils::es('Verze '.__E10_VERSION__.'.'.$si['e10commit']);
+				$c .= ($this->app->mobileMode) ? '.m' : '.d';
+				$c .= ".<span class='visible-xs-inline'>xs</span><span class='visible-sm-inline'>sm</span><span class='visible-md-inline'>md</span><span class='visible-lg-inline'>lg</span>";
+				$c .= utils::es('.'.$si['channelId']);
+				$c .= '&nbsp;#'.utils::es($dsId);
+
+				$remoteAddr = Utils::clientIp();
+				$addrLabel = ['text' => '', 'icon' => 'tables/e10.base.ipaddr', 'class' => '', 'suffix' => utils::es($remoteAddr)];
+				if(filter_var($remoteAddr, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6))
+					$addrLabel['text'] = 'IPv6';
+				else
+					$addrLabel['text'] = 'IPv4';
+				//$addrLabel['text'] .= ': '.$serverAddr;
+				$c .= '<br>'.$this->app()->ui()->renderTextLine($addrLabel);
+			$c .= '</small>';
 		$c .= '</div>';
 
 		$c .= '</div>';

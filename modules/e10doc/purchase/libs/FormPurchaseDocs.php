@@ -95,11 +95,12 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 						$this->addSeparator(self::coH2);
 						$this->layoutOpen(self::ltVertical);
 							$this->addColumnInput ('wasteOrigin', self::coHeader|self::coColW12);
-							//$this->addColumnInput ('wasteOriginCity', self::coHeader|self::coColW12);
+							if ($this->recData['personType'] == 1) // citizen
+								$this->addColumnInput ('wasteOriginAdmUnit', self::coHeader|self::coColW12);
 						$this->layoutClose();
 
 						if ($this->recData['personType'] == 2)
-						{
+						{ // company
 							$this->addSeparator(self::coH2);
 								$this->layoutOpen(self::ltVertical);
 								$this->addColumnInput ('personHandover', self::coHeader);
@@ -400,7 +401,7 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 			array_push($q, 'SELECT [addrs].*');
 			array_push($q, ' FROM [e10_persons_personsContacts] AS [addrs]');
 			array_push($q, ' WHERE [addrs].[person] = %i', $personNdx);
-			array_push($q, ' AND [addrs].[docState] = %i', 4000);
+			array_push($q, ' AND [addrs].[docState] IN %in', [4000, 8000]);
 			array_push($q, ' AND [addrs].[flagAddress] = %i', 1);
 			array_push($q, ' ORDER BY [addrs].[onTop], [addrs].[systemOrder], [addrs].[adrCity]');
 			$rows = $this->app()->db()->query($q);
@@ -509,8 +510,8 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 				}
 				if (count($addrOffices) > 1)
 				{
-					$fk = key($addrOffices);
-					unset($addrOffices[$fk]);
+					//$fk = key($addrOffices);
+					//unset($addrOffices[$fk]);
 				}
 
 				$this->addFormPersonInfo_Address ($addrOffices, 'otherAddress1', $suggestedAddrOffice, $addrTitle);
@@ -518,7 +519,8 @@ class FormPurchaseDocs extends \e10doc\core\FormHeads
 		}
 		else
 		{
-			$this->addColumnInput('personNomencCity', self::coNoLabel);
+			//$this->addColumnInput('personNomencCity', self::coNoLabel);
+			$this->addColumnInput ('wasteOriginAdmUnit', self::coNoLabel);
 		}
 
 		if ($this->app()->model()->table ('e10pro.loyp.pointsJournal') !== FALSE)

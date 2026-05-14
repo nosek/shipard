@@ -843,6 +843,23 @@ class Utils
 		return $len;
 	}
 
+	static function dateDiffShort3 (\DateTimeInterface $dateBegin, \DateTimeInterface $dateEnd)
+	{
+		$ii = $dateBegin->diff($dateEnd);
+		$len = '';
+
+		if ($ii->d === 0 && $ii->m === 0 && $ii->y === 0)
+			$len = $ii->format ('%hh');
+		elseif ($ii->m === 0 && $ii->y === 0)
+			$len = $ii->format ('%dd');
+		elseif ($ii->y === 0 )
+			$len = $ii->format ('%M měs %dd');
+		elseif ($ii->y > 0 )
+			$len = $ii->format ('%Yr %M měs %dd');
+
+		return $len;
+	}
+
 	static function datePeriodQuery ($column, &$q, $value, $tablePrefix = '')
 	{
 		if (isset ($value[$column]['from']) && $value[$column]['from'] != '')
@@ -988,6 +1005,8 @@ class Utils
 			$t .= " data-table='{$p['table']}'";
 		if (isset($p['data-table']))
 			$t .= " data-table='{$p['data-table']}'";
+		if (isset($p['data-class']))
+			$t .= " data-class='{$p['data-class']}'";
 
 		return $t;
 	}
@@ -1717,6 +1736,14 @@ class Utils
 		return $headers;
 	}
 
+	static function clientIp()
+	{
+		$headers = self::getAllHeaders();
+		if (isset($headers['x-forwarded-for']))
+			return $headers['x-forwarded-for'];
+		return $_SERVER['REMOTE_ADDR'] ?? '';
+	}
+
 	static function serverCounter ($key, $inc = FALSE)
 	{
 		$tmpDir = '/var/lib/shipard/tmp';
@@ -1845,5 +1872,36 @@ class Utils
     if ($pos = strrpos($className, '\\'))
 			return substr($className, $pos + 1);
     return $pos;
+	}
+
+	static function sortByOneKey(array $array, $key, $dict = false, $asc = true, $requierdKey = FALSE, $sortFlags = SORT_REGULAR)
+	{
+			$result = [];
+
+			$values = [];
+			foreach ($array as $id => $value)
+			{
+				if ($requierdKey && !$value[$requierdKey])
+					continue;
+				$values[$id] = isset($value[$key]) ? $value[$key] : 0;
+			}
+
+			if ($asc)
+			{
+				asort($values, $sortFlags);
+			}
+			else
+			{
+				arsort($values, $sortFlags);
+			}
+
+			if ($dict)
+				foreach ($values as $key => $value)
+					$result[$key] = $array[$key];
+			else
+				foreach ($values as $key => $value)
+					$result[] = $array[$key];
+
+			return $result;
 	}
 }

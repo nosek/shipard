@@ -50,11 +50,35 @@ class ViewAddressTechnical extends TableView
 			array_push ($q, ' OR [contacts].adrStreet LIKE %s', '%'.$fts.'%');
 			array_push ($q, ' OR [contacts].adrSpecification LIKE %s', '%'.$fts.'%');
 			array_push ($q, ' OR [contacts].adrZipCode LIKE %s', '%'.$fts.'%');
+			array_push ($q, ' OR [persons].fullName LIKE %s', '%'.$fts.'%');
 			array_push ($q, ')');
 		}
 
 		// -- query panel
 		$qv = $this->queryValues();
+
+		// -- person types
+		$humans = isset ($qv['personTypes']['humans']);
+		$companies = isset ($qv['personTypes']['companies']);
+		if ($humans xor $companies)
+		{
+			if ($humans)
+				array_push ($q, ' AND [persons].[company] = 0');
+			else
+				array_push ($q, ' AND [persons].[company] = 1');
+		}
+
+		// -- standardization
+		$stdYes = isset ($qv['standardization']['stdYes']);
+		$stdNo = isset ($qv['standardization']['stdNo']);
+		if ($stdYes xor $stdNo)
+		{
+			if ($stdYes)
+				array_push ($q, ' AND [contacts].[flagStandardized] = 1');
+			else
+				array_push ($q, ' AND [contacts].[flagStandardized] = 0');
+		}
+
 		if (isset ($qv['fiscalPeriods']))
 			array_push ($q, ' AND EXISTS (SELECT ndx FROM e10doc_core_heads WHERE contacts.person = e10doc_core_heads.person AND [fiscalYear] IN %in', array_keys($qv['fiscalPeriods']), ')');
 
@@ -83,11 +107,16 @@ class ViewAddressTechnical extends TableView
 				')'
 			);
 		}
+		if (isset ($qv['errors']['withoutAdmUnit11']))
+		{
+			array_push ($q, ' AND [saAdmUnit11Ndx] = %i', 0);
+		}
 		// -- countries
 		if (isset ($qv['personCountries']))
 			array_push ($q, ' AND [contacts].[adrCountry] IN %in', array_keys($qv['personCountries']));
 
-		$this->queryMain ($q, '[contacts].', ['[systemOrder], [adrCity]', '[ndx]']);
+		//$this->queryMain ($q, '[contacts].', ['[systemOrder], [adrCity]', '[ndx]']);
+		$this->queryMain ($q, '[contacts].', ['[ndx]']);
 		$this->runQuery ($q);
 
 		$this->runQuery ($q);
@@ -168,6 +197,11 @@ class ViewAddressTechnical extends TableView
 				$listItem['t3'] = $cf;
 		}
 
+		if ($item['flagStandardized'])
+			$listItem['!error'] = 'e10-me';
+		else
+			$listItem['!error'] = 'e10-off';
+
 
 		return $listItem;
 	}
@@ -191,17 +225,35 @@ class ViewAddressTechnical extends TableView
 	{
 		$qry = [];
 
+		// -- people/company
+		$chbxPersonTypes = [
+			'humans' => ['title' => 'Lidé', 'id' => 'humans'], 'companies' => ['title' => 'Společnosti', 'id' => 'companies']
+		];
+		$paramsPersonTypes = new \Shipard\UI\Core\Params ($this->app());
+		$paramsPersonTypes->addParam ('checkboxes', 'query.personTypes', ['items' => $chbxPersonTypes]);
+		$qry[] = ['id' => 'itemTypes', 'style' => 'params', 'title' => 'Osoby', 'params' => $paramsPersonTypes];
+
+		// -- standardization
+		$chbxStandardization = [
+			'stdYes' => ['title' => 'Ano', 'id' => 'stdYes'],
+			'stdNo' => ['title' => 'Ne', 'id' => 'stdNo']
+		];
+		$paramsStandardization = new \Shipard\UI\Core\Params ($this->app());
+		$paramsStandardization->addParam ('checkboxes', 'query.standardization', ['items' => $chbxStandardization]);
+		$qry[] = ['___id' => 'itemTypes', 'style' => 'params', 'title' => 'Standardizace', 'params' => $paramsStandardization];
+
+		// -- used in fiscal periods
 		$periods = $this->app->cfgItem ('e10doc.acc.periods');
 		$periodsEnum = [];
 		forEach ($periods as $periodNdx => $periodCfg)
 			$periodsEnum[$periodNdx] = ['title' => $periodCfg['fullName'], 'id' => $periodNdx];
 
-		$paramsFiscalPeriods = new \E10\Params ($panel->table->app());
+		$paramsFiscalPeriods = new \Shipard\UI\Core\Params ($panel->table->app());
 		$paramsFiscalPeriods->addParam ('checkboxes', 'query.fiscalPeriods', ['items' => $periodsEnum]);
 		$qry[] = ['id' => 'fiscalPeriods', 'style' => 'params', 'title' => 'Použito ve fiskálním období', 'params' => $paramsFiscalPeriods];
 
 		// -- countries
-		$paramsPersonCountries = new \E10\Params ($panel->table->app());
+		$paramsPersonCountries = new \Shipard\UI\Core\Params ($panel->table->app());
 		$countriesQry = 'SELECT distinct adrCountry FROM [e10_persons_personsContacts] WHERE [flagAddress] = 1 ORDER BY adrCountry';
 		$countriesRows = $this->table->db()->query ($countriesQry);
 		if (count($countriesRows) !== 0)
@@ -226,13 +278,13 @@ class ViewAddressTechnical extends TableView
 		$paramsGeoLocation->addParam ('checkboxes', 'query.geoLocation', ['items' => $chbxGeoLocation]);
 		$qry[] = ['id' => 'itemTypes', 'style' => 'params', 'title' => 'GEO lokace', 'params' => $paramsGeoLocation];
 
-
 		// -- errors
 		$chbxErrors = [
 			'withoutCity' => ['title' => 'Bez obce', 'id' => 'withoutCity'],
 			'withoutZip' => ['title' => 'Bez PSČ', 'id' => 'withoutZip'],
 			'blankAddress' => ['title' => 'Prázdná adresa', 'id' => 'blankAddress'],
 			'badCity' => ['title' => 'Vadný název obce', 'id' => 'badCity'],
+			'withoutAdmUnit11' => ['title' => 'Chybí ZUJ', 'id' => 'withoutAdmUnit11'],
 		];
 		$paramsErrors = new \E10\Params ($this->app());
 		$paramsErrors->addParam ('checkboxes', 'query.errors', ['items' => $chbxErrors]);

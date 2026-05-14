@@ -179,6 +179,7 @@ class TablePersons extends DbTable
 
 		$inputCode .= "<span class='e10-refinp-infotext'>" .$refTitle . '</span>';
 
+		/*
 		if (intval($pk))
 		{
 			$clsf = \E10\Base\ListClassification::referenceWidget($form, $srcColumnId, $this, $pk);
@@ -187,6 +188,8 @@ class TablePersons extends DbTable
 				$inputCode .= "<div style='padding: 2px; clear: both; margin: 4px; '>".$clsf['html'].'</div>';
 			}
 		}
+		*/
+
 		$inputCode .= '</div>';
 
 		$info ['widgetCode'] = NULL;
@@ -498,6 +501,29 @@ class TablePersons extends DbTable
 		return '';
 	}
 
+	public function loadGovBoxes ($persons)
+	{
+		if (!count($persons))
+			return [];
+
+		$govBoxes = [];
+
+		$q = [];
+		array_push($q, 'SELECT valueString FROM [e10_base_properties]');
+		array_push($q, ' WHERE [tableid] = %s', 'e10.persons.persons');
+		array_push($q, ' AND [recid] IN %in ', $persons);
+		array_push($q, ' AND [property] = %s', 'govDataBox', ' AND [group] = %s', 'contacts');
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			$e = trim($r['valueString']);
+			if ($e !== '')
+				$govBoxes[] = '$'.$e;
+		}
+
+		return $govBoxes;
+	}
+
 	public function createHeader ($recData, $options)
 	{
 		$hdr ['icon'] = $this->icon ($recData);
@@ -638,6 +664,26 @@ class TablePersons extends DbTable
 		}
 
 		return parent::columnInfoEnumTest ($columnId, $cfgKey, $cfgItem, $form);
+	}
+
+	function searchPerson($group, $id, $value)
+	{
+		$q[] = 'SELECT props.recid';
+
+		array_push ($q,	' FROM [e10_base_properties] AS props');
+		array_push ($q,	' LEFT JOIN [e10_persons_persons] AS persons ON props.recid = persons.ndx');
+		array_push ($q,	' WHERE 1');
+		array_push ($q,	' AND [tableid] = %s', 'e10.persons.persons', ' AND [valueString] = %s', $value);
+		array_push ($q,	' AND [group] = %s', $group, ' AND property = %s', $id);
+		array_push ($q, ' AND [persons].docState = %i', 4000);
+
+		$rows = $this->db()->query($q);
+		foreach ($rows as $r)
+		{
+			return $r['recid'];
+		}
+
+		return 0;
 	}
 }
 
@@ -842,6 +888,10 @@ class ViewPersonsBase extends TableView
 		if ($unused)
 			array_push($q, ' AND persons.lastUseDate IS NULL');
 
+		$canceled = isset ($qv['others']['canceled']);
+		if ($canceled)
+			array_push($q, ' AND persons.personCanceled = 1');
+
 		$withoutMainAddress = isset ($qv['others']['withoutMainAddress']);
 		if ($withoutMainAddress)
 		{
@@ -929,6 +979,11 @@ class ViewPersonsBase extends TableView
 			//	$listItem ['t2'][] = ['text' => '', 'icon' => 'system/iconCheck', 'class' => 'e10-success e10-off e10-small'];
 		}
 
+		if ($item['personCanceled'])
+		{
+			$listItem ['t2'][] = ['text' => 'ZRUŠENO', 'icon' => 'user/ban', 'class' => 'e10-error'];
+			$listItem ['!error'] = 'e10-error';
+		}
 		return $listItem;
 	}
 
@@ -1017,6 +1072,7 @@ class ViewPersonsBase extends TableView
 			$chbxOthers['withoutMainAddress'] = ['title' => 'Bez sídla', 'id' => 'withoutMainAddress'];
 			$chbxOthers['withMoreMainAddress'] = ['title' => 'S více sídly', 'id' => 'withMoreMainAddress'];
 			$chbxOthers['withoutCompanyId'] = ['title' => 'Firmy bez IČ', 'id' => 'withoutCompanyId'];
+			$chbxOthers['canceled'] = ['title' => 'Zrušené', 'id' => 'canceled'];
 		}
 
 		$paramsOthers = new \E10\Params ($this->app());

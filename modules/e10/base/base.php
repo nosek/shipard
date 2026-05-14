@@ -409,7 +409,10 @@ class ListProperties implements \E10\IDocumentList
 				{
 					$dd = utils::createDateTime ($row ['value']);
 					$r ['valueNum'] = date_timestamp_get ($dd);
+					if ($r ['valueNum'] < -2147483648 || $r ['valueNum'] > 2147483647)
+						$r ['valueNum'] = 0;
 					$r ['valueString'] = date_format ($dd, 'Y-m-d');
+					$r ['valueDate'] = date_format ($dd, 'Y-m-d');
 
 					$hasValue = true;
 				}
@@ -442,7 +445,7 @@ class ListProperties implements \E10\IDocumentList
 				$r['group'] = $row ['group'];
 				$r['subtype'] = isset ($row['subtype']) ? $row['subtype'] : '';
 				$r['note'] = isset ($row['note']) ? $row['note'] : '';
-
+error_log('INSERT PROP: '.json_encode($r));
 				$this->table->app()->db()->query ("INSERT INTO [e10_base_properties]", $r);
 				$newNdx = intval ($this->table->app()->db()->getInsertId ());
 				$usedNdx [] = $newNdx;
@@ -649,7 +652,7 @@ class ListProperties implements \E10\IDocumentList
 
 
 		if (isset($property ['note']) && $property ['note'])
-			$c .= "<label for='$inputNoteId' class='e10-prop-note'><i class='fa fa-pencil'></i></label>".
+			$c .= "<label for='$inputNoteId' class='e10-prop-note'>".$this->formData->app()->ui()->icon('system/iconPencil')."</label>".
 						"<input type='text' placeholder='pozn.' name='{$inputPrefix}.note' class='e10-prop-note' maxlength='50' id='$inputNoteId' data-fid='{$this->formData->fid}'$readOnlyParam/>";
 
 		if (isset($property ['multi']) && $property ['multi'] && !$this->formData->readOnly)

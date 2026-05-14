@@ -4,7 +4,7 @@ namespace E10Doc\Core;
 
 require_once __SHPD_MODULES_DIR__ . 'e10doc/core/core.php';
 
-use \E10\Application, \E10\utils, \E10\FormReport, \Shipard\Form\FormSidebar, \Shipard\Viewer\TableViewPanel;
+use \Shipard\Application\Application, \E10\utils, \E10\FormReport, \Shipard\Form\FormSidebar, \Shipard\Viewer\TableViewPanel;
 use E10\ContentRenderer;
 use \E10\TableViewDetail;
 use \E10\DbTable;
@@ -372,7 +372,7 @@ class TableHeads extends DbTable
 		$this->doRos($recData);
 		$this->doInbox($recData);
 
-		$this->doDocsOps ($recData);
+		//$this->doDocsOps ($recData);
 	}
 
 	public function checkBeforeSave (&$recData, $ownerData = NULL)
@@ -492,7 +492,7 @@ class TableHeads extends DbTable
 			$recData ['askPersonBalance'] = 0;
 		if ($paymentMethod['personForBalance'] ?? 0)
 			$recData ['personBalance'] = $paymentMethod['personForBalance'];
-		elseif (!$recData ['askPersonBalance'])
+		elseif (!intval($recData ['askPersonBalance'] ?? 0))
 			$recData ['personBalance'] = $recData ['person'];
 		if ($recData['paymentMethod'] == 2 || ($paymentMethod['card'] ?? 0))
 		{ // payment terminal
@@ -723,6 +723,32 @@ class TableHeads extends DbTable
 		if ($recData['totalCash'] != 0.0)
 			$this->app()->cache->invalidate('e10doc.core.heads', 'cash');
 		$this->app()->cache->invalidate('e10doc.core.heads', 'ALL');
+
+
+		if ($recData['docStateMain'] >= 1 && $recData ['docType'] === 'purchase' && $recData['personType'] === 1)
+		{
+			if (!$recData['wasteOriginAdmUnit'])
+			{
+				$addr = NULL;
+				if ($recData['deliveryAddress'] ?? 0)
+					$addr = $this->app()->loadItem($recData['deliveryAddress'], 'e10.persons.personsContacts');
+				elseif ($recData['otherAddress1'])
+					$addr = $this->app()->loadItem($recData['otherAddress1'], 'e10.persons.personsContacts');
+				elseif ($recData['otherAddress2'])
+					$addr = $this->app()->loadItem($recData['otherAddress2'], 'e10.persons.personsContacts');
+				if ($addr !== NULL)
+				{
+					if ($addr['adrCountry'] !== 60)
+					{ // outside CZ
+						$addr = $this->app()->loadItem($recData['ownerOffice'], 'e10.persons.personsContacts');
+						if ($addr !== NULL)
+							$recData['wasteOriginAdmUnit'] = $addr['saAdmUnit11Ndx'];
+					}
+					else
+						$recData['wasteOriginAdmUnit'] = $addr['saAdmUnit11Ndx'];
+				}
+			}
+		}
 	}
 
 	public function createNewDoc($recData)
@@ -1396,8 +1422,7 @@ class TableHeads extends DbTable
 			return;
 
 		$wre = new \e10pro\reports\waste_cz\libs\WasteReturnEngine($this->app);
-		$wre->year = $cy;
-		$wre->resetDocument($recData['ndx']);
+		$wre->resetDocument($recData);
 	}
 
 	public function documentStates ($recData)
@@ -2092,6 +2117,7 @@ class TableHeads extends DbTable
 						$attachmentFileName = 'priloha';
 
 					$msg->addAttachment($formReport->fullFileName, $attachmentFileName . '.pdf', 'application/pdf');
+					$formReport->addMessageAttachments($msg);
 
 					if ($doEmail && $emails !== '')
 						$msg->sendMail();
@@ -3174,6 +3200,23 @@ class ViewHeads extends TableView
 		$paramsPersonTypes->addParam ('checkboxes', 'query.personTypes', ['items' => $chbxPersonTypes]);
 		$qry[] = ['id' => 'itemTypes', 'style' => 'params', 'title' => 'Osoby', 'params' => $paramsPersonTypes];
 
+		// -- others
+		$chbxOthers = [
+			'withStock' => ['title' => 'Se skladem', 'id' => 'withStock'],
+			'withoutStock' => ['title' => 'Bez skladu', 'id' => 'withoutStock'],
+			'invalidItem' => ['title' => 'S neplatnými položkami', 'id' => 'invalidItem'],
+		];
+
+		if ($this->app->model()->module ('e10doc.waster') !== FALSE)
+		{
+			$chbxOthers ['wasteError'] = ['title' => 'Chyba v odpadech', 'id' => 'wasteError'];
+		}
+
+		$paramsOthers = new \E10\Params ($this->app());
+		$paramsOthers->addParam ('checkboxes', 'query.others', ['items' => $chbxOthers]);
+		$qry[] = ['id' => 'itemTypes', 'style' => 'params', 'title' => 'Ostatní', 'params' => $paramsOthers];
+
+
 		$this->extendPanelContentQry ($panel, $qry);
 
 		$panel->addContent(array ('type' => 'query', 'query' => $qry));
@@ -3313,6 +3356,33 @@ class ViewHeads extends TableView
 			else
 				array_push ($q, ' AND [persons].[company] = 1');
 		}
+
+		// -- others
+		$withStock = isset ($qv['others']['withStock']);
+		$withoutStock = isset ($qv['others']['withoutStock']);
+		if ($withStock xor $withoutStock)
+		{
+			if ($withStock)
+				array_push ($q, ' AND heads.[warehouse] != 0');
+			else
+				array_push ($q, ' AND heads.[warehouse] = 0');
+		}
+
+		if (isset ($qv['others']['wasteError']))
+		{
+			array_push ($q, ' AND heads.[docStateWaste] = %i', 9);
+		}
+
+		if (isset ($qv['others']['invalidItem']))
+		{
+			array_push ($q, ' AND EXISTS (SELECT [rows].ndx FROM e10doc_core_rows AS [rows] ',
+																		'LEFT JOIN e10_witems_items AS items ON [rows].item = items.ndx ',
+																		'WHERE heads.ndx = [rows].document AND (',
+																						'([items].validFrom IS NOT NULL AND [items].validFrom > heads.dateAccounting)',
+																						' OR ([items].validTo IS NOT NULL AND [items].validTo < heads.dateAccounting)',
+																					')',
+			')');
+		}
 	}
 
 	function globalDetailEnabled($detailId, $detailCfg)
@@ -3332,6 +3402,8 @@ class ViewHeads extends TableView
 
 		if ($this->accounting)
 			array_push($q, ' heads.docStateAcc as docStateAcc,');
+
+		array_push($q, ' heads.docStateWaste as docStateWaste,');
 
 		array_push($q, ' persons.fullName as personFullName, heads.[paymentMethod],');
 		array_push($q, ' heads.[rosReg] as rosReg, heads.[rosState] as rosState,');
@@ -4259,7 +4331,7 @@ class FormHeads extends TableForm
 			return $cp;
 		}
 
-		if ($srcTableId === 'e10doc.core.heads' && $srcColumnId === 'otherAddress1')
+		if ($srcTableId === 'e10doc.core.heads' && ($srcColumnId === 'otherAddress1' || $srcColumnId === 'personHandover'))
 		{
 			$cp = [
 				'personNdx' => strval ($allRecData ['recData']['person'])

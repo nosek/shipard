@@ -200,6 +200,11 @@ class HoursPlanGenerator extends Utility
 				$item['title'][] = ['text' => 'Náhradní termín: '.utils::datef($r['nahradaDatum'], '%d').', '.$r['nahradaZacatek'], 'suffix' => $hlm.' min', 'icon' => 'system/iconClock', 'class' => 'h2 e10-me'];
 
 			}
+			if ($r['suplovani'])
+			{
+				$supucRecData = $this->tablePersons->loadItem($r['suplujiciUcitel']);
+				$item['title'][] = ['text' => 'Suplování:', 'suffix' => $supucRecData['fullName'], 'icon' => 'system/iconUser', 'class' => 'h2 e10-error'];
+			}
 			$this->halfYears[$hy]['attendance']['ALL']['cnt'] += $hourLen;
 
 			if ($this->etkRecData['typ'] === 0)
@@ -565,7 +570,7 @@ class HoursPlanGenerator extends Utility
 
 
 		$item = ['rozvrh' => $rozvrh, 'date' => clone $date];
-		if ($item['date'] > $this->startDate)
+		if ($item['date'] >= $this->startDate)
 		{
 			$this->newHours[$this->cntNew] = $item;
 			$this->cntNew++;

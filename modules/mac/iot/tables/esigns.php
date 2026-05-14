@@ -5,6 +5,7 @@ namespace mac\iot;
 use \Shipard\Form\TableForm, \Shipard\Table\DbTable, \Shipard\Viewer\TableView, \Shipard\Viewer\TableViewDetail;
 use \Shipard\Application\DataModel;
 use \Shipard\Utils\Json;
+use \Shipard\Utils\Utils;
 
 
 /**
@@ -34,6 +35,15 @@ class TableESigns extends DbTable
 		if (!$info['esignRecData'])
 			return NULL;
 
+		$info['reloadInterval'] = 10;
+		$info['reloadMode'] = intval($info['esignRecData']['reloadMode'] ?? 0);
+		if ($info['reloadMode'] === 1)
+		{
+			$info['reloadInterval'] = intval($info['esignRecData']['reloadInterval'] ?? 0);
+			if ($info['reloadInterval'] < 1)
+				$info['reloadInterval'] = 10;
+		}
+
 		$epaperCfg = NULL;
 
 		$ioPortRecData = $this->app()->loadItem($info['esignRecData']['iotPort'], 'mac.iot.devicesIOPorts');
@@ -44,6 +54,7 @@ class TableESigns extends DbTable
 			{
 				$epaperCfg = $this->app()->cfgItem('mac.iot.epds.types.'.$portCfg['displayType'], NULL);
 				$info['orientation'] = intval($info['esignRecData']['orientation'] ?? 0);
+				$info['epaperCfg'] = $epaperCfg;
 			}
 		}
 		elseif ($info['esignRecData']['esignKind'])
@@ -51,11 +62,13 @@ class TableESigns extends DbTable
 			$esignKindRecData = $this->app()->loadItem($info['esignRecData']['esignKind'], 'mac.iot.esignsKinds');
 			$epaperCfg = $this->app()->cfgItem('mac.iot.epds.types.'.$esignKindRecData['displayType'], NULL);
 			$info['orientation'] = intval($esignKindRecData['orientation'] ?? 0);
+			$info['epaperCfg'] = $epaperCfg;
 		}
 
 		if ($epaperCfg)
 		{
 			$info['ok'] = 1;
+			$info['rotateOnServer'] = $epaperCfg['rotateOnServer'] ?? 0;
 
 			if ($info['orientation'] === 0 || $info['orientation'] === 2)
 			{
@@ -69,10 +82,15 @@ class TableESigns extends DbTable
 			}
 			$info['cntColors'] = $epaperCfg['cntColors'];
 			$info['colors'] = $epaperCfg['colors'];
+			foreach ($epaperCfg['colors'] as $k => $v)
+			{
+				$info['colorsDither'][] = $v['dither'];
+				$info['colorsSimulated'][] = $v['simulated'];
+			}
 
 			$info['displayInfoLabel'] = [['text' => $info['width'].' ✖️ '.$info['height'].'; '.$epaperCfg['cntColors'].'C', 'class' => 'label label-info']];
 			$cc = "<span style='padding: 2px;'>";
-			foreach ($epaperCfg['colors'] as $strColor)
+			foreach ($info['colorsSimulated'] as $strColor)
 			{
 				$cc .= "<span style='width: 1rem; display:inline-block; padding-left: 2px;border: 1px solid #777; background-color: #".$strColor.";'> </span>";
 			}
@@ -131,7 +149,7 @@ class ViewESigns extends TableView
 	public function renderRow ($item)
 	{
 		$listItem ['pk'] = $item ['ndx'];
-		$listItem ['i1'] = ['text' => '#'.$item['ndx'], 'class' => 'idName'];
+		$listItem ['i1'] = ['text' => '#'.$item['ndx'], 'class' => 'id'];
 		$listItem ['t1'] = $item['fullName'];
 		$listItem ['icon'] = $this->table->tableIcon ($item);
 
@@ -139,13 +157,64 @@ class ViewESigns extends TableView
 
     $t2[] = ['text' => $item['idName'], 'class' => 'label label-primary'];
 
+		if ($item['esignKindFullName'])
+			$t2[] = ['text' => $item['esignKindFullName'], 'class' => 'label label-default', 'icon' => 'tables/mac.iot.esignsKinds'];
+
+    $listItem['t2'] = $t2;
+
+		$listItem['t3'] = [];
+
 		$displayInfo = $this->table->getESignInfo($item ['ndx']);
 		if ($displayInfo && ($displayInfo['ok'] ?? 0))
 		{
-			$listItem['t3'] = $displayInfo['displayInfoLabel'];
+			$listItem['t3'][] = $displayInfo['displayInfoLabel'];
+			$listItem['t3'][] = ['text' => '', 'class' => 'break'];
 		}
 
-    $listItem['t2'] = $t2;
+		if ($item['iotDevice'])
+		{
+			$bl = ['text' => $item ['pwrBatteryLevel'].'%', 'icon' => 'user/battery', 'class' => 'label label-info'];
+			if ($item['pwrLastChargingDT'])
+			{
+				$now = new \DateTime();
+				$bl['suffix'] = Utils::dateDiffShort3($item['pwrLastChargingDT'], $now);
+			}
+
+			$listItem['t3'][] = $bl;
+
+			if ($item['signalLevel'] != 0)
+			{
+				$sl = ['text' => round(($item['signalLevel'] / 255) * 100).'%', 'icon' => 'user/wifi', 'class' => 'label label-default'];
+				if ($item['wifiSSID'] != '')
+				{
+					$sl['prefix'] = $item['wifiSSID'];
+					$sl['title'] = 'Aktivní WiFi SSID: '.$item['wifiSSID'];
+					if ($item['wifiRSSI'] != 0)
+						$sl['title'] .= ', RSSI: '.$item['wifiRSSI'];
+				}
+				$listItem['t3'][] = $sl;
+			}
+/*
+			if (!Utils::dateIsBlank($item['dateUpdate']))
+			{
+				$lsl = [
+					'text' => Utils::dateDiffShort3($item ['dateUpdate'], $now),
+					'title' => 'Poslední aktualizace: '.Utils::datef($item ['dateUpdate'], '%k %T'),
+					'icon' => 'user/checkSquare', 'class' => 'label label-default'
+				];
+				$age = Utils::dateDiffMinutes($item ['dateUpdate'], $now);
+				if ($age < 120)
+					$lsl['class'] = 'label label-success';
+				elseif ($age < 1440)
+					$lsl['class'] = 'label label-warning';
+				else
+					$lsl['class'] = 'label label-danger';
+
+				if ($age > 120)
+					$listItem['t3'][] = $lsl;
+			}
+*/
+		}
 
 		return $listItem;
 	}
@@ -154,19 +223,26 @@ class ViewESigns extends TableView
 	{
 		$fts = $this->fullTextSearch ();
 
-		$q [] = 'SELECT [esigns].*';
-		array_push ($q, ' FROM [mac_iot_esigns] AS [esigns]');
-		array_push ($q, ' WHERE 1');
+		$q = [];
+		array_push($q, 'SELECT [esigns].*,');
+		array_push($q, ' [iotDevicesInfo].[pwrBatteryLevel], [iotDevicesInfo].[pwrBatteryVoltage], [iotDevicesInfo].[pwrCharging],');
+		array_push($q, ' [iotDevicesInfo].[pwrChargeCurrent], [iotDevicesInfo].[pwrLastChargingDT], [iotDevicesInfo].[signalLevel],');
+		array_push($q, ' [iotDevicesInfo].[wifiRSSI], [iotDevicesInfo].[wifiSSID], [iotDevicesInfo].[dateUpdate],');
+		array_push($q, ' [esignsKinds].[fullName] AS [esignKindFullName]');
+		array_push($q, ' FROM [mac_iot_esigns] AS [esigns]');
+		array_push($q, ' LEFT JOIN [mac_iot_devicesInfo] AS [iotDevicesInfo] ON [esigns].iotDevice = iotDevicesInfo.[device]');
+		array_push($q, ' LEFT JOIN [mac_iot_esignsKinds] AS [esignsKinds] ON [esigns].esignKind = [esignsKinds].ndx');
+		array_push($q, ' WHERE 1');
 
 		// -- fulltext
 		if ($fts != '')
 		{
-			array_push ($q, ' AND (');
-			array_push ($q, ' [esigns].[fullName] LIKE %s', '%'.$fts.'%');
-			array_push ($q, ')');
+			array_push($q, ' AND (');
+			array_push($q, ' [esigns].[fullName] LIKE %s', '%'.$fts.'%');
+			array_push($q, ')');
 		}
 
-		$this->queryMain ($q, '[esigns].', ['[esigns].[shortName], [fullName]', '[ndx]']);
+		$this->queryMain($q, '[esigns].', ['[esigns].[shortName], [fullName]', '[ndx]']);
 		$this->runQuery ($q);
 	}
 }
@@ -185,6 +261,7 @@ class FormESign extends TableForm
 		$tabs ['tabs'][] = ['text' => 'Základní', 'icon' => 'system/formHeader'];
     $tabs ['tabs'][] = ['text' => 'Šablona', 'icon' => 'formText'];
     $tabs ['tabs'][] = ['text' => 'CSS', 'icon' => 'formText'];
+		$tabs ['tabs'][] = ['text' => 'Přílohy', 'icon' => 'system/formAttachments'];
 
 		$this->openForm ();
 			$this->openTabs ($tabs);
@@ -204,6 +281,9 @@ class FormESign extends TableForm
 					if ($this->addSubColumns('vdsData'))
 						$this->addSeparator(self::coH4);
 
+					$this->addColumnInput ('reloadMode');
+					if ($this->recData['reloadMode'] == 1)
+						$this->addColumnInput ('reloadInterval');
 				$this->closeTab ();
         $this->openTab (TableForm::ltNone);
           $this->addInputMemo ('codeTemplate', NULL, TableForm::coFullSizeY, DataModel::ctCode);
@@ -211,6 +291,9 @@ class FormESign extends TableForm
         $this->openTab (TableForm::ltNone);
           $this->addInputMemo ('codeStyle', NULL, TableForm::coFullSizeY, DataModel::ctCode);
         $this->closeTab();
+				$this->openTab (TableForm::ltNone);
+					$this->addAttachmentsViewer();
+				$this->closeTab ();
 			$this->closeTabs ();
 		$this->closeForm ();
 	}

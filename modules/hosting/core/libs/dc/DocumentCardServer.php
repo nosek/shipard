@@ -1,10 +1,11 @@
 <?php
 
 namespace hosting\core\libs\dc;
+use \Shipard\Utils\Json;
 
 
 /**
- * @class DocumentCardServer
+ * class DocumentCardServer
  */
 class DocumentCardServer extends \Shipard\Base\DocumentCard
 {
@@ -20,7 +21,83 @@ class DocumentCardServer extends \Shipard\Base\DocumentCard
     $this->serverInfoCore = json_decode($this->serverInfoRecData['dataCore'], TRUE);
 	}
 
-	public function createContentBody ()
+  protected function createTools()
+  {
+    $toolsButtons = [];
+
+    if ($this->recData['serverRole'] === 1 && $this->recData['fqdn'] !== '')
+    { // incus - server
+      $url = 'https://'.$this->recData['fqdn'].':8443/';
+      $toolsButtons[] = [
+        'type' => 'action', 'action' => 'open-popup',
+        '_element' => 'span',
+        'data-popup-url' => $url,
+        'data-popup-width' => '0.98', 'data-popup-height' => '0.9',
+        'with-shift' => 'tab',
+        'text' => 'Incus',
+        'icon' => 'system/iconTerminal', 'class' => 'mr1 nowrap',
+        'popup-id' => 'shpd_server_app_'.md5($url),
+      ];
+    }
+
+    if (($this->recData['serverRole'] === 0 || $this->recData['serverRole'] === 3) && $this->recData['hwMode'] === 2 && $this->recData['vmId'] !== '')
+    { // incus - instance
+      $hwServerRecData = $this->db()->query('SELECT * FROM [hosting_core_servers] WHERE [ndx] = %i', $this->recData['hwServer'])->fetch();
+      if ($hwServerRecData['fqdn'] !== '')
+      {
+        $url = 'https://'.$hwServerRecData['fqdn'].':8443/'.'ui/project/default/instance/'.$this->recData['vmId'];
+        $toolsButtons[] = [
+          'type' => 'action', 'action' => 'open-popup',
+          '_element' => 'span',
+          'data-popup-url' => $url,
+          'data-popup-width' => '0.98', 'data-popup-height' => '0.9',
+          'with-shift' => 'tab',
+          'text' => 'Incus',
+          'icon' => 'system/iconTerminal', 'class' => 'mr1 nowrap',
+          'popup-id' => 'shpd_server_app_'.md5($url),
+        ];
+      }
+    }
+
+    if ($this->recData['updownIOId'] !== '')
+    { // updown.io
+      $url = 'https://updown.io/'.$this->recData['updownIOId'];
+      $toolsButtons[] = [
+        'type' => 'action', 'action' => 'open-popup',
+        '_element' => 'span',
+        'data-popup-url' => $url,
+        'data-popup-width' => '0.98', 'data-popup-height' => '0.9',
+        'with-shift' => 'tab',
+        'text' => 'upDown.io',
+        'icon' => 'system/iconCheckSquare', 'class' => 'mr1 nowrap',
+        'popup-id' => 'shpd_server_app_'.md5($url),
+      ];
+    }
+
+    if ($this->recData['beszelUrl'] !== '')
+    { // updown.io
+      $url = $this->recData['beszelUrl'];
+      $toolsButtons[] = [
+        'type' => 'action', 'action' => 'open-popup',
+        '_element' => 'span',
+        'data-popup-url' => $url,
+        'data-popup-width' => '0.98', 'data-popup-height' => '0.9',
+        'with-shift' => 'tab',
+        'text' => 'Beszel',
+        'icon' => 'system/iconCheckSquare', 'class' => 'mr1 nowrap',
+        'popup-id' => 'shpd_server_app_'.md5($url),
+      ];
+    }
+
+    if (count($toolsButtons))
+    {
+      $this->addContent ('body', [
+        'pane' => 'e10-pane e10-pane-table', 'type' => 'line', 'line' => $toolsButtons,
+      ]);
+    }
+  }
+
+	public function createServerInfo ()
 	{
     if (!$this->serverInfoCore)
     {
@@ -72,6 +149,40 @@ class DocumentCardServer extends \Shipard\Base\DocumentCard
 			'pane' => 'e10-pane e10-pane-table', 'type' => 'table',
 			'header' => $h, 'table' => $info, 'params' => ['hideHeader' => 1, 'forceTableClass' => 'properties fullWidth']
 		]);
+	}
+
+  protected function createServerCfg()
+  {
+    if ($this->recData['serverRole'] === 3)
+    { // webProxy
+      $c = new \hosting\core\libs\WebProxyCfgCreator($this->app());
+      $c->forDocumentCard = 1;
+      $c->setServer($this->recData['ndx']);
+      if ($c->create())
+      {
+        foreach ($c->cfg['cfgFiles'] as $cfgFileId => $cfgFile)
+        {
+          $pc = [
+            'type' => 'text', 'subtype' => 'code', 'text' => $cfgFile,
+            'detailsTitle' => [['text' => $cfgFileId, 'class' => 'e10-me']],
+            'details' => 'e10-pane e10-pane-table'
+          ];
+          $this->addContent('body', $pc);
+        }
+
+        $this->addContent ('body', [
+          'pane' => 'e10-pane e10-pane-table', 'type' => 'line',
+          'line' => ['code' => '<pre>'.Json::lint($c->cfg).'</pre>']
+        ]);
+      }
+    }
+  }
+
+	public function createContentBody ()
+	{
+		$this->createTools();
+    $this->createServerInfo();
+    $this->createServerCfg();
 	}
 
 	public function createContent ()

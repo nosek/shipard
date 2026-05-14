@@ -139,6 +139,18 @@ class PersonData extends \services\persons\libs\CoreObject
 			foreach ($rowsAddr as $ra)
 			{
 				$raa = $ra->toArray();
+
+				// -- addressPlace - coordinates
+				if ($ra['addressPlaceNdx'])
+				{
+					$addrPlaceRec = $this->app()->loadItem($ra['addressPlaceNdx'], 'services.locAddr.addrPlaces');
+					if ($addrPlaceRec)
+					{
+						$raa['wgs84lat'] = $addrPlaceRec['wgs84lat'];
+						$raa['wgs84lng'] = $addrPlaceRec['wgs84lng'];
+					}
+				}
+
 				Json::polish($raa);
 				$p['address'][] = $raa;
 			}
@@ -244,6 +256,17 @@ class PersonData extends \services\persons\libs\CoreObject
 				unset($item['ndx']);
 				unset($item['person']);
 				unset($item['addressId']);
+
+				unset($item['addressPlaceNdx']);
+				unset($item['saZipCodeNdx']);
+				unset($item['saStreetNdx']);
+				unset($item['saCityNdx']);
+				unset($item['saCityPartNdx']);
+				unset($item['saCityPart2Ndx']);
+				unset($item['saStreetNoNdx']);
+				unset($item['saLaUnit10Ndx']);
+				unset($item['saLaUnit11Ndx']);
+
 				$item['country'] = World::countryId($this->app, $item['country']);
 			}
 		}
@@ -279,6 +302,10 @@ class PersonData extends \services\persons\libs\CoreObject
 	function addAddress(array $address)
 	{
 		$aid = $address['addressId'];
+		if ($this->app()->debug > 1)
+		{
+			echo "  - addAddress: `{$aid}`".json_encode($address)."\n";
+		}
 		$this->data	['address'][$aid] = $address;
 	}
 
@@ -299,7 +326,7 @@ class PersonData extends \services\persons\libs\CoreObject
 
 		foreach ($new as $key => $value)
 		{
-			if (!isset($old[$key]) || $value !== $old[$key])
+			if (!isset($old[$key]) || $value != $old[$key])
 			{
 				$updateRec[$key] = $value;
 				$changes[$key] = ['from' => $old[$key] ?? '', 'to' => $value];
@@ -402,28 +429,19 @@ class PersonData extends \services\persons\libs\CoreObject
 				{
 					$this->db()->query('UPDATE [services_persons_address] SET ', $update, ' WHERE [ndx] = %i', $existedAddr['ndx']);
 					$this->logRecord->addItem('update-person-address', '', ['update' => ['tableId' => 'services.persons.address', 'recId' => $existedAddr['ndx'], 'changes' => $changes]]);
+					if ($this->app()->debug > 1)
+					{
+						echo "--- saveChanges_Address ---\n";
+						echo "  -  FROM: ".json_encode($existedAddr->toArray())."\n";
+						echo "  -    TO: ".json_encode($oneAddr)."\n";
+						echo "  -UPDATE: ".json_encode($update)."\n";
+					}
 				}
 			}
 			else
 			{
-				$insert = [
-					'addressId' => $oneAddr['addressId'],
-					'person' => $this->personNdx,
-					'type' => $oneAddr['type'],
-
-					'street' => $oneAddr['street'],
-					'city' => $oneAddr['city'],
-					'zipcode' => $oneAddr['zipcode'],
-					'country' => $oneAddr['country'],
-					'specification' => $oneAddr['specification'] ?? '',
-					'natAddressGeoId' => $oneAddr['natAddressGeoId'] ?? 0,
-				];
-				if (isset($oneAddr['natId']))
-					$insert['natId'] = $oneAddr['natId'];
-				if (isset($oneAddr['validFrom']))
-					$insert['validFrom'] = $oneAddr['validFrom'];
-				if (isset($oneAddr['validTo']))
-					$insert['validTo'] = $oneAddr['validTo'];
+				$insert = $oneAddr;
+				$insert['person'] = $this->personNdx;
 
 				$this->db()->query('INSERT INTO [services_persons_address]', $insert);
 				$newNdx = intval ($this->db()->getInsertId ());

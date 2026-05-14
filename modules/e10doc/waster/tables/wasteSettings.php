@@ -49,8 +49,12 @@ class TableWasteSettings extends DbTable
           'stockin' => intval($r['docModeStockIn']),
 					'stockout' => intval($r['docModeStockOut']),
           'purchase' => intval($r['docModePurchase']),
+          'mnf' => intval($r['docModeMnf']),
           'wastelp' => 2,
-        ]
+				],
+				'wiOutPersonName' => $r['wiOutPersonName'],
+				'wiOutEmail' => $r['wiOutEmail'],
+				'wiOutPhone' => $r['wiOutPhone'],
       ];
 			$list [$r['calendarYear']] = $wsi;
     }
@@ -91,6 +95,7 @@ class ViewWasteSettings extends TableView
     $flags[] = ['text' => 'Příjemky: '.$this->wasteDocModes[$item['docModeStockIn']]['sc'], 'class' => 'label label-default', 'icon' => 'docType/stockIn'];
     $flags[] = ['text' => 'Výdejky: '.$this->wasteDocModes[$item['docModeStockOut']]['sc'], 'class' => 'label label-default', 'icon' => 'docType/stockOut'];
     $flags[] = ['text' => 'Výkupy: '.$this->wasteDocModes[$item['docModePurchase']]['sc'], 'class' => 'label label-default', 'icon' => 'docTypeRedemptions'];
+		$flags[] = ['text' => 'Výroba: '.$this->wasteDocModes[$item['docModeMnf']]['sc'], 'class' => 'label label-default', 'icon' => 'iconProduction'];
 
     $listItem ['t2'] = $flags;
 		$listItem ['icon'] = $this->table->tableIcon ($item);
@@ -139,6 +144,12 @@ class FormWasteSettings extends TableForm
 			$this->addColumnInput ('docModeStockIn');
       $this->addColumnInput ('docModeStockOut');
       $this->addColumnInput ('docModePurchase');
+      $this->addColumnInput ('docModeMnf');
+			$this->addSeparator(self::coH4);
+			$this->addStatic('Osoba odpovědná za Písemné informace o odpadu (prodej):');
+			$this->addColumnInput ('wiOutPersonName');
+			$this->addColumnInput ('wiOutEmail');
+			$this->addColumnInput ('wiOutPhone');
 		$this->closeForm ();
 	}
 }

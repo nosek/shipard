@@ -13,10 +13,10 @@ class WasteReturnEngine extends Utility
   var $year = 0;
   var $dateBegin;
   var $dateEnd;
-  var $wasteSettings = NULL;
+  //var $wasteSettings = NULL;
 
   var $onlyCreateData = 0;
-  var $wasteReturnRows = NULL;
+  var $wasteReturnRows = [];
   var $wasteReturnErrorLabels = [];
 
   /** @var \e10doc\core\TableHeads */
@@ -28,7 +28,10 @@ class WasteReturnEngine extends Utility
 
   var $enabledCodesKinds;
 
-  CONST rowDirIn = 0, rowDirOut = 1;
+  CONST rowDirIn = 0, rowDirOut = 1, rowDirAuto = 99;
+
+  CONST whcDirIn = 0, whcDirOut = 1, whcDirInitState = 2, whcDirMove = 3, whcDirProduction = 5;
+
   CONST personTypeHuman = 1, personTypeCompany = 2;
   var $handlingCodes = NULL;
 
@@ -44,31 +47,37 @@ class WasteReturnEngine extends Utility
       $this->enabledCodesKinds[] = $ackNdx;
     }
 
-		$this->wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$this->year, NULL);
+		//$this->wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$this->year, NULL);
 
     $this->handlingCodes = $this->app()->cfgItem('e10doc.waster.handlingCodes', NULL);
   }
 
-  public function resetYear()
+  public function addAllDocuments($year)
   {
-    $this->db()->query('DELETE FROM [e10pro_reports_waste_cz_returnRows] WHERE [calendarYear] = %i', $this->year);
-
-    $this->addAllDocuments();
-    $this->addWasteOps();
+    $this->addDocuments($year, 'purchase');
+    $this->addDocuments($year, 'stockin');
+    $this->addDocuments($year, 'invno');
+    $this->addDocuments($year, 'stockout');
+    $this->addDocuments($year, 'wastelp');
+    $this->addDocuments($year, 'mnf');
   }
 
-  public function addAllDocuments()
+  public function doOneDocument(array $docRecData)
   {
-    $this->addDocuments('purchase', self::rowDirIn);
-    $this->addDocuments('stockin', self::rowDirIn);
-    $this->addDocuments('invno', self::rowDirOut);
-    $this->addDocuments('stockout', self::rowDirOut);
-    $this->addDocuments('wastelp', self::rowDirOut);
-  }
+    $this->wasteReturnErrorLabels = [];
+    $this->wasteReturnRows = [];
 
-  public function addDocuments($docType, $rowDir)
-  {
-		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$this->year, NULL);
+    $docType = $docRecData['docType'] ?? '';
+    $docNdx = $docRecData['ndx'] ?? 0;
+    $year = intval($docRecData['dateAccounting']->format('Y'));
+
+    $rowDir = self::rowDirIn;
+    if ($docType === 'invno' || $docType === 'stockout' || $docType === 'wastelp')
+      $rowDir = self::rowDirOut;
+    elseif ($docType === 'mnf')
+      $rowDir = self::rowDirAuto;
+
+		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$year, NULL);
 		if (!$wasteSettings)
 			return;
 
@@ -76,35 +85,28 @@ class WasteReturnEngine extends Utility
 			return;
 
 		$q = [];
-
     array_push ($q, 'SELECT ');
-
-		array_push ($q, ' [rows].item AS item, [rows].unit AS unit, [rows].quantity, [rows].itemType, [rows].taxBase, [rows].document,');
+		array_push ($q, ' [rows].item AS item, [rows].unit AS unit, [rows].quantity, [rows].itemType, [rows].taxBase, [rows].document, [rows].operation AS operation,');
 		array_push ($q, ' heads.docNumber as docNumber, heads.dateAccounting as dateAccounting, heads.warehouse as warehouse,');
     array_push ($q, ' heads.docType AS docType, heads.cashBoxDir AS cashBoxDir, heads.personType, heads.person,');
-    array_push ($q, ' heads.otherAddress1,  heads.otherAddress1Mode, heads.deliveryAddress, heads.personNomencCity, heads.wasteOrigin');
+    array_push ($q, ' heads.otherAddress1,  heads.otherAddress1Mode, heads.deliveryAddress, heads.wasteOriginAdmUnit, heads.wasteOrigin');
 		array_push ($q, ' FROM e10doc_core_rows AS [rows]');
 		array_push ($q, ' LEFT JOIN e10doc_core_heads AS heads ON [rows].document = heads.ndx');
 		array_push ($q, ' LEFT JOIN e10_persons_persons AS persons ON heads.person = persons.ndx');
 		array_push ($q, ' LEFT JOIN e10_persons_personsContacts AS offices ON heads.otherAddress1 = offices.ndx');
 		array_push ($q, ' WHERE  1');
     array_push ($q, ' AND [rows].rowType = %i', 0);
-    array_push ($q, ' AND [heads].docType = %s', $docType);
+    //array_push ($q, ' AND [heads].docType = %s', $docType);
     array_push ($q, ' AND [heads].docState = %i', 4000);
 
     if ($wasteSettings['docModes'][$docType] === 1)
       array_push ($q, ' AND [heads].addToWasteReport = %i', 1);
+    elseif ($wasteSettings['docModes'][$docType] === 2)
+      array_push ($q, ' AND [heads].excludeFromWasteReport = %i', 0);
 
-    if ($this->documentNdx)
-      array_push ($q, ' AND [rows].[document] = %i', $this->documentNdx);
-    else
-    {
-      array_push ($q, ' AND [heads].dateAccounting >= %d', $this->dateBegin);
-      array_push ($q, ' AND [heads].dateAccounting <= %d', $this->dateEnd);
-    }
+    array_push ($q, ' AND [rows].[document] = %i', $docNdx);
     array_push ($q, ' ORDER BY [heads].[docNumber], [rows].[ndx]');
 
-    $cnt = 0;
     $rows = $this->db()->query($q);
     foreach ($rows as $r)
     {
@@ -115,12 +117,25 @@ class WasteReturnEngine extends Utility
 			$this->tableHeads->loadDocRowItemsCodes($row, $r['personType'], $row, NULL, $rowDestData, $allDestData);
       $moveCode = $this->loadCodeForMove($row, $row);
 
-      if ($this->onlyCreateData)
+      if (isset($rowDestData['rowItemCodesDataErrors']))
       {
-        if (isset($rowDestData['rowItemCodesDataErrors']))
+        foreach ($rowDestData['rowItemCodesDataErrors'] as $errLbl)
+          $this->wasteReturnErrorLabels[] = $errLbl;
+      }
+
+      $rd = $rowDir;
+      $whcDir = $rowDir;
+      if ($rowDir === self::rowDirAuto)
+      {
+        if ($r['operation'] === 1060701) // Příjem z výroby
         {
-          foreach ($rowDestData['rowItemCodesDataErrors'] as $errLbl)
-            $this->wasteReturnErrorLabels[] = $errLbl;
+          $rd = self::rowDirIn;
+          $whcDir = self::whcDirProduction;
+        }
+        else
+        {
+          $rd = self::rowDirOut;
+          $whcDir = self::whcDirMove;
         }
       }
 
@@ -137,7 +152,7 @@ class WasteReturnEngine extends Utility
         $newRow = [
           'calendarYear' => intval($r['dateAccounting']->format('Y')),
           'item' => $r['item'],
-          'dir' => $rowDir,
+          'dir' => $rd,
           'wasteCodeText' => $rowDestData['rowItemCodesData'][$eck]['itemCodeText'],
           'wasteCodeNomenc' => $rowDestData['rowItemCodesData'][$eck]['itemCodeNomenc'],
           'wasteCodeKind' => $eck,
@@ -174,30 +189,168 @@ class WasteReturnEngine extends Utility
           if ($r['otherAddress1Mode'] == 0)
             $newRow['personOffice'] = intval($r['otherAddress1']); // office
           else
-            $newRow['nomencCity'] = intval($r['personNomencCity']); // city
+            $newRow['nomencCity'] = intval($r['wasteOriginAdmUnit']); // city
         }
 
-        $handlingCode = $this->handlingCode($newRow);
-        $newRow['wasteHandlingCode'] = $handlingCode;
+        // CONST whcDirIn = 0, whcDirOut = 1, whcDirInitState = 2, whcDirMove = 3, whcDirProduction = 5;
+        $handlingCode = $this->handlingCode($whcDir, $newRow, $docRecData);
 
-        //if (!$newRow['wasteCodeText'] || $newRow['wasteCodeText'] === '')
-        //  echo "\n".'! '.$r['docNumber'].': '.json_encode($rowDestData['rowItemCodesData'])."\n";
+        $cfgOwnerPersonNdx = intval($this->app()->cfgItem ('options.core.ownerPerson', 0));
+        if ($docRecData['person'] === $cfgOwnerPersonNdx && $whcDir == self::whcDirIn /*&& $docRecData['docType'] !== 'purchase'*/)
+        {
+          $handlingCode = 'A00';
+          $newRow['person'] = 0;
+          $newRow['personType'] = 0;
+          $newRow['addressMode'] = 0;
+        }
+
+        $newRow['wasteHandlingCode'] = $handlingCode;
 
         if ($this->onlyCreateData)
         {
           $this->wasteReturnRows[] = $newRow;
         }
         else
+        {
+          $this->wasteReturnRows[] = $newRow;
           $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $newRow);
+        }
       }
-      $cnt++;
+    }
+
+    $this->addMoveRows();
+
+    if (!$this->onlyCreateData)
+    {
+      if (!count($this->wasteReturnErrorLabels))
+        $docRecData ['docStateWaste'] = 1;
+      else
+      {
+        $docRecData ['docStateWaste'] = 9;
+      }
+      $this->db()->query ("UPDATE [e10doc_core_heads] SET docStateWaste = %i WHERE ndx = %i", $docRecData ['docStateWaste'], $docRecData['ndx']);
+    }
+  }
+
+  public function addDocuments($year, $docType)
+  {
+		$wasteSettings = $this->app()->cfgItem('e10doc.waster.settings.'.$year, NULL);
+		if (!$wasteSettings)
+			return;
+
+    if (!isset($wasteSettings['docModes'][$docType]) || $wasteSettings['docModes'][$docType] === 0)
+			return;
+
+		$q = [];
+
+    /*
+    $q [] = 'SELECT heads.*, persons.fullName as personName ';
+		array_push ($q, ' FROM e10doc_core_heads as heads');
+		array_push ($q, '	LEFT JOIN e10_persons_persons as persons ON heads.person = persons.ndx');
+		array_push ($q, ' WHERE heads.docState = %i', 4000);
+
+    array_push ($q, ' AND heads.docType IN %in', ['purchase', 'invno']);
+    array_push ($q, ' AND heads.dateAccounting >= %d', $dateBegin);
+    array_push ($q, ' AND heads.dateAccounting <= %d', $dateEnd);
+
+		array_push ($q, ' ORDER BY dateAccounting, docNumber');
+    */
+
+    array_push ($q, 'SELECT [heads].*');
+		array_push ($q, ' FROM e10doc_core_heads AS [heads]');
+		array_push ($q, ' LEFT JOIN e10_persons_persons AS persons ON heads.person = persons.ndx');
+		array_push ($q, ' LEFT JOIN e10_persons_personsContacts AS offices ON heads.otherAddress1 = offices.ndx');
+		array_push ($q, ' WHERE  1');
+    array_push ($q, ' AND [heads].docType = %s', $docType);
+    array_push ($q, ' AND [heads].docState = %i', 4000);
+
+    if ($wasteSettings['docModes'][$docType] === 1)
+      array_push ($q, ' AND [heads].addToWasteReport = %i', 1);
+    elseif ($wasteSettings['docModes'][$docType] === 2)
+      array_push ($q, ' AND [heads].excludeFromWasteReport = %i', 0);
+
+    array_push ($q, ' AND [heads].dateAccounting >= %d', $this->dateBegin);
+    array_push ($q, ' AND [heads].dateAccounting <= %d', $this->dateEnd);
+    array_push ($q, ' ORDER BY [heads].[docNumber], [heads].[ndx]');
+
+    $rows = $this->db()->query($q);
+    foreach ($rows as $r)
+    {
+      $this->doOneDocument($r->toArray());
 
       //if ($cnt % 1000 === 0)
       //  echo ". ".$cnt;
       //if ($cnt > 10000)
       //  break;
     }
+
     //echo "\n".$cnt." rows\n";
+  }
+
+  protected function addMoveRows()
+  {
+    $moveRows = [];
+    foreach($this->wasteReturnRows as $r)
+    {
+      if (!isset($r['wasteCodeTextMove']) || $r['wasteCodeTextMove'] === '')
+        continue;
+
+      $hcSrc = 'BR12'; // AN4 in 2025
+      if ($r['personType'] == 1) // human
+      {
+        $hcSrc = 'A';
+        $hcDst = 'A00';
+      }
+      else
+      {
+        $hcSrc = 'B';
+        $hcDst = 'A00';
+      }
+
+      if (in_array($r['wasteCodeTextMove'], ["200101", "150102", "170203"]))
+        $hcSrc .= 'R12c';
+      else
+        $hcSrc .= 'R12d';
+
+      $newRow = [
+        'document' => $r['document'],
+        'calendarYear' => $r['calendarYear'],
+        'item' => $r['item'],
+        'unit' => $r['unit'],
+        'quantity' => $r['quantity'],
+        'quantityKG' => $r['quantityKG'],
+        'dateAccounting' => $r['dateAccounting'],
+        'wasteHandlingCode' => $hcSrc,
+        'wasteCodeNomenc' => $r['wasteCodeNomenc'],
+        'wasteCodeText' => $r['wasteCodeText'],
+
+        'personType' => 0,
+
+        'wasteCodeKind' => 1,
+      ];
+
+      // -- move OUT
+      $newRow ['dir'] = self::rowDirOut;
+      $moveRows[] = $newRow;
+      if (!$this->onlyCreateData)
+        $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $newRow);
+
+      // -- move IN
+      $newRow ['dir'] = self::rowDirIn;
+      $newRow ['wasteHandlingCode'] = $hcDst;
+      $newRow ['wasteCodeNomenc'] = $r['wasteCodeNomencMove'];
+      $newRow ['wasteCodeText'] = $r['wasteCodeTextMove'];
+      $moveRows[] = $newRow;
+      if (!$this->onlyCreateData)
+        $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $newRow);
+    }
+
+    if (count($moveRows))
+    {
+      $this->wasteReturnRows = array_merge($this->wasteReturnRows, $moveRows);
+      //if (!$this->onlyCreateData)
+      //  $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $moveRows);
+    }
   }
 
   public function loadCodeForMove(array $headRecData, array $rowRecData)
@@ -297,7 +450,7 @@ class WasteReturnEngine extends Utility
 //		$rowDestData ['rowItemCodesData'] = $codes;
 	}
 
-  protected function handlingCode($newRow)
+  protected function handlingCode($whcDir, $newRow, $docRecData)
   {
     foreach ($this->handlingCodes as $hcId => $hcCfg)
     {
@@ -307,7 +460,16 @@ class WasteReturnEngine extends Utility
         continue;
       if (isset($hcCfg['personType']) && $newRow['personType'] !== $hcCfg['personType'])
         continue;
-      if ($newRow['dir'] != $hcCfg['dir'])
+      if (/*$newRow['dir']*/$whcDir != $hcCfg['dir'])
+        continue;
+
+      if (isset($hcCfg['enabledWasteCodes']))
+      {
+        if (!in_array($newRow['wasteCodeText'], $hcCfg['enabledWasteCodes']))
+          continue;
+      }
+
+      if ($docRecData['docType'] === 'mnf' && !intval($hcCfg['isForMnf'] ?? 0))
         continue;
 
       return $hcId;
@@ -404,23 +566,31 @@ class WasteReturnEngine extends Utility
         $newRow ['wasteCodeText'] = $r['wasteCodeTextDst'];
         $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $newRow);
       }
+      elseif ($r['opType'] == 3)
+      { // inverturní rozdíl - přebytek [-]
+        $newRow ['dir'] = self::rowDirOut;
+        $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $newRow);
+      }
+      elseif ($r['opType'] == 4)
+      { // inverturní rozdíl - nedostatek [+]
+        $newRow ['dir'] = self::rowDirIn;
+        $this->db()->query('INSERT INTO [e10pro_reports_waste_cz_returnRows]', $newRow);
+      }
     }
   }
 
-  public function resetDocument($documentNdx)
+  public function resetDocument(array $docRecData)
   {
     $this->init();
 
-    $this->documentNdx = $documentNdx;
-
+    $this->documentNdx = $docRecData['ndx'];
     $this->tableHeads = $this->app->table ('e10doc.core.heads');
-
     $this->db()->query('DELETE FROM [e10pro_reports_waste_cz_returnRows] WHERE [document] = %i', $this->documentNdx);
 
-    $this->addAllDocuments();
+    $this->doOneDocument($docRecData);
   }
 
-  public function createDataForDocument($documentNdx)
+  public function createDataForDocument(array $docRecData)
   {
     $this->onlyCreateData = 1;
 
@@ -428,10 +598,10 @@ class WasteReturnEngine extends Utility
 
     $this->wasteReturnRows = [];
     $this->wasteReturnErrorLabels = [];
-    $this->documentNdx = $documentNdx;
+    $this->documentNdx = $docRecData['ndx'];
     $this->tableHeads = $this->app->table ('e10doc.core.heads');
 
-    $this->addAllDocuments();
+    $this->doOneDocument($docRecData);
   }
 
   public function resetWasteOp($wasteOpNdx)
@@ -441,15 +611,21 @@ class WasteReturnEngine extends Utility
     $this->addWasteOps($wasteOpNdx);
   }
 
-  public function run()
+  public function resetYear($year)
   {
     $this->init();
 
-    $this->dateBegin = $this->year.'-01-01';
-    $this->dateEnd = $this->year.'-12-31';
+    $this->dateBegin = $year.'-01-01';
+    $this->dateEnd = $year.'-12-31';
 
     $this->tableHeads = $this->app->table ('e10doc.core.heads');
+    $this->db()->query('DELETE FROM [e10doc_waster_wasteOps] WHERE [generated] = %i', 1,
+                       ' AND [date] >= %d', $this->dateBegin, ' AND [date] <= %d', $this->dateEnd);
 
-    $this->resetYear();
+    $this->db()->query('DELETE FROM [e10pro_reports_waste_cz_returnRows] WHERE [calendarYear] = %i', $year);
+
+    $this->addAllDocuments($year);
+
+    $this->addWasteOps();
   }
 }

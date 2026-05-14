@@ -1,9 +1,9 @@
 {
     "OldDesktop": {
         "client.js": {
-            "sha384": "f637d26aa0e6329808f6310e6663abfa34c80eda23b69d5a3d6fed708ffa6e38358a04195a16cba4065d2fc1d48a2a6b",
-            "integrity": "sha384-9jfSaqDmMpgI9jEOZmOr+jTIDtojtp1aPW/tcI/6bjg1igQZWhbLpAZdL8HUiipr",
-            "ver": "a8bfec9a5f3011578408ad1d2da89a16"
+            "sha384": "16df87dea8f35f36180e94ef7c84706fc82d0b602bcdcf2f8a267ef01ff28bf18cd4c0bd186652ad869771b780ac37fd",
+            "integrity": "sha384-Ft+H3qjzXzYYDpTvfIRwb8gtC2Arzc8viiZ+8B/yi/GM1MC9GGZSrYaXcbeArDf9",
+            "ver": "971f32bd7ed640d40666281f5400ffe8"
         }
     },
     "OldMobile": {
@@ -15,16 +15,16 @@
     },
     "ng": {
         "client.js": {
-            "sha384": "966f9e00504e8518c7f37c38f207f213c523eadaf85ec3b6b1894571606e3250a266d0ac2b033ca00b1999eb1c7fd627",
-            "integrity": "sha384-lm+eAFBOhRjH83w48gfyE8Uj6tr4XsO2sYlFcWBuMlCiZtCsKwM8oAsZmescf9Yn",
-            "ver": "765751594ecf4ef907666aa053b1ace3"
+            "sha384": "a29140df649737aee9b7180f23d4db5afd1437de90e1267eefecf6b50900aec95ca3883c27fda02d5ec8fc295df6fa76",
+            "integrity": "sha384-opFA32SXN67ptxgPI9TbWv0UN96Q4SZ+7+z2tQkArslco4g8J/2gLV7I/Cld9vp2",
+            "ver": "1f403a1a86e08a79074ad7a9ea2322c6"
         },
         "libs": [
             {
                 "ibSerialTerm.js": {
-                    "sha384": "f265655ef99caf9f4608dd8af6409361215d42f631e0a2d513be6746d6cc1c1a8877f0cbb3237b8f2c6ff0aee3a24908",
-                    "integrity": "sha384-8mVlXvmcr59GCN2K9kCTYSFdQvYx4KLVE75nRtbMHBqId/DLsyN7jyxv8K7jokkI",
-                    "ver": "f2d8893705b85487a7549b71fb4e29cd"
+                    "sha384": "0c2573f321ffc270502dd7c4714002ad29903214b3424f7c62d287be0bb9ba3a90b2e2c06cbc4447ad413a02393ae9ca",
+                    "integrity": "sha384-DCVz8yH/wnBQLdfEcUACrSmQMhSzQk98YtKHvgu5ujqQsuLAbLxER61BOgI5OunK",
+                    "ver": "ef0fda13f5db9d210888d35dedcea3d3"
                 }
             },
             {

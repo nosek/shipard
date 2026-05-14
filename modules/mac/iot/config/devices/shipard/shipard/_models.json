@@ -47,6 +47,11 @@
 		"iotKind": "epd", "iotSubKind": "shib"
 	},
 
+	"epd-sh-133-s6": {
+		"fn": "E-Ink 13.3 S6",
+		"iotKind": "epd", "iotSubKind": "shib"
+	},
+
 	"epd-sh-small": {
 		"fn": "E-Ink - malý",
 		"iotKind": "epd", "iotSubKind": "shib"
@@ -54,6 +59,18 @@
 
 	"eth-box-core_V1": {
 		"fn": "ETH box core",
+		"iotKind": "shib", "iotSubKind": "shib"
+	},
+	"eth-box-oli_V1": {
+		"fn": "ETH box Olimex",
+		"iotKind": "shib", "iotSubKind": "shib"
+	},
+	"sms50_V1": {
+		"fn": "SMS50 V1",
+		"iotKind": "shib", "iotSubKind": "shib"
+	},
+	"vt-btns4": {
+		"fn": "Tlačítka 4x",
 		"iotKind": "shib", "iotSubKind": "shib"
 	},
 	"uart-vm": {

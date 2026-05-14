@@ -1,7 +1,7 @@
 <?php
 
 namespace mac\iot\libs;
-use \Shipard\Base\Utility, \Shipard\Utils\Json;
+use \Shipard\Base\Utility, \Shipard\Utils\Json, \Shipard\Utils\Utils;
 
 
 /**
@@ -36,6 +36,27 @@ class ESignImageEngine extends Utility
     $this->tableESigns = $this->app()->table('mac.iot.esigns');
   }
 
+  protected function systemCss()
+  {
+    $css = '';
+
+    $css .= ":root {\n";
+    $css .= "\t--esignWidth: ".$this->displayInfo['width']."px;\n";
+    $css .= "\t--esignHeight: ".$this->displayInfo['height']."px;\n";
+    $css .= "\n";
+
+    foreach ($this->displayInfo['colors'] as $color)
+    {
+      $css .= "\t--epdColor".$color['name'].": #".$color['dither'].";\n";
+    }
+
+    $css .= "}\n";
+
+    $css .= "\n\n";
+
+    return $css;
+  }
+
   protected function createHTML()
   {
     $this->template = new \mac\iot\libs\TemplateESigns($this->app());
@@ -45,9 +66,12 @@ class ESignImageEngine extends Utility
     if ($this->esignIoTDeviceInfo)
       $this->template->data['deviceInfo'] = $this->esignIoTDeviceInfo;
 
+    $css = $this->systemCss();
+    $css .= $this->template->renderTextSafe($this->templateCss);
+
     $this->template->data['vds'] = Json::decode($this->esignRecData['vdsData']);
     $this->template->data['dataVer'] = md5(json_encode($this->esignRecData));
-    $this->template->data['cssStyle'] = $this->template->renderTextSafe($this->templateCss);
+    $this->template->data['cssStyle'] = $css;
     $this->htmlCode = $this->template->renderTextSafe($this->templateHtml);
   }
 
@@ -90,10 +114,12 @@ class ESignImageEngine extends Utility
 
     $convertedFileName = $sc->dstFullFileName.'._c.png';
 
-    $didderPalette = implode(' ', $this->displayInfo['colors']);
-    $cmd = "didder --palette \"{$didderPalette}\" -i ".$sc->dstFullFileName." -o ".$convertedFileName; // -dither FloydSteinberg -define dither:diffusion-amount=85%
-    $cmd .= " -s 0.1 bayer 16x16";
-    exec ($cmd);
+    $ic = new \mac\iot\libs\EPDImageConverter($this->app());
+    $ic->setDisplayInfo($this->displayInfo);
+    $ic->setSrcFileName($sc->dstFullFileName);
+    $ic->setConvertedFileName($convertedFileName);
+    $ic->convertImage();
+
     $urlImage = 'https://'.$this->app()->cfgItem('hostingCfg.serverDomain').'/'.$this->app->cfgItem('dsid').'/tmp/'.basename($convertedFileName);
     $this->esignImgRecData['imagePreviewURL'] = $urlImage;
 
@@ -143,6 +169,13 @@ class ESignImageEngine extends Utility
         $this->esignIoTDeviceInfo = $di->toArray();
         $this->esignIoTDeviceInfo['test'] = 'test';
         $this->esignIoTDeviceInfo['available'] = 1;
+
+        if ($this->esignIoTDeviceInfo['pwrLastChargingDT'])
+        {
+          $now = new \DateTime();
+          $this->esignIoTDeviceInfo['onBattery'] = Utils::dateDiffShort($this->esignIoTDeviceInfo['pwrLastChargingDT'], $now);
+          $this->esignIoTDeviceInfo['onBattery3'] = Utils::dateDiffShort3($this->esignIoTDeviceInfo['pwrLastChargingDT'], $now);
+        }
       }
       else
       {

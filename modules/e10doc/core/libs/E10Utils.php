@@ -46,8 +46,12 @@ class E10Utils
 	{
 		if ($srcUnit === 'kg' && $dstUnit === 'g')
 			return 1000;
+		if ($srcUnit === 'kg' && $dstUnit === 't')
+			return 0.001;
 		if ($srcUnit === 'g' && $dstUnit === 'kg')
 			return 0.001;
+		if ($srcUnit === 'g' && $dstUnit === 't')
+			return 0.000001;
 
 		return 1;
 	}
@@ -466,6 +470,13 @@ class E10Utils
 			if ($headRecData ['cashBoxDir'] == 1) // příjem
 				return 2;
 			return 1;
+		}
+
+		if ($headRecData['docType'] == 'mnf')
+		{
+			if ($rowRecData ['operation'] == 1060702) // Výdej na výrobu
+				return 1;
+			return 2;
 		}
 
 		if ($headRecData['docType'] === 'bank' || $headRecData['docType'] === 'cmnbkp')

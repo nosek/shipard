@@ -49,6 +49,173 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
       $dest['validFrom'] = $data['validFrom'];
     if (isset($data['validTo']))
       $dest['validTo'] = $data['validTo'];
+
+    $dest['natAddressGeoId'] = intval($data['natAddressGeoId'] ?? 0);
+    $dest['source'] = intval($data['source'] ?? 0);
+  }
+
+  function createAddressARES(array $data, array &$dest)
+  {
+    if ($this->app()->debug > 1)
+      echo Json::lint($data)."\n";
+
+    $dest['natAddressGeoId'] = intval($data['kodAdresnihoMista'] ?? 0);
+    $dest['standardized'] = 0;
+
+    $partlyStandardized = 0;
+
+    // -- standardized mode
+    if (isset($data['standardizaceAdresy']) && $data['standardizaceAdresy'])
+    {
+      $dest['standardized'] = 1;
+      $dest['addressPlaceNdx'] = 0;
+      $addrPlaceRec = $this->db()->query('SELECT ndx FROM [services_locAddr_addrPlaces] WHERE [addrPlaceId] = %i', $dest['natAddressGeoId'],
+                          ' AND [country] = %i', 60 /* CZ */)->fetch();
+      if ($addrPlaceRec)
+        $dest['addressPlaceNdx'] = $addrPlaceRec['ndx'];
+    }
+
+    $saLaUnit11Id = 0;
+    $saLaUnit11Ndx = 0;
+    $saLaUnit10Ndx = 0;
+
+    $dest['saStreetName'] = $data['nazevUlice'] ?? '';
+    $dest['saStreetId'] = intval($data['kodUlice'] ?? 0);
+    if ($dest['saStreetId'])
+    {
+      $streetRec = $this->db()->query('SELECT ndx FROM [services_locAddr_streets] WHERE [streetId] = %i', $dest['saStreetId'],
+                          ' AND [country] = %i', 60 /* CZ */)->fetch();
+      if ($streetRec)
+      {
+        $dest['saStreetNdx'] = $streetRec['ndx'];
+        $partlyStandardized = 1;
+      }
+    }
+
+    $dest['saCityName'] = $data['nazevObce'] ?? '';
+    $dest['saCityId'] = intval($data['kodObce'] ?? 0);
+    if ($dest['saCityId'])
+    {
+      $cityRec = $this->db()->query('SELECT ndx, laUnit11, laUnit10 FROM [services_locAddr_cities] WHERE [cityId] = %i', $dest['saCityId'],
+                          ' AND [country] = %i', 60 /* CZ */)->fetch();
+      if ($cityRec)
+      {
+        $dest['saCityNdx'] = $cityRec['ndx'];
+        $saLaUnit11Ndx = $cityRec['laUnit11'];
+        $saLaUnit10Ndx = $cityRec['laUnit10'];
+        $partlyStandardized = 1;
+      }
+    }
+
+    $dest['saCityPartName'] = $data['nazevCastiObce'] ?? '';
+    $dest['saCityPartId'] = intval($data['kodCastiObce'] ?? 0);
+    if ($dest['saCityPartId'])
+    {
+      $cityRec = $this->db()->query('SELECT ndx FROM [services_locAddr_citiesParts] WHERE [cityPartId] = %i', $dest['saCityPartId'],
+                          ' AND [country] = %i', 60 /* CZ */)->fetch();
+      if ($cityRec)
+      {
+        $dest['saCityPartNdx'] = $cityRec['ndx'];
+        $partlyStandardized = 1;
+      }
+    }
+
+    $dest['saCityPart2Name'] = $data['nazevMestskehoObvodu'] ?? $data['nazevMestskeCastiObvodu'] ?? '';
+    $dest['saCityPart2Id'] = intval($data['kodMestskeCastiObvodu'] ?? 0);
+    if ($dest['saCityPart2Id'])
+    {
+      $cityPartRec = $this->db()->query('SELECT ndx, laUnit11 FROM [services_locAddr_citiesParts] WHERE [cityPartId] = %i', $dest['saCityPart2Id'],
+                          ' AND [cityPartKind] = %i', 1, ' AND [country] = %i', 60 /* CZ */)->fetch();
+      if ($cityPartRec)
+      {
+        $dest['saCityPart2Ndx'] = $cityPartRec['ndx'];
+        if ($cityPartRec['laUnit11'])
+          $saLaUnit11Ndx = $cityPartRec['laUnit11'];
+        $partlyStandardized = 1;
+      }
+    }
+
+    $dest['saZipCodeId'] = strval($data['psc'] ?? $data['pscTxt'] ?? '');
+    $zipCodeNumber = intval($dest['saZipCodeId']);
+    if ($zipCodeNumber)
+    {
+      $zipCodeRec = $this->db()->query('SELECT ndx FROM [services_locAddr_zipCodes] WHERE [zipCodeId] = %i', $zipCodeNumber,
+                          ' AND [country] = %i', 60 /* CZ */)->fetch();
+      if ($zipCodeRec)
+      {
+        $dest['saZipCodeNdx'] = $zipCodeRec['ndx'];
+        $partlyStandardized = 1;
+      }
+    }
+
+    $houseNRTypeARES = intval($data['typCisloDomovni'] ?? 1);
+    $dest['saHouseNr1'] = 0;
+    $dest['saHouseNr2'] = 0;
+    $dest['saHouseNrLetter'] = '';
+    if ($houseNRTypeARES == 1) // číslo popisné (1)
+    {
+      $dest['saHouseNr1Type'] = 0; // číslo popisné
+      $dest['saHouseNr1'] = intval($data['cisloDomovni'] ?? 0);
+      $dest['saHouseNr2'] = intval($data['cisloOrientacni'] ?? 0);
+      $dest['saHouseNrLetter'] = strval($data['cisloOrientacniPismeno'] ?? '');
+
+    }
+    else
+    { // číslo evidenční (2)
+      $dest['saHouseNr1Type'] = 1; // číslo evidenční
+      $dest['saHouseNr1'] = intval($data['cisloDomovni'] ?? 0);
+      $dest['saHouseNr'] = strval($dest['saHouseNr1']);
+    }
+
+    $dest['saHouseNr'] = '';
+    if ($dest['saHouseNr1'] != 0)
+    {
+      //if ($dest['saHouseNr1Type'] === 1)
+      //  $dest['saHouseNr'] .= 'ev.č. ';
+      $dest['saHouseNr'] .= strval($dest['saHouseNr1']);
+      if ($dest['saHouseNr2'] != 0)
+        $dest['saHouseNr'] .= '/'.$dest['saHouseNr2'];
+      if ($dest['saHouseNrLetter'] != '')
+        $dest['saHouseNr'] .= $dest['saHouseNrLetter'];
+    }
+
+    if ($saLaUnit11Ndx)
+    {
+      $dest['saLaUnit11Ndx'] = $saLaUnit11Ndx;
+      $laUnitRec = $this->db()->query('SELECT ndx, laUnitId FROM [services_locAddr_laUnits] WHERE [ndx] = %i', $saLaUnit11Ndx,
+                          ' ANd [level] = %i', 11, ' AND [country] = %i', 60 /* CZ */)->fetch();
+      if ($laUnitRec)
+        $dest['saLaUnit11Id'] = $laUnitRec['laUnitId'];
+    }
+    if ($saLaUnit10Ndx)
+    {
+      $dest['saLaUnit10Ndx'] = $saLaUnit10Ndx;
+      $laUnitRec = $this->db()->query('SELECT ndx, laUnitId FROM [services_locAddr_laUnits] WHERE [ndx] = %i', $saLaUnit10Ndx,
+                          ' ANd [level] = %i', 10, ' AND [country] = %i', 60 /* CZ */)->fetch();
+      if ($laUnitRec)
+        $dest['saLaUnit10Id'] = $laUnitRec['laUnitId'];
+    }
+
+    if (!$dest['standardized'] && $partlyStandardized)
+      $dest['standardized'] = 2;
+
+    // -- OLD mode
+    $dest['street'] = $dest['saStreetName'] ?? '';
+    if ($dest['street'] === '')
+      $dest['street'] = $dest['saCityPartName'] ?? '';
+    $streetNumber = $dest['saHouseNr'];
+
+    if ($streetNumber !== '')
+    {
+      if ($dest['street'] !== '')
+        $dest['street'] .= ' ';
+      if ($dest['saHouseNr1Type'] === 1)
+        $dest['street'] .= 'ev.č. ';
+      $dest['street'] .= $streetNumber;
+    }
+
+    $dest['city'] = $data['saCityName'] ?? '';
+    $dest['zipcode'] = $data['psc'] ?? $data['pscTxt'] ?? '';
   }
 
   function doImport_ARES_Core()
@@ -58,8 +225,8 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
     $regData = $this->regData(self::prtCZAresCore, $this->personDataCurrent->personId);
     if (!$regData)
     {
-      if ($this->app()->debug)
-        echo "ERROR; no regs data found\n";
+      if ($this->app()->debug > 1)
+        echo "ERROR; no ARES regs data found\n";
       return;
     }
 
@@ -115,18 +282,12 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
 
         $this->personDataImport->addID(['idType' => self::idtOIDPrimary, 'id' => $oid]);
 
-        $primaryAddress = [];
-        $this->fillAddress ([
-            'addressId' => 'P'.$oid,
-            'street' => $data['sidlo']['nazevUlice'] ?? '',
-            'streetNumber' => $data['sidlo']['cisloDomovni'] ?? '',
-            'streetNumber2' => ($data['sidlo']['cisloOrientacni'] ?? '').($data['sidlo']['cisloOrientacniPismeno'] ?? ''),
-            'city' => $data['sidlo']['nazevObce'] ?? '',
-            'zipcode' => $data['sidlo']['psc'] ?? $data['sidlo']['pscTxt'] ?? '',
-          ], $primaryAddress);
-
-        $primaryAddress['type'] = 0;
-
+        $primaryAddress = [
+          'addressId' => 'P'.$oid,
+          'source' => 1,
+          'type' => 0,
+        ];
+        $this->createAddressARES($data['sidlo'], $primaryAddress);
         $this->personDataImport->addAddress($primaryAddress);
 			}
       else
@@ -186,9 +347,6 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
             continue;
           foreach ($z['provozovny'] as $provozovna)
           {
-            if ($this->app()->debug > 1)
-              echo Json::lint($provozovna)."\n";
-
             $this->doImport_ARES_RZP_Provozovna($provozovna);
           }
         }
@@ -201,24 +359,22 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
 
   protected function doImport_ARES_RZP_Provozovna($bb)
   {
-    $officeId = strval($bb['icp']);
-
-    $officeAddress = [];
-    $this->fillAddress ([
-        'addressId' => 'O'.$officeId,
-        'street' => $bb['sidloProvozovny']['nazevUlice'] ?? '',
-        'streetNumber' => $bb['sidloProvozovny']['cisloDomovni'] ?? '',
-        'streetNumber2' => $bb['sidloProvozovny']['cisloDomovni2'] ?? '', // @TODO: ???
-        'city' => $bb['sidloProvozovny']['nazevObce'] ?? '',
-        'zipcode' => $bb['sidloProvozovny']['pscTxt'] ?? '',
-        'specification' => $bb['umisteniProvozovny'] ?? '',
-        'natAddressGeoId' => $bb['sidloProvozovny']['kodAdresnihoMista'] ?? 0,
-      ], $officeAddress);
-
-    $officeAddress['type'] = 1;
+    $officeId = strval($bb['icp'] ?? '');
+    if ($officeId === '')
+    {
+      //echo "ERROR: no ICP in RZP provozovna data: ".json_encode($bb)."\n";
+      return;
+    }
+    $officeAddress = [
+      'addressId' => 'O'.$officeId,
+      'specification' => $bb['umisteniProvozovny'] ?? '',
+      'source' => 2,
+      'type' => 1, // provozovna
+    ];
+    $this->createAddressARES($bb['sidloProvozovny'], $officeAddress);
 
     if (isset($bb['icp']))
-      $officeAddress['natId'] = $bb['icp'];
+      $officeAddress['natId'] = strval($bb['icp']);
 
     if (isset($bb['platnostOd']))
       $officeAddress['validFrom'] = $bb['platnostOd'];
@@ -228,22 +384,12 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
     $this->personDataImport->addAddress($officeAddress);
   }
 
-  function doImport_ARES_RZP_OLD()
+  function doImport_ARES_ROS()
   {
-    return;
-
     if ($this->app()->debug)
-      echo "* doImport_ARES_RZP_OLD; ";
+      echo "* doImport_ARES_ROS; ";
 
-    if (!$this->useRZP)
-    {
-      if ($this->app()->debug)
-        echo "disabled\n";
-
-      return;
-    }
-
-    $regData = $this->regData(self::prtCZAresRZP, $this->personDataCurrent->personId);
+    $regData = $this->regData(self::prtCZAresROS, $this->personDataCurrent->personId);
     if (!$regData)
     {
       if ($this->app()->debug)
@@ -251,78 +397,56 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
       return;
     }
 
-    $xml = @simplexml_load_string ($regData['srcData']);
-		if (!$xml)
+    $rzpData = Json::decode($regData['srcData']);
+		if (!$rzpData)
 		{
-      echo "parse error!\n";
+      if ($this->app()->debug)
+        echo "parse ERROR!\n";
       return;
     }
 
-    $ns = $xml->getDocNamespaces();
-    $data = $xml->children($ns['are']);
-    $el = $data->children($ns['D'])->Vypis_RZP;
-		$rzpData = json_decode (json_encode($el), TRUE);
-
-    if (!isset($rzpData['Adresy']))
+    if (isset($rzpData['zaznamy']))
     {
-      //echo "invalid ARES-RZP data!\n";
-      return;
-    }
-
-    // -- primary address
-    foreach ($rzpData['Adresy'] as $addrId => $addr)
-    {
-      //$this->addAddress ($addr, $this->srcData['RZP']);
-      break;
-    }
-
-    // -- provozovny
-    foreach ($rzpData['ZI']['Z'] as $aaId => $aa)
-    {
-      if (isset($aa['PRY']['PR']['ICP']))
+      foreach ($rzpData['zaznamy'] as $zaznam)
       {
-        $this->doImport_ARES_RZP_OLD_Provozovna($aa['PRY']['PR']);
-        continue;
-      }
-      if (isset($aa['PRY']))
-      {
-        foreach ($aa['PRY'] as $bbId_1 => $bb_1)
+        if (!isset($zaznam['provozovny']))
+          continue;
+        foreach ($zaznam['provozovny'] as $provozovna)
         {
-          foreach ($bb_1 as $bbId => $bb)
-          {
-            if (!isset($bb['ICP']) || $bb['ICP'] === '')
-              continue;
-            $this->doImport_ARES_RZP_OLD_Provozovna($bb);
-          }
+          $this->doImport_ARES_ROS_Provozovna($provozovna);
         }
+
+        break; // only first record?
       }
     }
+
+    if ($this->app()->debug)
+      echo "\n";
   }
 
-  protected function doImport_ARES_RZP_OLD_Provozovna($bb)
+  protected function doImport_ARES_ROS_Provozovna($bb)
   {
-    $officeId = strval($bb['ICP']);
+    $officeId = strval($bb['icp'] ?? '');
+    if ($officeId === '')
+    {
+      //echo "ERROR: no ICP in RZP provozovna data: ".json_encode($bb)."\n";
+      return;
+    }
+    $officeAddress = [
+      'addressId' => 'O'.$officeId,
+      'specification' => $bb['umisteniProvozovny'] ?? '',
+      'source' => 4,
+      'type' => 1, // provozovna
+    ];
+    $this->createAddressARES($bb['adresaProvozovny'], $officeAddress);
 
-    $officeAddress = [];
-    $this->fillAddress ([
-        'addressId' => 'O'.$officeId,
-        'street' => $bb['AP']['NU'] ?? '',
-        'streetNumber' => $bb['AP']['CD'] ?? '',
-        'streetNumber2' => $bb['AP']['CO'] ?? '',
-        'city' => $bb['AP']['N'] ?? '',
-        'zipcode' => $bb['AP']['PSC'] ?? '',
-        'specification' => $bb['NPR'] ?? '',
-      ], $officeAddress);
+    if (isset($bb['icp']))
+      $officeAddress['natId'] = strval($bb['icp']);
 
-    $officeAddress['type'] = 1;
-
-    if (isset($bb['ICP']))
-      $officeAddress['natId'] = $bb['ICP'];
-
-    if (isset($bb['Zahajeni']))
-      $officeAddress['validFrom'] = $bb['Zahajeni'];
-    if (isset($bb['Ukonceni']))
-      $officeAddress['validTo'] = $bb['Ukonceni'];
+    if (isset($bb['datumZahajeniCinnosti']['datum']))
+      $officeAddress['validFrom'] = $bb['datumZahajeniCinnosti']['datum'];
+    if (isset($bb['datumUkonceniCinnosti']['datum']))
+      $officeAddress['validTo'] = $bb['datumUkonceniCinnosti']['datum'];
 
     $this->personDataImport->addAddress($officeAddress);
   }
@@ -361,7 +485,9 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
 
         foreach ($officesList as $p)
         {
-          $officeId = $p['IdentifikacniCisloProvozovny'];
+          $officeId = $p['IdentifikacniCisloProvozovny'] ?? '';
+          if ($officeId === '')
+            continue;
           $addressId = 'O'.$officeId;
 
           $addrParts = explode(',', $p['ZmenaAdresy']['TextAdresy']);
@@ -414,21 +540,44 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
             $dp = explode('.', $p['UkonceniCinnosti']);
             $newAddress['validTo'] = $dp[2].'-'.$dp[1].'-'.$dp[0];
           }
+          elseif (isset($p['UkonceniProvozovani']))
+          {
+            $dp = explode('.', $p['UkonceniProvozovani']);
+            $newAddress['validTo'] = $dp[2].'-'.$dp[1].'-'.$dp[0];
+          }
+
+          $newAddress['source'] = 3;
 
           $officeAddress = [];
           $this->fillAddress ($newAddress, $officeAddress);
 
-          $officeAddress['natId'] = $officeId;
+          $officeAddress['natId'] = strval($officeId);
           $officeAddress['type'] = 1;
 
           if (!isset($this->personDataImport->data['address'][$addressId]))
           {
+            //echo "\n\n###### ADDING RZP ADDRESS: ".json_encode($officeAddress)."\n";
             $this->personDataImport->addAddress($officeAddress);
           }
           else
           {
             //if ((!isset($this->personDataImport->data['address'][$addressId]) || $this->personDataImport->data['address'][$addressId]['specification'] === '' && $specification !== ''))
             $this->personDataImport->data['address'][$addressId]['specification'] = Str::upToLen($specification, 160);
+
+            if (isset($officeAddress['validTo']))
+            {
+              if (!isset($this->personDataImport->data['address'][$addressId]['validTo']))
+                $this->personDataImport->data['address'][$addressId]['validTo'] = $officeAddress['validTo'];
+              elseif ($this->personDataImport->data['address'][$addressId]['validTo'] < $officeAddress['validTo'])
+                $this->personDataImport->data['address'][$addressId]['validTo'] = $officeAddress['validTo'];
+            }
+            else
+            {
+              if (isset($this->personDataImport->data['address'][$addressId]['validTo']))
+                unset($this->personDataImport->data['address'][$addressId]['validTo']);
+            }
+
+            //echo "\n\n###### UPDATE RZP ADDRESS: ".json_encode($officeAddress)."\n";
           }
         }
       }
@@ -455,7 +604,7 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
               $this->personDataImport->data	['address'][$addressId]['type'] = 1;
               $this->personDataImport->data	['address'][$addressId]['addressId'] = $addressId;
               $this->personDataImport->data	['address'][$addressId]['country'] = 60;
-              $this->personDataImport->data	['address'][$addressId]['natId'] = $vpzItem['IdentifikacniCisloProvozovny'];
+              $this->personDataImport->data	['address'][$addressId]['natId'] = strval($vpzItem['IdentifikacniCisloProvozovny']);
               if (isset($vpzItem['ZmenaAdresy']['TextAdresy']))
                 $this->parseOneLineAddress($vpzItem['ZmenaAdresy']['TextAdresy'], $this->personDataImport->data	['address'][$addressId]);
             }
@@ -585,6 +734,41 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
       $this->personDataImport->addID(['idType' => self::idtVATPrimary, 'id' => $regVatId]);
   }
 
+  function doImport_ISDS()
+  {
+    if ($this->app()->debug)
+      echo "* doImport_ISDS; ";
+
+    $regData = $this->regData(self::prtCZISDS, $this->personDataCurrent->personId);
+    if (!$regData)
+    {
+      if ($this->app()->debug)
+        echo "ERROR: no reg data; \n";
+      return;
+    }
+
+    $isdsData = json_decode($regData['srcData'], TRUE);
+    if (!$isdsData)
+    {
+      if ($this->app()->debug)
+        echo "ERROR: parse data failed:\n".$regData."\n\n";
+      return;
+    }
+
+    if (isset($isdsData['Osoba']['ISDS']))
+    {
+      $info = ['govEBoxId' => $isdsData['Osoba']['ISDS']];
+      if ($this->app()->debug)
+        echo "ISDS ID: ".$info['govEBoxId']."\n";
+      $this->personDataImport->setCoreInfo($info);
+    }
+    else
+    {
+      if ($this->app()->debug)
+        echo "ERROR: no ISDS ID in data\n".$regData."\n\n";
+    }
+  }
+
   function clearFullName ($originalName)
 	{
 		$s = str_replace('"', '', $originalName);
@@ -664,9 +848,12 @@ class ImportPersonFromRegsCZ extends ImportPersonFromRegs
     if ($this->app()->debug)
       echo "* doImport\n";
     $this->doImport_ARES_Core();
-    $this->doImport_ARES_RZP();
-    $this->doImport_RZP();
+
+    $this->doImport_ARES_ROS();
+    //$this->doImport_ARES_RZP();
+    //$this->doImport_RZP();
     $this->doImport_VAT();
+    $this->doImport_ISDS();
   }
 
   public function saveChanges()

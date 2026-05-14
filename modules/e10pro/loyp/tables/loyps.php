@@ -30,6 +30,24 @@ class TableLoyps extends DbTable
 	public function saveConfig ()
 	{
 		$list = [];
+
+		$list[0] = [
+			'ndx' => 0,
+			'type' => 0,
+			'fn' => 'Žádný',
+			'sn' => 'Žádný',
+			'minPointsPerDoc' => 0,
+			'pointsSource' => 0,
+			'dbCounterInvoiceOut' => 0,
+			'docKindInvoiceOut' => 0,
+			'warehouse' => 0,
+			'debsAccIdInDr' => 0,
+			'debsAccIdInCr' => 0,
+			'debsAccIdOutBalanceDr' => 0,
+			'debsAccIdOutCosts' => 0,
+			'pointAccPrice' => 0,
+		];
+
 		$rows = $this->app()->db->query ('SELECT * from [e10pro_loyp_loyps] WHERE [docState] != 9800 ORDER BY [validFrom] DESC, [fullName]');
 
 		foreach ($rows as $r)
@@ -42,11 +60,12 @@ class TableLoyps extends DbTable
 				'minPointsPerDoc' => $r ['minPointsPerDoc'],
 				'pointsSource' => $r ['pointsSource'],
         'dbCounterInvoiceOut' => $r ['dbCounterInvoiceOut'],
+        'docKindInvoiceOut' => $r ['docKindInvoiceOut'],
         'warehouse' => $r ['warehouse'],
 				'debsAccIdInDr' => $r ['debsAccIdInDr'],
 				'debsAccIdInCr' => $r ['debsAccIdInCr'],
-				'debsAccIdOutDr' => $r ['debsAccIdOutDr'],
-				'debsAccIdOutCr' => $r ['debsAccIdOutCr'],
+				'debsAccIdOutBalanceDr' => $r ['debsAccIdOutBalanceDr'],
+				'debsAccIdOutCosts' => $r ['debsAccIdOutCosts'],
 				'pointAccPrice' => $r ['pointAccPrice'],
       ];
 
@@ -167,21 +186,14 @@ class FormLoyp extends TableForm
       $this->addColumnInput ('validTo');
       $this->addSeparator(self::coH4);
       $this->addColumnInput ('dbCounterInvoiceOut');
+			$this->addColumnInput ('docKindInvoiceOut');
       $this->addColumnInput ('warehouse');
 			$this->addSeparator(self::coH4);
 			$this->addColumnInput ('debsAccIdInDr');
 			$this->addColumnInput ('debsAccIdInCr');
-			$this->addColumnInput ('debsAccIdOutDr');
-			$this->addColumnInput ('debsAccIdOutCr');
+			$this->addColumnInput ('debsAccIdOutBalanceDr');
+			$this->addColumnInput ('debsAccIdOutCosts');
 			$this->addColumnInput ('pointAccPrice');
-
-			/*
-					{"id": "debsAccIdInDr", "name": "Účet Získání bodů - MD", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
-		{"id": "debsAccIdInCr", "name": "Účet Získání bodů - DAL", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
-		{"id": "debsAccIdOutDr", "name": "Účet Uplatnění bodů - MD", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
-		{"id": "debsAccIdOutCr", "name": "Účet Uplatnění bodů - DAL", "type": "string", "len": 12, "comboViewer": "combo", "comboTable": "e10doc.debs.accounts"},
-    {"id": "pointAccPrice", "name": "Částka za 1 bod", "type": "money"},
-*/
 		$this->closeForm ();
 	}
 }

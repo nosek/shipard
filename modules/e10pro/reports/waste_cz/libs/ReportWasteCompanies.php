@@ -33,7 +33,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 
     if ($this->subReportId === 'companiesIn')
     {
-      $this->addParam('switch', 'sendStatus', ['title' => 'Stav', 'switch' => ['all' => 'Vše', 'toSend' => 'Neodeslané', 'sent' => 'Odeslané'], 'radioBtn' => 1, 'defaultValue' => 'all']);
+      //$this->addParam('switch', 'sendStatus', ['title' => 'Stav', 'switch' => ['all' => 'Vše', 'toSend' => 'Neodeslané', 'sent' => 'Odeslané'], 'radioBtn' => 1, 'defaultValue' => 'all']);
     }
 
     if ($this->subReportId === 'report')
@@ -42,7 +42,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 		parent::init();
 
     if ($this->sendStatus === '')
-      $this->sendStatus = $this->reportParams ['sendStatus']['value'] ?? 'all';
+      $this->sendStatus = /*$this->reportParams ['sendStatus']['value'] ?? */ 'all';
 
     $this->showUnits = intval($this->reportParams ['showUnits']['value'] ?? '0');
 
@@ -186,7 +186,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
     array_push ($q, ' SUM([rows].quantityKG) as quantityKG,');
     array_push ($q, ' nomencItems.fullName, nomencItems.itemId,');
     array_push ($q, ' persons.fullName AS personFullName,');
-    array_push ($q, ' addrs.adrCity, addrs.adrStreet, addrs.id1, addrs.id2');
+    array_push ($q, ' addrs.adrCity, addrs.adrStreet, addrs.id1, addrs.id2, addrs.docState AS addrDocState');
 		array_push ($q, ' FROM e10pro_reports_waste_cz_returnRows AS [rows]');
     array_push ($q, ' LEFT JOIN [e10_base_nomencItems] AS nomencItems ON [rows].wasteCodeNomenc = nomencItems.ndx');
     array_push ($q, ' LEFT JOIN [e10_persons_personsContacts] AS addrs ON [rows].personOffice = addrs.ndx');
@@ -268,6 +268,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 
 
         // -- print button
+        /*
         if ($dir === WasteReturnEngine::rowDirIn)
         {
           $btn = ['type' => 'action', 'action' => 'print', 'style' => 'print', 'icon' => 'system/actionPrint', 'text' => 'Přehled',
@@ -314,7 +315,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
           ];
           $header['wasteCode'][] = $btn;
         }
-
+        */
         $header['_options']['beforeSeparator'] = 'separator';
 
         $data['HDR_'.$r['person']] = $header;
@@ -350,15 +351,20 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
           }
           if ($r['id1'] && $r['id1'] !== '')
           {
-            $data[$wcId]['id1'][] = [
-              ['text' => 'IČP: ', 'class' => ''],
-              [
+            $data[$wcId]['id1'][] = ['text' => 'IČP: ', 'class' => ''];
+              $data[$wcId]['id1'][] = [
                 'text' => $r['id1'], 'docAction' => 'edit', 'pk' => $r['personOffice'],
                 'table' => 'e10.persons.personsContacts', 'class' => '',
                 'suffix' => $r['adrStreet'].', '.$r['adrCity'],
-              ],
-            ];
+              ];
+
             $data[$wcId]['icp'] = $r['id1'];
+
+            if ($r['addrDocState'] !== 4000)
+            {
+              $data[$wcId]['id1'][0]['icon'] = 'system/iconWarning';
+              $data[$wcId]['_options']['cellClasses']['id1'] = 'e10-warning1';
+            }
           }
         }
       }
@@ -478,6 +484,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
 	public function createToolbar ()
 	{
 		$buttons = parent::createToolbar();
+    /*
     if ($this->subReportId === 'companiesIn')
     {
       $buttons[] = [
@@ -492,6 +499,7 @@ class ReportWasteCompanies extends \e10doc\core\libs\reports\GlobalReport
         'class' => 'btn-primary'
       ];
     }
+    */
 		return $buttons;
 	}
 

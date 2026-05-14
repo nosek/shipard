@@ -50,7 +50,14 @@
 				"mkt-rb2011-uias": {"title": "RB2011UiAS-IN / RB2011UiAS-RM"},
 				"mkt-rb3011-uias": {"title": "RB3011UiAS-RM"},
 				"mkt-rb4011-igs": {"title": "RB4011iGS+RM"},
-				"mkt-rb5009-upr-s-in": {"title": "RB5009UPr+S+IN"},
+				"mkt-rb5009-upr-s-in": {
+					"title": "RB5009UPr+S+IN",
+					"ports": [
+						{"kind": 5, "count": 8, "maskId": "ether"},
+						{"kind": 6, "count": 1, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 				"mkt-rb5009-ug-s-in": {"title": "RB5009UG+S+IN"},
 				"mkt-rb951-ui-2hnd": {
 					"title": "RB951Ui-2HnD",
@@ -140,8 +147,15 @@
 						{"kind": 10, "count": 1, "maskId": "mng"}
 					]
 				},
-				"mkt-xap_map": {"title": "mAP"},
-
+				"mkt-xap_map": {
+					"title": "mAP",
+					"wirelessMode": "wireless",
+					"ports": [
+						{"kind": 5, "count": 2, "maskId": "ether"},
+						{"kind": 1, "count": 1, "maskId": "wlan"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 				"mkt-xap_wap-d2": {
 					"title": "wAP ac",
 					"typeIds": ["RBwAPG-5HacD2HnD"],
@@ -270,6 +284,22 @@
 					]
 				},
 				"mkt-crs310-1g-5s-4s": {"title": "CRS310-1G-5S-4S+IN"},
+				"mkt-crs310-8g+2s+": {
+					"title": "CRS310-8G+2S+IN",
+					"ports": [
+						{"kind": 5, "count": 8, "maskId": "ether"},
+						{"kind": 6, "count": 2, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
+				"mkt-crs317-1g-16s+rm": {
+					"title": "CRS317-1G-16S+RM",
+					"ports": [
+						{"kind": 5, "count": 1, "maskId": "ether"},
+						{"kind": 6, "count": 16, "maskId": "sfp-sfpplus"},
+						{"kind": 10, "count": 1, "maskId": "mng"}
+					]
+				},
 				"mkt-crs318-16p-2s-out": {
 					"title": "CRS318-16P-2S+OUT",
 					"ports": [

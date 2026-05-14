@@ -21,8 +21,6 @@ class TablePersonsContacts extends DbTable
 
 	public function checkBeforeSave (&$recData, $ownerData = NULL)
 	{
-		parent::checkBeforeSave ($recData, $ownerData);
-
 		$recData['systemOrder'] = 99;
 		if ($recData['flagMainAddress'] ?? 0)
 			$recData['systemOrder'] = 1;
@@ -34,13 +32,45 @@ class TablePersonsContacts extends DbTable
 
 		if ($recData['flagAddress'] ?? 0)
 		{
-			$newLocHash = $this->geoCodeLocHash ($recData);
-			if ($newLocHash !== $recData['adrLocHash'])
+			if (is_string($recData['addrPlaceInReg'] ?? '') && ($recData['addrPlaceInReg'][0] ?? '') === '{')
 			{
-				$recData['adrLocHash'] = $newLocHash;
-				$recData['adrLocState'] = 0;
+				$regData = json_decode($recData['addrPlaceInReg'], TRUE);
+				$this->applyAddrPlaceInReg($recData, $regData);
+			}
+
+			$recData['addrPlaceInReg'] = 0;
+
+			if (!($recData['flagStandardized'] ?? 0))
+			{
+				$newLocHash = $this->geoCodeLocHash ($recData);
+				if ($newLocHash !== $recData['adrLocHash'])
+				{
+					$recData['adrLocHash'] = $newLocHash;
+					$recData['adrLocState'] = 0;
+				}
+			}
+
+			if ($recData['adrLocManual'] ?? 0)
+			{
+				$recData['adrLocState'] = 1;
+			}
+
+			if (!($recData['flagStandardized'] ?? 0))
+			{
+				if (isset($recData['saAdmUnit10Ndx']) && $recData['saAdmUnit10Ndx'] != 0)
+				{
+					$admUnitRecData = $this->app()->loadItem($recData['saAdmUnit10Ndx'], 'e10.world.admUnits');
+					$recData['saAdmUnit10Id'] = $admUnitRecData['admUnitId'] ?? 0;
+				}
+				if (isset($recData['saAdmUnit11Ndx']) && $recData['saAdmUnit11Ndx'] != 0)
+				{
+					$admUnitRecData = $this->app()->loadItem($recData['saAdmUnit11Ndx'], 'e10.world.admUnits');
+					$recData['saAdmUnit11Id'] = $admUnitRecData['admUnitId'] ?? 0;
+				}
 			}
 		}
+
+		parent::checkBeforeSave ($recData, $ownerData);
 	}
 
 	public function checkNewRec (&$recData)
@@ -73,6 +103,11 @@ class TablePersonsContacts extends DbTable
 			$refTitle[] = ['text' => $recData['adrCity']];
 		if ($recData['adrZipCode'] !== '')
 			$refTitle[] = ['text' => $recData['adrZipCode']];
+
+		if ($recData['id1'] !== '')
+			$refTitle[] = ['text' => ' IČP: '.$recData['id1'], 'class' => ''];
+		if ($recData['id2'] !== '')
+			$refTitle[] = ['text' => ' IČZ: '.$recData['id2'], 'class' => ''];
 
 		return $refTitle;
 	}
@@ -178,7 +213,103 @@ class TablePersonsContacts extends DbTable
 
 	public function geoCodeLocHash ($recData)
 	{
-		return md5($recData['adrStreet'].'_'.$recData['adrCity'].'_'.$recData['adrZipCode'].'_'.$recData['adrCountry']);
+		return md5(($recData['adrStreet'] ?? '').'_'.($recData['adrCity'] ?? '').'_'.($recData['adrZipCode'] ?? '').'_'.($recData['adrCountry'] ?? ''));
+	}
+
+	public function applyAddrPlaceInReg(&$recData, $regAddrPlace)
+	{
+		$recData['natAddressGeoId'] = $regAddrPlace['addrPlaceId'] ?? 0;
+		$recData['saStreetName'] = $regAddrPlace['streetFullName'] ?? '';
+		$recData['saStreetId'] = $regAddrPlace['saStreetId'] ?? 0;
+		$recData['saHouseNr1Type'] = $regAddrPlace['houseNr1Type'] ?? 0;
+		$recData['saHouseNr'] = $regAddrPlace['houseNr'] ?? '';
+		$recData['saCityPartName'] = $regAddrPlace['cityPartFullName'] ?? '';
+		$recData['saCityPartId'] = $regAddrPlace['saCityPartId'] ?? 0;
+		$recData['saCityPart2Name'] = $regAddrPlace['cityPart2FullName'] ?? '';
+		$recData['saCityPart2Id'] = $regAddrPlace['saCityPart2Id'] ?? 0;
+		$recData['saCityName'] = $regAddrPlace['cityFullName'] ?? '';
+		$recData['saCityId'] = $regAddrPlace['saCityId'] ?? 0;
+		$recData['saZipCodeId'] = $regAddrPlace['zipCodeIdName'] ?? '';
+
+		$recData['saAdmUnit10Ndx'] = $this->admUnitNdx($regAddrPlace['admUnit10Id'] ?? 0, 10);
+		$recData['saAdmUnit11Ndx'] = $this->admUnitNdx($regAddrPlace['admUnit11Id'] ?? 0, 11);
+
+		$recData['saAdmUnit10Id'] = $regAddrPlace['admUnit10Id'] ?? 0;
+		$recData['saAdmUnit11Id'] = $regAddrPlace['admUnit11Id'] ?? 0;
+
+
+		// -- 'old' columns
+		$recData['adrStreet'] = $regAddrPlace['streetFullName'] ?? '';
+		if ($recData['saHouseNr'] !== '')
+		{
+			if ($recData['adrStreet'] === '')
+			{
+				$recData['adrStreet'] = $recData['saHouseNr1Type'] == 1 ? 'č.ev. ' : 'č.p. ';
+			}
+			else
+				$recData['adrStreet'] .= ' ';
+			$recData['adrStreet'] .= $recData['saHouseNr'];
+		}
+		$recData['adrCity'] = $regAddrPlace['cityFullName'] ?? '';
+
+		$recData['adrZipCode'] = $regAddrPlace['zipCodeIdName'] ?? '';
+
+		// -- geo loc
+		$recData['adrLocLat'] = $regAddrPlace['wgs84lat'] ?? 0.0;
+		$recData['adrLocLon'] = $regAddrPlace['wgs84lng'] ?? 0.0;
+		$recData['adrLocState'] = 1;
+		$recData['adrLocHash'] = $this->geoCodeLocHash ($recData);
+		$recData['adrLocTime'] = NULL;
+	}
+
+  protected function admUnitNdx($admUnitId, $level)
+  {
+    $unit = $this->app()->db()->query('SELECT ndx FROM [e10_world_admUnits] WHERE country = %i', 60,
+                                        ' AND admUnitId = %s ', $admUnitId,
+                                        ' AND level = %i', $level)->fetch();
+    if ($unit)
+      return $unit['ndx'];
+    return 0;
+  }
+
+	public function addressTextOneLine($recData)
+	{
+		$txt = '';
+		if ($recData['adrStreet'] !== '')
+			$txt .= $recData['adrStreet'];
+		if ($recData['adrCity'] !== '')
+		{
+			if ($txt !== '')
+				$txt .= ', ';
+			$txt .= $recData['adrCity'];
+		}
+		if ($recData['adrZipCode'] !== '')
+		{
+			if ($txt !== '')
+				$txt .= ', ';
+			$txt .= $recData['adrZipCode'];
+		}
+
+		return $txt;
+	}
+
+	public function addressTextRow($recData)
+	{
+		$ap = [];
+		if ($recData['adrSpecification'] != '')
+			$ap[] = $recData['adrSpecification'];
+		if ($recData['adrStreet'] != '')
+			$ap[] = $recData['adrStreet'];
+		if ($recData['adrCity'] != '')
+			$ap[] = $recData['adrCity'];
+		if ($recData['adrZipCode'] != '')
+			$ap[] = $recData['adrZipCode'];
+
+		//$country = World::country($this->app(), $recData['adrCountry']);
+		//$ap[] = /*$country['f'].' '.*/$country['t'];
+
+		$address = implode(', ', $ap);
+		return $address;
 	}
 }
 
@@ -214,6 +345,7 @@ class ViewPersonsContactsCombo extends TableView
 		array_push ($q, ' FROM [e10_persons_personsContacts] AS [contacts]');
 		array_push ($q, ' WHERE 1');
 		array_push ($q, ' AND [contacts].[person] = %i', $this->personNdx);
+		array_push ($q, ' AND [contacts].[flagAddress] = %i', 1);
 
 		// -- fulltext
 		if ($fts != '')
@@ -277,7 +409,10 @@ class ViewPersonsContactsCombo extends TableView
       if ($item['id1'] !== '')
         $addressFlags[] = ['text' => 'IČP: '.$item['id1'], 'class' => 'label label-default'];
 
-      $listItem['t1'] = $address;
+      if ($item['id2'] !== '')
+        $addressFlags[] = ['text' => 'IČZ: '.$item['id2'], 'class' => 'label label-default'];
+
+			$listItem['t1'] = $address;
 
       if (count($addressFlags))
         $listItem['t2'] = $addressFlags;
@@ -323,40 +458,57 @@ class ViewPersonsContactsCombo extends TableView
 class FormPersonContact extends TableForm
 {
 	var $idsOptions = NULL;
+	var $useStandardizedAddress = 0;
 
 	public function renderForm ()
 	{
 		$useOfficesIds = intval($this->app()->cfgItem ('options.persons.useOfficesIds', 0));
+		$useAdmUnits11 = intval($this->app()->cfgItem ('options.persons.useAdmUnits11', 0));
+		$this->useStandardizedAddress = intval($this->app()->cfgItem ('options.persons.useStandardizedAddress', 0));
 
 		$this->loadContactIdsOptions();
 
 		$this->setFlag ('formStyle', 'e10-formStyleSimple');
 		$this->setFlag ('sidebarPos', TableForm::SIDEBAR_POS_RIGHT);
+		$this->setFlag ('sidebarWidth', '0.30');
 
 		$tabs ['tabs'][] = ['text' => 'Kontakt', 'icon' => 'formContacts'];
 		$tabs ['tabs'][] = ['text' => 'Nastavení', 'icon' => 'system/formSettings'];
+		if ($this->recData['flagStandardized'])
+			$tabs ['tabs'][] = ['text' => 'Info', 'icon' => 'system/iconMapMarker'];
+		$tabs ['tabs'][] = ['text' => 'Historie', 'icon' => 'system/formHistory'];
 
 		$this->openForm ();
 			$this->openTabs ($tabs);
 				$this->openTab ();
+					$this->addColumnInput ('flagAddress', self::coRightCheckbox);
 					$this->openRow();
-						$this->addColumnInput ('flagAddress', self::coRightCheckbox);
 						if ($this->recData['flagAddress'])
 						{
 							$this->addColumnInput ('flagMainAddress', self::coRightCheckbox);
 							$this->addColumnInput ('flagPostAddress', self::coRightCheckbox);
 							$this->addColumnInput ('flagOffice', self::coRightCheckbox);
+							if ($this->useStandardizedAddress)
+								$this->addColumnInput ('flagStandardized', self::coRightCheckbox);
 						}
 					$this->closeRow();
 					$needSep = 0;
 					if ($this->recData['flagAddress'])
 					{
-						$this->addColumnInput ('adrSpecification');
-						$this->addColumnInput ('adrStreet');
-						$this->addColumnInput ('adrCity');
-						$this->addColumnInput ('adrZipCode');
-						$this->addColumnInput ('adrCountry');
-
+						if ($this->recData['flagStandardized'])
+							$this->renderForm_addrStandardized();
+						else
+						{
+							$this->addColumnInput ('adrSpecification');
+							$this->addColumnInput ('adrStreet');
+							$this->addColumnInput ('adrCity');
+							$this->addColumnInput ('adrZipCode');
+							$this->addColumnInput ('adrCountry');
+							if ($useAdmUnits11)
+							{
+								$this->addColumnInput ('saAdmUnit11Ndx');
+							}
+						}
 						if ($useOfficesIds && $this->idsOptions && (isset($this->idsOptions['id1']) || isset($this->idsOptions['id2'])))
 						{
 							$this->addSeparator(self::coH4);
@@ -368,17 +520,7 @@ class FormPersonContact extends TableForm
 						}
 					}
 
-					$this->addSeparator(self::coH4);
-					$this->addColumnInput ('flagContact', self::coRightCheckbox);
-					if ($this->recData['flagContact'])
-					{
-						$this->addColumnInput ('contactName');
-						$this->addColumnInput ('contactRole');
-						$this->addColumnInput ('contactEmail');
-						$this->addColumnInput ('contactPhone');
-						$this->addSeparator(self::coH4);
-						$this->addList ('sendReports', '', TableForm::loAddToFormLayout);
-					}
+					$this->renderForm_contact();
 
 					$this->addSeparator(self::coH4);
 					$this->addList ('clsf', '', TableForm::loAddToFormLayout);
@@ -387,9 +529,65 @@ class FormPersonContact extends TableForm
 				$this->openTab ();
 					$this->addColumnInput ('validFrom');
 					$this->addColumnInput ('validTo');
+					$this->addSeparator(self::coH4);
+					$this->addColumnInput ('adrLocManual');
+					if ($this->recData['adrLocManual'])
+					{
+						$this->addColumnInput ('adrLocLat');
+						$this->addColumnInput ('adrLocLon');
+					}
 				$this->closeTab ();
-				$this->closeTabs ();
+				if ($this->recData['flagStandardized'])
+				{
+					$this->openTab (self::ltNone);
+						$this->addDocumentCard('e10.persons.libs.dc.DCAddress');
+					$this->closeTab();
+				}
+				$this->openTab(self::ltNone);
+					$params = ['tableid' => $this->tableId(),'recid' => $this->recData['ndx']];
+					$this->addViewerWidget('e10.base.docslog', 'e10.base.libs.ViewDocsLogDocHistory', $params);
+				$this->closeTab();
+			$this->closeTabs ();
 		$this->closeForm ();
+	}
+
+	protected function renderForm_contact()
+	{
+		$this->addSeparator(self::coH4);
+		$this->addColumnInput ('flagContact', self::coRightCheckbox);
+		if ($this->recData['flagContact'])
+		{
+			$this->addColumnInput ('contactName');
+			$this->addColumnInput ('contactRole');
+			$this->addColumnInput ('contactEmail');
+			$this->addColumnInput ('contactPhone');
+			$this->addSeparator(self::coH4);
+			$this->addList ('sendReports', '', TableForm::loAddToFormLayout);
+		}
+	}
+
+	protected function renderForm_addrStandardized()
+	{
+		$this->addSeparator(self::coH4);
+		if (!$this->readOnly)
+			$this->addColumnInput ('addrPlaceInReg', self::coFocus);
+
+		$addInputsOption = 0;
+		if ($this->recData['flagStandardized'])
+			$addInputsOption = self::coReadOnly;
+
+		$this->addColumnInput ('adrSpecification');
+		$this->addColumnInput ('saStreetName', $addInputsOption);
+		$this->addColumnInput ('saHouseNr', $addInputsOption);
+		$this->addColumnInput ('saCityPartName', $addInputsOption);
+		$this->addColumnInput ('saCityPart2Name', $addInputsOption);
+		$this->addColumnInput ('saCityName', $addInputsOption);
+		$this->addColumnInput ('saZipCodeId', $addInputsOption);
+		$this->addColumnInput ('adrCountry');
+		$this->addColumnInput ('saAdmUnit10Ndx');
+		$this->addColumnInput ('saAdmUnit11Ndx');
+//		$this->addColumnInput ('saAdmUnit10Id');
+//		$this->addColumnInput ('saAdmUnit11Id');
 	}
 
 	public function loadContactIdsOptions()

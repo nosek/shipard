@@ -229,6 +229,8 @@ class TableServers extends DbTable
 		$rows = $this->app()->db->query ("SELECT * FROM [e10_web_servers] WHERE docState != 9800 ORDER BY [order], [fullName]");
 		foreach ($rows as $r)
 		{
+			if (!$r['inProduction'])
+				continue;
 			if (!isset($webServers['e10']['web']['servers']['list'][$r['ndx']]))
 				continue;
 			$host = $r['domain'];
@@ -410,6 +412,36 @@ class TableServers extends DbTable
 		$dst[$key] = '/att/'.$image['path'].$image ['filename'];
 	}
 
+	public function createInfoForHosting(&$hostingInfo)
+	{
+		$rows = $this->app()->db->query ('SELECT * FROM [e10_web_servers] WHERE docState != 9800 ORDER BY [order], [fullName]');
+		$servers = [];
+		foreach ($rows as $r)
+		{
+			if (!$r['inProduction'] || $r['domain'] === '')
+				continue;
+
+			$s = [
+				'ndx' => $r['ndx'],
+				'domain' => $r['domain'],
+			];
+
+			if ($r['domainsRedirectHere'] !== '')
+			{
+				$rh = explode (' ', $r['domainsRedirectHere']);
+				foreach ($rh as $oneDomain)
+				{
+					$s['redirectHere'][] = trim($oneDomain);
+				}
+			}
+
+			$servers [] = $s;
+		}
+
+		if (count($servers))
+			$hostingInfo['webServers'] = $servers;
+	}
+
 	public function subColumnsInfo ($recData, $columnId)
 	{
 		$template = new \e10\TemplateCore ($this->app());
@@ -507,6 +539,10 @@ class ViewServers extends TableView
 
 		$listItem ['icon'] = $this->table->tableIcon($item);
 
+		if ($item['inProduction'])
+			$listItem['!error'] = 'e10-success';
+		else
+			$listItem['!error'] = 'e10-off';
 		return $listItem;
 	}
 
@@ -596,6 +632,8 @@ class FormServer extends TableForm
 					$this->addColumnInput('domainsRedirectHere');
 					$this->addSeparator(self::coH2);
 					$this->addList ('doclinks', '', TableForm::loAddToFormLayout);
+					$this->addSeparator(self::coH2);
+					$this->addColumnInput('inProduction');
 				$this->closeTab ();
 				$this->openTab ();
 					$this->addColumnInput ('templateNdx');

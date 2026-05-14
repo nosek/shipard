@@ -50,7 +50,7 @@ class TableDevices extends DbTable
 		parent::checkBeforeSave($recData, $ownerData);
 
 		//if (isset($recData['uid']) && $recData['uid'] === '')
-		//	$recData['uid'] = utils::createToken(20);
+		//	$recData['uid'] = utils::createToken(48);
 	}
 
 	public function createHeader ($recData, $options)
@@ -388,8 +388,6 @@ class ViewDevices extends TableView
 
 	function decorateRow (&$item)
 	{
-		$item['i2'] = ['text' => '', 'title' => 'Informace nejsou k dispozici', 'icon' => 'system/iconWarning', 'class' => 'e10-error'];
-
 		if (!isset ($this->devicesInfo [$item ['pk']]))
 			return;
 
@@ -403,27 +401,42 @@ class ViewDevices extends TableView
 			$fwlabel = ['text' => $deviceInfo ['fwVersion'], 'prefix' => 'fw', 'class' => 'label label-default'];
 			//if ($deviceInfo['devType'] != '')
 			//	$fwlabel['suffix'] = $deviceInfo['devType'];
-			$labels[] = $fwlabel;
+			//$labels[] = $fwlabel;
+			$item['t2'][] = $fwlabel;
 		}
-		if ($deviceInfo['osVersion'] != '')
-			$labels[] = ['text' => $deviceInfo ['osVersion'], 'prefix' => 'os', 'class' => 'label label-default'];
+		//if ($deviceInfo['osVersion'] != '')
+		//	$labels[] = ['text' => $deviceInfo ['osVersion'], 'prefix' => 'os', 'class' => 'label label-default'];
 
 		if ($deviceInfo['pwrBatteryLevel'] != 0 || $deviceInfo['pwrBatteryVoltage'] != 0)
 		{
 			$bl = ['text' => $deviceInfo ['pwrBatteryLevel'].'%', 'icon' => 'user/battery', 'class' => 'label label-info'];
 			if ($deviceInfo['pwrBatteryVoltage'] != 0)
-				$bl['suffix'] = $deviceInfo['pwrBatteryVoltage'].'V';
+				$bl['prefix'] = $deviceInfo['pwrBatteryVoltage'].'V';
+
+			if ($deviceInfo['pwrLastChargingDT'])
+			{
+				$bl['suffix'] = Utils::dateDiffShort($deviceInfo['pwrLastChargingDT'], $now);
+			}
+
 			$labels[] = $bl;
 		}
 
 		if ($deviceInfo['uptime'] != 0)
 		{
-			$labels[] = ['text' => Utils::secondsToTime($deviceInfo['uptime'], $deviceInfo['uptime'] < 100), 'prefix' => 'upt', 'class' => 'label label-default'];
+			//$labels[] = ['text' => Utils::secondsToTime($deviceInfo['uptime'], $deviceInfo['uptime'] < 100), 'prefix' => 'upt', 'class' => 'label label-default'];
 		}
 
 		if ($deviceInfo['signalLevel'] != 0)
 		{
-			$labels[] = ['text' => $deviceInfo['signalLevel'], 'icon' => 'user/wifi', 'class' => 'label label-default'];
+			$sl = ['text' => round(($deviceInfo['signalLevel'] / 255) * 100).'%', 'icon' => 'user/wifi', 'class' => 'label label-default'];
+			if ($deviceInfo['wifiSSID'] != '')
+			{
+				$sl['prefix'] = $deviceInfo['wifiSSID'];
+				$sl['title'] = 'Aktivní WiFi SSID: '.$deviceInfo['wifiSSID'];
+				if ($deviceInfo['wifiRSSI'] != 0)
+					$sl['title'] .= ', RSSI: '.$deviceInfo['wifiRSSI'];
+			}
+			$labels[] = $sl;
 		}
 
 		if (count($labels))
@@ -431,15 +444,24 @@ class ViewDevices extends TableView
 
 		if ($deviceInfo['dateUpdate'] != NULL)
 		{
-			$item['i2'] = ['text' => Utils::dateDiffShort($deviceInfo ['dateUpdate'], $now), 'title' => 'Poslední aktualizace: '.Utils::datef($deviceInfo ['dateUpdate'], '%k %T'), 'icon' => 'user/checkSquare', 'class' => 'label label-default'];
+			$lsl = [
+				'text' => Utils::dateDiffShort($deviceInfo ['dateUpdate'], $now),
+				'title' => 'Poslední aktualizace: '.Utils::datef($deviceInfo ['dateUpdate'], '%k %T'),
+				'icon' => 'user/checkSquare', 'class' => 'label label-default'
+			];
 			$age = Utils::dateDiffMinutes($deviceInfo ['dateUpdate'], $now);
 			if ($age < 120)
-				$item['i2']['class'] = 'label label-success';
+				$lsl['class'] = 'label label-success';
 			elseif ($age < 1440)
-				$item['i2']['class'] = 'label label-warning';
+				$lsl['class'] = 'label label-warning';
 			else
-				$item['i2']['class'] = 'label label-danger';
+				$lsl['class'] = 'label label-danger';
 		}
+		else
+		{
+			$lsl = ['text' => 'Žádné informace', 'icon' => 'user/warning', 'class' => 'label label-danger'];
+		}
+		$item['t3'][] = $lsl;
 	}
 
 	public function createPanelContentQry (TableViewPanel $panel)
@@ -528,6 +550,7 @@ class FormDevice  extends TableForm
 					$this->addColumnInput ('place');
 					$this->addColumnInput ('lan');
 					$this->addColumnInput ('nodeServer');
+					//$this->addColumnInput ('uid');
 
 					if ($useIOPorts)
 					{

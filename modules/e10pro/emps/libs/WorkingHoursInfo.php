@@ -32,7 +32,6 @@ class WorkingHoursInfo extends \Shipard\Base\Utility
     }
 
     $this->title[] = ['text' => Utils::dateFromTo($this->workingHoursRecData['validFrom'], $this->workingHoursRecData['validTo'], NULL), 'class' => 'h1 padd5'];
-
   }
 
   public function loadData()
@@ -107,5 +106,55 @@ class WorkingHoursInfo extends \Shipard\Base\Utility
 
     $this->weeklyContent['table'] = $table;
     $this->weeklyContent['header'] = $header;
+
+    $headerRecap = [
+      'wlWeeklyTotal' => '|Týdenní pracovní doba',
+      'wlWeeklyPedagogicalActivity' => '|Stanovená výše přímé pedagogické činnosti',
+      'wlWeekly1' => '|Přímá pedagogická činnost',
+      'wlWeekly2' => '|Práce související s přímou pedagogickou činností',
+      'wlWeekly' => '|Počet pracovních hodin týdně celkem',
+      'wlWeeklyRatio' => '|Výše úvazku'
+    ];
+    $rowRecap[] = [
+      'wlWeeklyTotal' => $this->workingHoursRecData['wlWeeklyTotal'],
+      'wlWeeklyPedagogicalActivity' => $this->workingHoursRecData['wlWeeklyPedagogicalActivity'],
+      'wlWeekly1' => $this->workingHoursRecData['wlWeekly1'],
+      'wlWeekly2' => $this->workingHoursRecData['wlWeekly2'],
+      'wlWeekly' => $this->workingHoursRecData['wlWeekly'],
+      'wlWeeklyRatio' => str_replace('.', ',', strval($this->workingHoursRecData['wlWeeklyRatio'])),
+    ];
+
+    $this->weeklyContent['all'] = [
+      'tables' => [
+        'recap' => [
+          'header' => $headerRecap,
+          'table' => $rowRecap
+        ],
+        'weekly' => [
+          'header' => $header,
+          'table' => $table,
+          'params' => ['tableClass' => 'default fullWidth mt1']
+        ],
+      ]
+    ];
+  }
+
+  public function searchWorkingHours($periodBegin, $periodEnd, $personNdx)
+  {
+    $q = [];
+    array_push($q, 'SELECT * FROM [e10pro_emps_workingHours]');
+    array_push($q, ' WHERE 1');
+    array_push($q, ' AND ([validFrom] IS NULL OR [validFrom] <= %d)', $periodEnd);
+    array_push($q, ' AND ([validTo] IS NULL OR [validTo] >= %d)', $periodBegin);
+    array_push($q, ' AND [person] = %i', $personNdx);
+    array_push($q, ' ORDER BY [validFrom] DESC');
+
+    $rows = $this->db()->query($q);
+    foreach ($rows as $r)
+    {
+      return $r['ndx'];
+    }
+
+    return 0;
   }
 }

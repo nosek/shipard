@@ -85,9 +85,90 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		$action->runFromCli($yearParam, $wasteCodeKindParam);
 	}
 
+	protected function createOperationalLogRecords()
+	{
+		$dateBegin = Utils::createDateTime($this->app->arg('dateBegin'));
+		if (!$dateBegin)
+		{
+			echo "ERROR: param `--dateBegin=' not found...\n";
+			return;
+		}
+
+		$dateEnd = Utils::createDateTime($this->app->arg('dateEnd'));
+		if (!$dateEnd)
+		{
+			echo "ERROR: param `--dateEnd=' not found...\n";
+			return;
+		}
+
+		if ($dateBegin > $dateEnd)
+		{
+			echo "ERROR: param `--dateBegin=' is higher than param `--dateEnd='...\n";
+			return;
+		}
+
+		$engine = new \e10pro\purchase\libs\OperationalLogEngine($this->app);
+		$engine->createLogRecords($dateBegin, $dateEnd);
+	}
+
+	protected function createOperationalLogRecordsToday()
+	{
+		$dateBegin = Utils::today();
+		$dateEnd = Utils::today();
+
+		$engine = new \e10pro\purchase\libs\OperationalLogEngine($this->app);
+		$engine->createLogRecords($dateBegin, $dateEnd);
+	}
+
+	protected function createWasteInfoIn()
+	{
+		$dateBegin = Utils::createDateTime($this->app->arg('dateBegin'));
+		if (!$dateBegin)
+		{
+			echo "ERROR: param `--dateBegin=' not found...\n";
+			return;
+		}
+
+		$dateEnd = Utils::createDateTime($this->app->arg('dateEnd'));
+		if (!$dateEnd)
+		{
+			echo "ERROR: param `--dateEnd=' not found...\n";
+			return;
+		}
+
+		if ($dateBegin > $dateEnd)
+		{
+			echo "ERROR: param `--dateBegin=' is higher than param `--dateEnd='...\n";
+			return;
+		}
+
+		$engine = new \e10pro\purchase\libs\WasteInfoInCreator($this->app);
+		$engine->createAll($dateBegin, $dateEnd);
+	}
+
+	protected function wasteOriginCityRepair()
+	{
+		$wasteReturn = intval($this->app->arg('wasteReturn'));
+		if (!$wasteReturn)
+		{
+			echo "ERROR: param `--wasteReturn=' not found...\n";
+			return;
+		}
+
+		$engine = new \e10pro\purchase\libs\WasteOriginCityRepair($this->app);
+		$engine->repairAll($wasteReturn);
+	}
+
 	public function onCronHourly ()
 	{
 		$this->generateBankOrders();
+
+		$now = new \DateTime ();
+		$hour = intval($now->format('H'));
+		if ($hour === 17)
+		{
+			$this->createOperationalLogRecordsToday();
+		}
 	}
 
 	public function onCron ($cronType)
@@ -104,6 +185,9 @@ class ModuleServices extends \E10\CLI\ModuleServices
 		switch ($actionId)
 		{
 			case 'send-waste-report-persons': return $this->sendWasteReportPersons();
+			case 'create-op-log-records': return $this->createOperationalLogRecords();
+			case 'create-waste-info-in': return $this->createWasteInfoIn();
+			case 'waste-origin-city-repair': return $this->wasteOriginCityRepair();
 		}
 
 		parent::onCliAction($actionId);
